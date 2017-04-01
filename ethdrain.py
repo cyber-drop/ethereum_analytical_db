@@ -11,21 +11,23 @@ from elasticsearch import Elasticsearch
 from elasticsearch import helpers
 
 TX_INDEX_NAME = "ethereum-transaction"
-B_INDEX_NAME  = "ethereum-block"
-HTTP_HEADERS = { "content-type": "application/json" }
+B_INDEX_NAME = "ethereum-block"
+HTTP_HEADERS = {"content-type": "application/json"}
 
 # Elasticsearch maximum number of connections
 ES_MAXSIZE = 10
 # Parallel processing semaphore size
-SEM_SIZE   = 256
+SEM_SIZE = 256
 # Size of chunk size in blocks
 CHUNK_SIZE = 500
 # Size of multiprocessing Pool processing the chunks
-POOL_SIZE  = 8
+POOL_SIZE = 8
+
 
 def chunks(l, n):
     for i in range(0, len(l), n):
         yield l[i:i + n]
+
 
 def makeRequest(id):
     return json.dumps({
@@ -34,6 +36,7 @@ def makeRequest(id):
         "params": [hex(id), True],
         "id": 1
     })
+
 
 async def fetch(url, session, blockNb, process, actions):
     try:
@@ -45,9 +48,11 @@ async def fetch(url, session, blockNb, process, actions):
     if data:
         process(data, actions)
 
+
 async def sema_fetch(sem, url, session, blockNb, fn, actions):
     async with sem:
         await fetch(url, session, blockNb, fn, actions)
+
 
 async def run(blockRange, processFn, actions):
     url = "http://localhost:8545"
@@ -64,6 +69,7 @@ async def run(blockRange, processFn, actions):
 
         await asyncio.gather(*tasks)
 
+
 def process_block(b, actions):
     b = b["result"]
 
@@ -74,14 +80,14 @@ def process_block(b, actions):
     blockNb = int(b["number"], 0)
     blockTimestamp = datetime.datetime.fromtimestamp(int(b["timestamp"], 0))
 
-    if(len(txs) > 0):
+    if (len(txs) > 0):
         for tx in txs:
             tx["blockNumber"] = int(tx["blockNumber"], 0)
             tx["blockTimestamp"] = blockTimestamp
             # Convert wei into ether
             tx["value"] = int(tx["value"], 0) / 1000000000000000000.0
             txValueSum += tx["value"]
-            actions.append({ "_index":TX_INDEX_NAME, "_type":"tx", "_id":tx["hash"], "_source":tx })
+            actions.append({"_index": TX_INDEX_NAME, "_type": "tx", "_id": tx["hash"], "_source": tx})
             txHashes.append(tx["hash"])
 
     b["transactions"] = txHashes
@@ -93,10 +99,10 @@ def process_block(b, actions):
     b["transactionCount"] = len(txHashes)
     b["txValueSum"] = txValueSum
 
-    actions.append({ "_index": B_INDEX_NAME, "_type":"b", "_id":blockNb, "_source":b })
+    actions.append({"_index": B_INDEX_NAME, "_type": "b", "_id": blockNb, "_source": b})
+
 
 def setup_process(block_range):
-
     out_actions = list()
 
     es = Elasticsearch(["localhost"], maxsize=ES_MAXSIZE)
@@ -106,7 +112,7 @@ def setup_process(block_range):
     loop.run_until_complete(future)
 
     blocks = [act for act in out_actions if act["_type"] == "b"]
-    txs    = [act for act in out_actions if act["_type"] == "tx"]
+    txs = [act for act in out_actions if act["_type"] == "tx"]
 
     try:
         helpers.bulk(es, out_actions)
@@ -114,6 +120,7 @@ def setup_process(block_range):
     except:
         for act in blocks:
             sys.stderr.write(str(act["_id"]) + "\n")
+
 
 if __name__ == "__main__":
 
@@ -130,4 +137,3 @@ if __name__ == "__main__":
 
     p = Pool(POOL_SIZE)
     p.map(setup_process, chks)
-
