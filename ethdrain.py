@@ -3,10 +3,9 @@ import sys
 import asyncio
 import json
 import datetime
-import aiohttp
 from multiprocessing import Pool
 
-from aiohttp import ClientSession
+import aiohttp
 from elasticsearch import Elasticsearch
 from elasticsearch import helpers
 
@@ -21,91 +20,89 @@ SEM_SIZE = 256
 # Size of chunk size in blocks
 CHUNK_SIZE = 500
 # Size of multiprocessing Pool processing the chunks
-POOL_SIZE = 8
+POOL_SIZE = 2
 
 
-def chunks(l, n):
-    for i in range(0, len(l), n):
-        yield l[i:i + n]
+def chunks(lst, nb_chunks):
+    for i in range(0, len(lst), nb_chunks):
+        yield lst[i:i + nb_chunks]
 
 
-def makeRequest(id):
+def make_request(block):
     return json.dumps({
         "jsonrpc": "2.0",
         "method": "eth_getBlockByNumber",
-        "params": [hex(id), True],
+        "params": [hex(block), True],
         "id": 1
     })
 
 
-async def fetch(url, session, blockNb, process, actions):
+async def fetch(url, session, block, process_fn, actions):
     try:
-        async with session.post(url, data=makeRequest(blockNb), headers=HTTP_HEADERS) as response:
-            data = await response.json()
-    except:
-        sys.stderr.write(str(blockNb) + "\n")
-
-    if data:
-        process(data, actions)
+        async with session.post(url, data=make_request(block), headers=HTTP_HEADERS) as response:
+            process_fn(await response.json(), actions)
+    except aiohttp.ClientError:
+        sys.stderr.write(str(block) + "\n")
 
 
-async def sema_fetch(sem, url, session, blockNb, fn, actions):
+async def sema_fetch(sem, url, session, block, process_fn, actions):
     async with sem:
-        await fetch(url, session, blockNb, fn, actions)
+        await fetch(url, session, block, process_fn, actions)
 
 
-async def run(blockRange, processFn, actions):
+async def run(block_range, process_fn, actions):
     url = "http://localhost:8545"
     tasks = []
     sem = asyncio.Semaphore(SEM_SIZE)
 
     # Create client session that will ensure we dont open new connection
     # per each request.
-    async with ClientSession() as session:
-        for i in blockRange:
+    async with aiohttp.ClientSession() as session:
+        for i in block_range:
             # pass Semaphore and session to every POST request
-            task = asyncio.ensure_future(sema_fetch(sem, url, session, i, processFn, actions))
+            task = asyncio.ensure_future(sema_fetch(sem, url, session, i, process_fn, actions))
             tasks.append(task)
 
         await asyncio.gather(*tasks)
 
 
-def process_block(b, actions):
-    b = b["result"]
+def process_block(block, actions):
+    block = block["result"]
 
-    txs = b["transactions"]
-    txHashes = list()
-    txValueSum = 0
+    transactions = block["transactions"]
+    tx_hashes = list()
+    tx_value_sum = 0
 
-    blockNb = int(b["number"], 0)
-    blockTimestamp = datetime.datetime.fromtimestamp(int(b["timestamp"], 0))
+    block_nb = int(block["number"], 0)
+    block_timestamp = datetime.datetime.fromtimestamp(int(block["timestamp"], 0))
 
-    if (len(txs) > 0):
-        for tx in txs:
-            tx["blockNumber"] = int(tx["blockNumber"], 0)
-            tx["blockTimestamp"] = blockTimestamp
-            # Convert wei into ether
-            tx["value"] = int(tx["value"], 0) / 1000000000000000000.0
-            txValueSum += tx["value"]
-            actions.append({"_index": TX_INDEX_NAME, "_type": "tx", "_id": tx["hash"], "_source": tx})
-            txHashes.append(tx["hash"])
+    for tx in transactions:
+        tx["blockNumber"] = int(tx["blockNumber"], 0)
+        tx["blockTimestamp"] = block_timestamp
+        # Convert wei into ether
+        tx["value"] = int(tx["value"], 0) / 1000000000000000000.0
+        tx_value_sum += tx["value"]
+        actions.append(
+            {"_index": TX_INDEX_NAME, "_type": "tx", "_id": tx["hash"], "_source": tx}
+        )
+        tx_hashes.append(tx["hash"])
 
-    b["transactions"] = txHashes
-    b["number"] = blockNb
-    b["timestamp"] = blockTimestamp
-    b["gasLimit"] = int(b["gasLimit"], 0)
-    b["gasUsed"] = int(b["gasUsed"], 0)
-    b["size"] = int(b["size"], 0)
-    b["transactionCount"] = len(txHashes)
-    b["txValueSum"] = txValueSum
+    block["transactions"] = tx_hashes
+    block["number"] = block_nb
+    block["timestamp"] = block_timestamp
+    block["gasLimit"] = int(block["gasLimit"], 0)
+    block["gasUsed"] = int(block["gasUsed"], 0)
+    block["size"] = int(block["size"], 0)
+    block["transactionCount"] = len(tx_hashes)
+    block["txValueSum"] = tx_value_sum
 
-    actions.append({"_index": B_INDEX_NAME, "_type": "b", "_id": blockNb, "_source": b})
+    actions.append({"_index": B_INDEX_NAME, "_type": "b", "_id": block_nb, "_source": block})
 
 
 def setup_process(block_range):
     out_actions = list()
 
-    es = Elasticsearch(["localhost"], maxsize=ES_MAXSIZE)
+    elasticsearch = Elasticsearch(["localhost"], maxsize=ES_MAXSIZE)
 
     loop = asyncio.get_event_loop()
     future = asyncio.ensure_future(run(block_range, process_block, out_actions))
@@ -115,9 +112,11 @@ def setup_process(block_range):
     txs = [act for act in out_actions if act["_type"] == "tx"]
 
     try:
-        helpers.bulk(es, out_actions)
-        print("#{}: ({}b, {}tx)".format(max([int(b["_id"]) for b in blocks]), len(blocks), len(txs)))
-    except:
+        helpers.bulk(elasticsearch, out_actions)
+        print("#{}: ({}b, {}tx)".format(
+            max([int(b["_id"]) for b in blocks]), len(blocks), len(txs)
+        ))
+    except helpers.BulkIndexError:
         for act in blocks:
             sys.stderr.write(str(act["_id"]) + "\n")
 
@@ -126,14 +125,14 @@ if __name__ == "__main__":
 
     if len(sys.argv) == 2:
         with open(sys.argv[1]) as f:
-            content = f.readlines()
-            blockRange = [int(x) for x in content if len(x.strip()) > 0 and len(x.strip()) <= 8]
+            CONTENT = f.readlines()
+            BLOCK_RANGE = [int(x) for x in CONTENT if x.strip() and len(x.strip()) <= 8]
     elif len(sys.argv) == 3:
-        blockRange = range(int(sys.argv[1]), int(sys.argv[2]))
+        BLOCK_RANGE = range(int(sys.argv[1]), int(sys.argv[2]))
     else:
         sys.exit("Usage: ethdrain.py <block start> <block end> OR <block list file>")
 
-    chks = chunks(blockRange, CHUNK_SIZE)
+    CHUNKS = chunks(BLOCK_RANGE, CHUNK_SIZE)
 
-    p = Pool(POOL_SIZE)
-    p.map(setup_process, chks)
+    POOL = Pool(POOL_SIZE)
+    POOL.map(setup_process, CHUNKS)
