@@ -1,6 +1,6 @@
 # Ethdrain
 
-Python 3 script allowing to drain the Ethereum blockchain in an efficient way by connecting to a local node supporting RPC (tried with Parity).
+Python 3 script allowing to index the Ethereum blockchain in an efficient way by connecting to a local node supporting RPC (tried with Parity).
 
 I hardcoded the use of Elasticsearch but feel free to fork it to support others.
 
@@ -54,7 +54,7 @@ In case of an expected error, it will print new faulty block numbers to stderr.
 
 ## Benchmarks
 The only benchmark I have right now is this one:
-    - Draining blocks 0 to 500'000 and all related transactions took *21 minutes*~
+* Draining blocks 0 to 500'000 and all related transactions took *21 minutes*~
 
 ## Planned features
 * Indexing of addresses / contracts
