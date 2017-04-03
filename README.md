@@ -1,6 +1,6 @@
 # Ethdrain
 
-Python 3 script allowing to index the Ethereum blockchain in an efficient way by connecting to a local node supporting RPC (tried with Parity).
+Python 3 script allowing to copy and index the Ethereum blockchain in an efficient way to ElasticSearch by connecting to a local node supporting RPC (tried with Parity).
 
 I hardcoded the use of Elasticsearch but feel free to fork it to support others.
 
@@ -53,14 +53,20 @@ In case of an expected error, it will print new faulty block numbers to stderr.
 ```
 
 ## Benchmarks
-The only benchmark I have right now is this one:
-* Draining blocks 0 to 500'000 and all related transactions took *21 minutes*~
+Few benchmarks of copying blocks into ElasticSearch as well as all related transactions on an average computer (ES node is not running on the same machine):
+
+| # | start block | end block | # of blocks | time taken (in minutes) |
+|---|-------------|-----------|-------------|-------------------------|
+| 1 |           0 | 1'000'000 |   1'000'000 |                      40 |
+| 2 |   1'000'000 | 2'000'000 |   1'000'000 |                      90 |
+| 3 |   3'451'780 | 3'469'200 |      17'420 |                     5.5 |
 
 ## Planned features
 * Indexing of addresses / contracts
 
 ## To-do
 * Friendly help/doc inside the script
+* Include some unit-testing
 * Better architecture to add other databases easily
 * Document some benchmarks
 
