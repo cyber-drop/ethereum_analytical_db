@@ -20,7 +20,7 @@ SEM_SIZE = 256
 # Size of chunk size in blocks
 CHUNK_SIZE = 500
 # Size of multiprocessing Pool processing the chunks
-POOL_SIZE = 2
+POOL_SIZE = 8
 
 
 def chunks(lst, nb_chunks):
@@ -126,13 +126,17 @@ if __name__ == "__main__":
     if len(sys.argv) == 2:
         with open(sys.argv[1]) as f:
             CONTENT = f.readlines()
-            BLOCK_RANGE = [int(x) for x in CONTENT if x.strip() and len(x.strip()) <= 8]
+            BLOCKS_TO_PROCESS = [int(x) for x in CONTENT if x.strip() and len(x.strip()) <= 8]
     elif len(sys.argv) == 3:
-        BLOCK_RANGE = range(int(sys.argv[1]), int(sys.argv[2]))
+        BLOCKS_TO_PROCESS = list(range(int(sys.argv[1]), int(sys.argv[2])))
     else:
         sys.exit("Usage: ethdrain.py <block start> <block end> OR <block list file>")
 
-    CHUNKS = chunks(BLOCK_RANGE, CHUNK_SIZE)
+    CHUNKS = list(chunks(BLOCKS_TO_PROCESS, CHUNK_SIZE))
+
+    sys.stdout.write("~~Processing {} blocks split into {} chunks~~\n".format(
+        len(BLOCKS_TO_PROCESS), len(CHUNKS))
+    )
 
     POOL = Pool(POOL_SIZE)
     POOL.map(setup_process, CHUNKS)
