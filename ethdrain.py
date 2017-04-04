@@ -45,8 +45,9 @@ async def fetch(url, session, block, process_fn, actions):
     try:
         async with session.post(url, data=make_request(block), headers=HTTP_HEADERS) as response:
             process_fn(await response.json(), actions)
-    except aiohttp.ClientError:
+    except (aiohttp.ClientError, asyncio.TimeoutError) as exception:
         sys.stderr.write(str(block) + "\n")
+        sys.stdout.write("Issue with block {}:\n{}\n".format(block, exception))
 
 
 async def sema_fetch(sem, url, session, block, process_fn, actions):
@@ -114,14 +115,15 @@ def setup_process(block_range):
     blocks = [act for act in out_actions if act["_type"] == "b"]
     txs = [act for act in out_actions if act["_type"] == "tx"]
 
-    try:
-        helpers.bulk(elasticsearch, out_actions)
-        print("#{}: ({}b, {}tx)".format(
-            max([int(b["_id"]) for b in blocks]), len(blocks), len(txs)
-        ))
-    except helpers.BulkIndexError:
-        for act in blocks:
-            sys.stderr.write(str(act["_id"]) + "\n")
+    if blocks or txs:
+        try:
+            helpers.bulk(elasticsearch, out_actions)
+            print("#{}: ({}b, {}tx)".format(
+                max([int(b["_id"]) for b in blocks]), len(blocks), len(txs)
+            ))
+        except helpers.BulkIndexError:
+            for act in blocks:
+                sys.stderr.write(str(act["_id"]) + "\n")
 
 
 if __name__ == "__main__":
