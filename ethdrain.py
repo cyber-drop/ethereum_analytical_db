@@ -3,11 +3,14 @@ import sys
 import asyncio
 import json
 import datetime
+import logging
 import multiprocessing as mp
 
 import aiohttp
 from elasticsearch import Elasticsearch
 from elasticsearch import helpers
+
+logging.basicConfig(filename='error_blocks.log', level=logging.ERROR)
 
 TX_INDEX_NAME = "ethereum-transaction"
 B_INDEX_NAME = "ethereum-block"
@@ -46,8 +49,8 @@ async def fetch(url, session, block, process_fn, actions):
         async with session.post(url, data=make_request(block), headers=HTTP_HEADERS) as response:
             process_fn(await response.json(), actions)
     except (aiohttp.ClientError, asyncio.TimeoutError) as exception:
-        sys.stderr.write(str(block) + "\n")
-        sys.stdout.write("Issue with block {}:\n{}\n".format(block, exception))
+        logging.error("block: " + str(block))
+        print("Issue with block {}:\n{}\n".format(block, exception))
 
 
 async def sema_fetch(sem, url, session, block, process_fn, actions):
@@ -121,9 +124,10 @@ def setup_process(block_range):
             print("#{}: ({}b, {}tx)".format(
                 max([int(b["_id"]) for b in blocks]), len(blocks), len(txs)
             ))
-        except helpers.BulkIndexError:
+        except helpers.BulkIndexError as exception:
+            print("Issue with {} blocks:\n{}\n".format(len(blocks), exception))
             for act in blocks:
-                sys.stderr.write(str(act["_id"]) + "\n")
+                logging.error("block: " + str(act["_id"]))
 
 
 if __name__ == "__main__":
@@ -139,7 +143,7 @@ if __name__ == "__main__":
 
     CHUNKS = list(chunks(BLOCKS_TO_PROCESS, CHUNK_SIZE))
 
-    sys.stdout.write("~~Processing {} blocks split into {} chunks~~\n".format(
+    print("~~Processing {} blocks split into {} chunks~~\n".format(
         len(BLOCKS_TO_PROCESS), len(CHUNKS)
     ))
 
