@@ -53,13 +53,14 @@ In case of an expected error, it will print new faulty block numbers to stderr.
 ```
 
 ## Benchmarks
-Few benchmarks of copying blocks into ElasticSearch as well as all related transactions on an average computer (ES node is not running on the same machine):
+Few benchmarks of copying blocks into ElasticSearch as well as all related transactions on an Intel i7-6700 @ 4GHz and 32GB of RAM. The POOL\_SIZE parameter was set to 12.
 
 | # | start block | end block | # of blocks | time taken (in minutes) |
 |---|-------------|-----------|-------------|-------------------------|
-| 1 |           0 | 1'000'000 |   1'000'000 |                      40 |
-| 2 |   1'000'000 | 2'000'000 |   1'000'000 |                      90 |
-| 3 |   3'451'780 | 3'469'200 |      17'420 |                     5.5 |
+| 1 |           0 |   500'000 |     500'000 |                      16 |
+| 2 |     500'000 | 2'000'000 |   1'500'000 |                      87 |
+| 3 |   2'000'000 | 3'000'000 |   1'000'000 |                      60 |
+| 4 |   3'000'000 | 3'475'450 |     475'440 |                      39 |
 
 ## Planned features
 * Indexing of addresses / contracts
@@ -68,5 +69,4 @@ Few benchmarks of copying blocks into ElasticSearch as well as all related trans
 * Friendly help/doc inside the script
 * Include some unit-testing
 * Better architecture to add other databases easily
-* Document some benchmarks
 
