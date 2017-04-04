@@ -3,7 +3,7 @@ import sys
 import asyncio
 import json
 import datetime
-from multiprocessing import Pool
+import multiprocessing as mp
 
 import aiohttp
 from elasticsearch import Elasticsearch
@@ -24,7 +24,7 @@ SEM_SIZE = 256
 # Size of chunk size in blocks
 CHUNK_SIZE = 500
 # Size of multiprocessing Pool processing the chunks
-POOL_SIZE = 8
+POOL_SIZE = mp.cpu_count() + 2
 
 
 def chunks(lst, nb_chunks):
@@ -141,5 +141,5 @@ if __name__ == "__main__":
         len(BLOCKS_TO_PROCESS), len(CHUNKS)
     ))
 
-    POOL = Pool(POOL_SIZE)
+    POOL = mp.Pool(POOL_SIZE)
     POOL.map(setup_process, CHUNKS)
