@@ -15,6 +15,10 @@ HTTP_HEADERS = {"content-type": "application/json"}
 
 # Elasticsearch maximum number of connections
 ES_MAXSIZE = 10
+# Elasticsearch host
+ES_HOST = "localhost"
+# Ethereum RPC endpoint
+ETH_ENDPOINT = "http://localhost:8545"
 # Parallel processing semaphore size
 SEM_SIZE = 256
 # Size of chunk size in blocks
@@ -51,7 +55,6 @@ async def sema_fetch(sem, url, session, block, process_fn, actions):
 
 
 async def run(block_range, process_fn, actions):
-    url = "http://localhost:8545"
     tasks = []
     sem = asyncio.Semaphore(SEM_SIZE)
 
@@ -60,7 +63,7 @@ async def run(block_range, process_fn, actions):
     async with aiohttp.ClientSession() as session:
         for i in block_range:
             # pass Semaphore and session to every POST request
-            task = asyncio.ensure_future(sema_fetch(sem, url, session, i, process_fn, actions))
+            task = asyncio.ensure_future(sema_fetch(sem, ETH_ENDPOINT, session, i, process_fn, actions))
             tasks.append(task)
 
         await asyncio.gather(*tasks)
@@ -102,7 +105,7 @@ def process_block(block, actions):
 def setup_process(block_range):
     out_actions = list()
 
-    elasticsearch = Elasticsearch(["localhost"], maxsize=ES_MAXSIZE)
+    elasticsearch = Elasticsearch([ES_HOST], maxsize=ES_MAXSIZE)
 
     loop = asyncio.get_event_loop()
     future = asyncio.ensure_future(run(block_range, process_block, out_actions))
@@ -135,8 +138,8 @@ if __name__ == "__main__":
     CHUNKS = list(chunks(BLOCKS_TO_PROCESS, CHUNK_SIZE))
 
     sys.stdout.write("~~Processing {} blocks split into {} chunks~~\n".format(
-        len(BLOCKS_TO_PROCESS), len(CHUNKS))
-    )
+        len(BLOCKS_TO_PROCESS), len(CHUNKS)
+    ))
 
     POOL = Pool(POOL_SIZE)
     POOL.map(setup_process, CHUNKS)
