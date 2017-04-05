@@ -107,10 +107,10 @@ def process_block(block, actions):
     actions.append({"_index": B_INDEX_NAME, "_type": "b", "_id": block_nb, "_source": block})
 
 
-def setup_process(block_range, es_url=ES_URL, es_maxsize=ES_MAXSIZE):
+def setup_process(block_range):
     out_actions = list()
 
-    elasticsearch = Elasticsearch([es_url], maxsize=es_maxsize)
+    elasticsearch = Elasticsearch([ES_URL], maxsize=ES_MAXSIZE)
 
     loop = asyncio.get_event_loop()
     future = asyncio.ensure_future(run(block_range, process_block, out_actions))
@@ -166,13 +166,15 @@ if __name__ == "__main__":
             block_list = [int(x) for x in CONTENT if x.strip() and len(x.strip()) <= 8]
     else:
         block_list = list(range(int(args.start), int(args.end)))
+        
+    ES_MAXSIZE = int(args.esmaxsize)
+    ES_URL = args.esurl
 
-    esmaxsize = int(args.esmaxsize)
-    chunks_arr = list(chunks(block_list, esmaxsize))
+    chunks_arr = list(chunks(block_list, CHUNK_SIZE))
 
     print("~~Processing {} blocks split into {} chunks~~\n".format(
         len(block_list), len(chunks_arr)
     ))
 
     POOL = mp.Pool(POOL_SIZE)
-    POOL.map(setup_process(block_list, args.esurl, esmaxsize), chunks_arr)
+    POOL.map(setup_process, chunks_arr)
