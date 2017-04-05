@@ -37,19 +37,27 @@ CHUNK_SIZE = 500
 POOL_SIZE  = 8
 ```
 
-## Use
-You can use it either with one parameter, a list of block numbers (separated by a new line), or with two integers representing a range.
-In case of an expected error, it will print new faulty block numbers to stderr.
-
+## Usage
 ```bash
-# Simple range
-> ./ethdrain.py <start_block_nb> <end_block_nb>
+> ./ethdrain.py -h                             
+usage: ethdrain.py [-h] [-f FILE] [-u ESURL] [-m ESMAXSIZE] [-r ETHRPCURL]
+                   start_block end_block
 
-# Output faulty blocks to file
-> ./ethdrain.py 0 1000000
+positional arguments:
+  start_block           What block to start indexing.
+  end_block             What block to finish indexing.
 
-# Input a list of faulty block (integers, line-separated)
-> ./ethdrain.py list_of_blocks.txt
+optional arguments:
+  -h, --help            show this help message and exit
+  -f FILE, --file FILE  Use an input file, each block number on a new line.
+  -u ESURL, --esurl ESURL
+                        The elasticsearch url and port. Accepts all the same
+                        parameters needed as a normal Elasticsearch client
+                        expects.
+  -m ESMAXSIZE, --esmaxsize ESMAXSIZE
+                        The elasticsearch max chunk size.
+  -r ETHRPCURL, --ethrpcurl ETHRPCURL
+                        The Ethereum RPC node url and port.
 ```
 
 ## Benchmarks
