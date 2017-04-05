@@ -24,3 +24,4 @@ fabric.properties
 .idea/
 .python-version
 get-pip.py
+error_blocks.log
