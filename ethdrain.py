@@ -1,11 +1,12 @@
-#!/usr/bin/python3
+# python
 import sys
 import asyncio
 import json
 import datetime
-from multiprocessing import Pool
-
+import argparse
 import aiohttp
+
+from multiprocessing import Pool
 from elasticsearch import Elasticsearch
 from elasticsearch import helpers
 
@@ -15,6 +16,8 @@ HTTP_HEADERS = {"content-type": "application/json"}
 
 # Elasticsearch maximum number of connections
 ES_MAXSIZE = 10
+# Elasticsearch default url
+ES_URL = "http://localhost:9200"
 # Parallel processing semaphore size
 SEM_SIZE = 256
 # Size of chunk size in blocks
@@ -99,10 +102,10 @@ def process_block(block, actions):
     actions.append({"_index": B_INDEX_NAME, "_type": "b", "_id": block_nb, "_source": block})
 
 
-def setup_process(block_range):
+def setup_process(block_range, es_url=ES_URL, es_maxsize=ES_MAXSIZE):
     out_actions = list()
 
-    elasticsearch = Elasticsearch(["localhost"], maxsize=ES_MAXSIZE)
+    elasticsearch = Elasticsearch([es_url], maxsize=es_maxsize)
 
     loop = asyncio.get_event_loop()
     future = asyncio.ensure_future(run(block_range, process_block, out_actions))
@@ -113,30 +116,52 @@ def setup_process(block_range):
 
     try:
         helpers.bulk(elasticsearch, out_actions)
-        print("#{}: ({}b, {}tx)".format(
-            max([int(b["_id"]) for b in blocks]), len(blocks), len(txs)
-        ))
+        if len(blocks) > 0:
+            print("#{}: ({}b, {}tx)".format(
+                max([int(b["_id"]) for b in blocks]), len(blocks), len(txs)
+            ))
     except helpers.BulkIndexError:
         for act in blocks:
             sys.stderr.write(str(act["_id"]) + "\n")
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
 
-    if len(sys.argv) == 2:
-        with open(sys.argv[1]) as f:
-            CONTENT = f.readlines()
-            BLOCKS_TO_PROCESS = [int(x) for x in CONTENT if x.strip() and len(x.strip()) <= 8]
-    elif len(sys.argv) == 3:
-        BLOCKS_TO_PROCESS = list(range(int(sys.argv[1]), int(sys.argv[2])))
-    else:
-        sys.exit("Usage: ethdrain.py <block start> <block end> OR <block list file>")
+    parser.add_argument('-s', '--start',
+                        default='0',
+                        help='What block to start indexing'
+                        )
 
-    CHUNKS = list(chunks(BLOCKS_TO_PROCESS, CHUNK_SIZE))
+    parser.add_argument('-e', '--end',
+                        default='1000',
+                        help='What block to finish indexing'
+                        )
 
+    parser.add_argument('-u', '--esurl',
+                        default='http://localhost:9200',
+                        help='The elasticsearch url and port. Accepts all the same parameters needed as a normal Elasticsearch client expects.'
+                        )
+
+    parser.add_argument('-m', '--esmaxsize',
+                        default='10',
+                        help='The elasticsearch max chunk size'
+                        )
+
+    args = parser.parse_args()
+
+    esurl = args.esurl
+
+    esmaxsize = int(args.esmaxsize) | CHUNK_SIZE
+
+    BLOCKS_TO_PROCESS = list(range(int(args.start), int(args.end)))
+    #
+    CHUNKS = list(chunks(BLOCKS_TO_PROCESS, esmaxsize))
+    #
+    #
     sys.stdout.write("~~Processing {} blocks split into {} chunks~~\n".format(
         len(BLOCKS_TO_PROCESS), len(CHUNKS))
     )
 
     POOL = Pool(POOL_SIZE)
-    POOL.map(setup_process, CHUNKS)
+    POOL.map(setup_process(BLOCKS_TO_PROCESS, esurl, esmaxsize), CHUNKS)
