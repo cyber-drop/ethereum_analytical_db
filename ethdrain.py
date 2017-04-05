@@ -5,8 +5,9 @@ import json
 import datetime
 import logging
 import multiprocessing as mp
-
+import argparse
 import aiohttp
+
 from elasticsearch import Elasticsearch
 from elasticsearch import helpers
 
@@ -18,8 +19,8 @@ HTTP_HEADERS = {"content-type": "application/json"}
 
 # Elasticsearch maximum number of connections
 ES_MAXSIZE = 10
-# Elasticsearch host
-ES_HOST = "localhost"
+# Elasticsearch default url
+ES_URL = "http://localhost:9200"
 # Ethereum RPC endpoint
 ETH_ENDPOINT = "http://localhost:8545"
 # Parallel processing semaphore size
@@ -109,7 +110,7 @@ def process_block(block, actions):
 def setup_process(block_range):
     out_actions = list()
 
-    elasticsearch = Elasticsearch([ES_HOST], maxsize=ES_MAXSIZE)
+    elasticsearch = Elasticsearch([ES_URL], maxsize=ES_MAXSIZE)
 
     loop = asyncio.get_event_loop()
     future = asyncio.ensure_future(run(block_range, process_block, out_actions))
@@ -131,21 +132,49 @@ def setup_process(block_range):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
 
-    if len(sys.argv) == 2:
-        with open(sys.argv[1]) as f:
+    parser.add_argument('-s', '--start',
+                        default='0',
+                        help='What block to start indexing'
+                        )
+
+    parser.add_argument('-e', '--end',
+                        default='1000',
+                        help='What block to finish indexing'
+                        )
+
+    parser.add_argument('-f', '--file',
+                        default=None,
+                        help="Use an input file"
+                        )
+    parser.add_argument('-u', '--esurl',
+                        default='http://localhost:9200',
+                        help='The elasticsearch url and port. Accepts all the same parameters needed as a normal Elasticsearch client expects.'
+                        )
+
+    parser.add_argument('-m', '--esmaxsize',
+                        default='10',
+                        help='The elasticsearch max chunk size'
+                        )
+
+    args = parser.parse_args()
+
+    if (args.file):
+        with open(args.file) as f:
             CONTENT = f.readlines()
-            BLOCKS_TO_PROCESS = [int(x) for x in CONTENT if x.strip() and len(x.strip()) <= 8]
-    elif len(sys.argv) == 3:
-        BLOCKS_TO_PROCESS = list(range(int(sys.argv[1]), int(sys.argv[2])))
+            block_list = [int(x) for x in CONTENT if x.strip() and len(x.strip()) <= 8]
     else:
-        sys.exit("Usage: ethdrain.py <block start> <block end> OR <block list file>")
+        block_list = list(range(int(args.start), int(args.end)))
+        
+    ES_MAXSIZE = int(args.esmaxsize)
+    ES_URL = args.esurl
 
-    CHUNKS = list(chunks(BLOCKS_TO_PROCESS, CHUNK_SIZE))
+    chunks_arr = list(chunks(block_list, CHUNK_SIZE))
 
     print("~~Processing {} blocks split into {} chunks~~\n".format(
-        len(BLOCKS_TO_PROCESS), len(CHUNKS)
+        len(block_list), len(chunks_arr)
     ))
 
     POOL = mp.Pool(POOL_SIZE)
-    POOL.map(setup_process, CHUNKS)
+    POOL.map(setup_process, chunks_arr)
