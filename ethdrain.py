@@ -144,6 +144,10 @@ if __name__ == "__main__":
                         help='What block to finish indexing'
                         )
 
+    parser.add_argument('-f', '--file',
+                        default=None,
+                        help="Use an input file"
+                        )
     parser.add_argument('-u', '--esurl',
                         default='http://localhost:9200',
                         help='The elasticsearch url and port. Accepts all the same parameters needed as a normal Elasticsearch client expects.'
@@ -156,18 +160,19 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    esurl = args.esurl
+    if (args.file):
+        with open(args.file) as f:
+            CONTENT = f.readlines()
+            block_list = [int(x) for x in CONTENT if x.strip() and len(x.strip()) <= 8]
+    else:
+        block_list = list(range(int(args.start), int(args.end)))
 
-    esmaxsize = int(args.esmaxsize) | CHUNK_SIZE
+    esmaxsize = int(args.esmaxsize)
+    chunks_arr = list(chunks(block_list, esmaxsize))
 
-    BLOCKS_TO_PROCESS = list(range(int(args.start), int(args.end)))
-    #
-    CHUNKS = list(chunks(BLOCKS_TO_PROCESS, esmaxsize))
-    #
-    #
     print("~~Processing {} blocks split into {} chunks~~\n".format(
-        len(BLOCKS_TO_PROCESS), len(CHUNKS)
+        len(block_list), len(chunks_arr)
     ))
 
     POOL = mp.Pool(POOL_SIZE)
-    POOL.map(setup_process, CHUNKS)
+    POOL.map(setup_process(block_list, args.esurl, esmaxsize), chunks_arr)
