@@ -46,10 +46,10 @@ In case of an expected error, it will print new faulty block numbers to stderr.
 > ./ethdrain.py <start_block_nb> <end_block_nb>
 
 # Output faulty blocks to file
-> ./ethdrain.py 0 1000000 2> error_blocks
+> ./ethdrain.py 0 1000000
 
-# Input a list of faulty block for retry
-> ./ethdrain.py error_blocks 2> new_errors
+# Input a list of faulty block (integers, line-separated)
+> ./ethdrain.py list_of_blocks.txt
 ```
 
 ## Benchmarks
