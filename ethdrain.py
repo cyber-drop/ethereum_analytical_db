@@ -1,14 +1,17 @@
-# python
+#!/usr/bin/python3
 import sys
 import asyncio
 import json
 import datetime
+import logging
+import multiprocessing as mp
 import argparse
 import aiohttp
 
-from multiprocessing import Pool
 from elasticsearch import Elasticsearch
 from elasticsearch import helpers
+
+logging.basicConfig(filename='error_blocks.log', level=logging.ERROR)
 
 TX_INDEX_NAME = "ethereum-transaction"
 B_INDEX_NAME = "ethereum-block"
@@ -18,12 +21,14 @@ HTTP_HEADERS = {"content-type": "application/json"}
 ES_MAXSIZE = 10
 # Elasticsearch default url
 ES_URL = "http://localhost:9200"
+# Ethereum RPC endpoint
+ETH_ENDPOINT = "http://localhost:8545"
 # Parallel processing semaphore size
 SEM_SIZE = 256
 # Size of chunk size in blocks
 CHUNK_SIZE = 500
 # Size of multiprocessing Pool processing the chunks
-POOL_SIZE = 8
+POOL_SIZE = mp.cpu_count() + 2
 
 
 def chunks(lst, nb_chunks):
@@ -44,8 +49,9 @@ async def fetch(url, session, block, process_fn, actions):
     try:
         async with session.post(url, data=make_request(block), headers=HTTP_HEADERS) as response:
             process_fn(await response.json(), actions)
-    except aiohttp.ClientError:
-        sys.stderr.write(str(block) + "\n")
+    except (aiohttp.ClientError, asyncio.TimeoutError) as exception:
+        logging.error("block: " + str(block))
+        print("Issue with block {}:\n{}\n".format(block, exception))
 
 
 async def sema_fetch(sem, url, session, block, process_fn, actions):
@@ -54,7 +60,6 @@ async def sema_fetch(sem, url, session, block, process_fn, actions):
 
 
 async def run(block_range, process_fn, actions):
-    url = "http://localhost:8545"
     tasks = []
     sem = asyncio.Semaphore(SEM_SIZE)
 
@@ -63,7 +68,7 @@ async def run(block_range, process_fn, actions):
     async with aiohttp.ClientSession() as session:
         for i in block_range:
             # pass Semaphore and session to every POST request
-            task = asyncio.ensure_future(sema_fetch(sem, url, session, i, process_fn, actions))
+            task = asyncio.ensure_future(sema_fetch(sem, ETH_ENDPOINT, session, i, process_fn, actions))
             tasks.append(task)
 
         await asyncio.gather(*tasks)
@@ -114,15 +119,16 @@ def setup_process(block_range, es_url=ES_URL, es_maxsize=ES_MAXSIZE):
     blocks = [act for act in out_actions if act["_type"] == "b"]
     txs = [act for act in out_actions if act["_type"] == "tx"]
 
-    try:
-        helpers.bulk(elasticsearch, out_actions)
-        if len(blocks) > 0:
+    if blocks or txs:
+        try:
+            helpers.bulk(elasticsearch, out_actions)
             print("#{}: ({}b, {}tx)".format(
                 max([int(b["_id"]) for b in blocks]), len(blocks), len(txs)
             ))
-    except helpers.BulkIndexError:
-        for act in blocks:
-            sys.stderr.write(str(act["_id"]) + "\n")
+        except helpers.BulkIndexError as exception:
+            print("Issue with {} blocks:\n{}\n".format(len(blocks), exception))
+            for act in blocks:
+                logging.error("block: " + str(act["_id"]))
 
 
 if __name__ == "__main__":
@@ -159,9 +165,9 @@ if __name__ == "__main__":
     CHUNKS = list(chunks(BLOCKS_TO_PROCESS, esmaxsize))
     #
     #
-    sys.stdout.write("~~Processing {} blocks split into {} chunks~~\n".format(
-        len(BLOCKS_TO_PROCESS), len(CHUNKS))
-    )
+    print("~~Processing {} blocks split into {} chunks~~\n".format(
+        len(BLOCKS_TO_PROCESS), len(CHUNKS)
+    ))
 
-    POOL = Pool(POOL_SIZE)
-    POOL.map(setup_process(BLOCKS_TO_PROCESS, esurl, esmaxsize), CHUNKS)
+    POOL = mp.Pool(POOL_SIZE)
+    POOL.map(setup_process, CHUNKS)
