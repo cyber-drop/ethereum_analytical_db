@@ -72,6 +72,8 @@ Few benchmarks of copying blocks into ElasticSearch as well as all related trans
 
 ## Planned features
 * Indexing of addresses / contracts
+* Automatically get the last current block (as default param)
+* Continuous sync of blocks and transactions
 
 ## To-do
 * Friendly help/doc inside the script
