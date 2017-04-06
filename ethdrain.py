@@ -109,7 +109,7 @@ def process_block(block, actions):
 def setup_process(block_range):
     out_actions = list()
 
-    elasticsearch = Elasticsearch([ES_URL], maxsize=ES_MAXSIZE)
+    elasticsearch = Elasticsearch([ES_URL], maxsize=ES_MAXSIZE, timeout=30, max_retries=10, retry_on_timeout=True)
 
     loop = asyncio.get_event_loop()
     future = asyncio.ensure_future(run(block_range, process_block, out_actions))
