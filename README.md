@@ -37,6 +37,22 @@ CHUNK_SIZE = 500
 POOL_SIZE  = 8
 ```
 
+## Basic examples
+```bash
+# Indexing blocks 0 to 5000
+> ./ethdrain.py -s 0 -e 5000
+
+# Indexing blocks 3'000'000 to the latest one
+> ./ethdrain.py -s 3000000
+
+# Starting from the latest block indexed by ES, indexing up to block 3'500'000
+> ./ethdrain.py -e 3500000
+
+# Automatic mode (could be used in a cron job).
+# Starting from the latest block indexed by ES to the latest one available on the local node
+> ./ethdrain.py
+```
+
 ## Usage
 ```bash
 >  ./ethdrain.py -h
