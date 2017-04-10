@@ -5,6 +5,7 @@ import datetime
 import logging
 import multiprocessing as mp
 import argparse
+import requests
 import aiohttp
 
 from elasticsearch import Elasticsearch
@@ -35,14 +36,20 @@ def chunks(lst, nb_chunks):
         yield lst[i:i + nb_chunks]
 
 
-def make_request(block):
+def make_request(block, use_hex=True):
     return json.dumps({
         "jsonrpc": "2.0",
         "method": "eth_getBlockByNumber",
-        "params": [hex(block), True],
+        "params": [hex(block) if use_hex else block, True],
         "id": 1
     })
 
+def post_request(url, request):
+    return requests.post(url, data=request, headers={"content-type": "application/json"}).json()
+
+def es_request(url, **kwargs):
+    elasticsearch = Elasticsearch([url])
+    return elasticsearch.search(**kwargs)
 
 async def fetch(url, session, block, process_fn, actions):
     try:
@@ -132,8 +139,11 @@ def setup_process(block_range):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('start_block', type=int, help='What block to start indexing.')
-    parser.add_argument('end_block', type=int, help='What block to finish indexing.')
+
+    parser.add_argument('-s', '--start', dest='start_block', type=int,
+                        help='What block to start indexing. If nothing is provided, the lastest block indexed in ElasticSearch will be used.')
+    parser.add_argument('-e', '--end', dest='end_block', type=int,
+                        help='What block to finish indexing. If nothing is provided, the latest one will be used.')
     parser.add_argument('-f', '--file', default=None,
                         help='Use an input file, each block number on a new line.')
     parser.add_argument('-u', '--esurl', default=ES_URL,
@@ -141,6 +151,16 @@ if __name__ == "__main__":
     parser.add_argument('-m', '--esmaxsize', default=ES_MAXSIZE, help='The elasticsearch max chunk size.')
     parser.add_argument('-r', '--ethrpcurl', default=ETH_URL, help='The Ethereum RPC node url and port.')
     args = parser.parse_args()
+
+    # Determine start block number if needed
+    if not args.start_block:
+        args.start_block = es_request(ES_URL, index=B_INDEX_NAME, size=1, sort="number:desc")["hits"]["hits"][0]["_source"]["number"]
+        print("Start block automatically set to: {}".format(args.start_block))
+
+    # Determine last block number if needed
+    if not args.end_block:
+        args.end_block = int(post_request(ETH_URL, make_request("latest", False))["result"]["number"], 0)
+        print("Last block automatically set to: {}".format(args.end_block))
 
     if args.file:
         with open(args.file) as f:

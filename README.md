@@ -39,16 +39,19 @@ POOL_SIZE  = 8
 
 ## Usage
 ```bash
-> ./ethdrain.py -h                             
-usage: ethdrain.py [-h] [-f FILE] [-u ESURL] [-m ESMAXSIZE] [-r ETHRPCURL]
-                   start_block end_block
-
-positional arguments:
-  start_block           What block to start indexing.
-  end_block             What block to finish indexing.
+>  ./ethdrain.py -h
+usage: ethdrain.py [-h] [-s START_BLOCK] [-e END_BLOCK] [-f FILE] [-u ESURL]
+                   [-m ESMAXSIZE] [-r ETHRPCURL]
 
 optional arguments:
   -h, --help            show this help message and exit
+  -s START_BLOCK, --start START_BLOCK
+                        What block to start indexing. If nothing is provided,
+                        the lastest block indexed in ElasticSearch will be
+                        used.
+  -e END_BLOCK, --end END_BLOCK
+                        What block to finish indexing. If nothing is provided,
+                        the latest one will be used.
   -f FILE, --file FILE  Use an input file, each block number on a new line.
   -u ESURL, --esurl ESURL
                         The elasticsearch url and port. Accepts all the same
