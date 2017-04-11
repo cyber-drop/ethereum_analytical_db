@@ -10,6 +10,7 @@ import aiohttp
 
 from elasticsearch import Elasticsearch
 from elasticsearch import helpers
+from elasticsearch import exceptions as es_exceptions
 
 logging.basicConfig(filename='error_blocks.log', level=logging.ERROR)
 
@@ -154,7 +155,10 @@ if __name__ == "__main__":
 
     # Determine start block number if needed
     if not args.start_block:
-        args.start_block = es_request(ES_URL, index=B_INDEX_NAME, size=1, sort="number:desc")["hits"]["hits"][0]["_source"]["number"]
+        try:
+            args.start_block = es_request(ES_URL, index=B_INDEX_NAME, size=1, sort="number:desc")["hits"]["hits"][0]["_source"]["number"]
+        except (es_exceptions.NotFoundError, es_exceptions.RequestError):
+            args.start_block = 0
         print("Start block automatically set to: {}".format(args.start_block))
 
     # Determine last block number if needed
