@@ -163,7 +163,7 @@ if __name__ == "__main__":
 
     # Determine last block number if needed
     if not args.end_block:
-        args.end_block = int(post_request(ETH_URL, make_request("latest", False))["result"]["number"], 0)
+        args.end_block = int(post_request(ETH_URL, make_request("latest", False))["result"]["number"], 0) + 1
         print("Last block automatically set to: {}".format(args.end_block))
 
     if args.file:
