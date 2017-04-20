@@ -24,4 +24,5 @@ fabric.properties
 .idea/
 .python-version
 get-pip.py
+__pycache__/
 error_blocks.log

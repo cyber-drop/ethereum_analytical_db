@@ -1,22 +1,17 @@
 #!/usr/bin/python3
 import asyncio
 import json
-import datetime
 import logging
 import multiprocessing as mp
 import argparse
 import requests
 import aiohttp
 
-from elasticsearch import Elasticsearch
-from elasticsearch import helpers
 from elasticsearch import exceptions as es_exceptions
 
-logging.basicConfig(filename='error_blocks.log', level=logging.ERROR)
+import elasticdatastore
 
-TX_INDEX_NAME = "ethereum-transaction"
-B_INDEX_NAME = "ethereum-block"
-WEI_ETH_FACTOR = 1000000000000000000.0
+logging.basicConfig(filename='error_blocks.log', level=logging.ERROR)
 
 # Elasticsearch maximum number of connections
 ES_MAXSIZE = 25
@@ -45,28 +40,26 @@ def make_request(block, use_hex=True):
         "id": 1
     })
 
-def post_request(url, request):
+def http_post_request(url, request):
     return requests.post(url, data=request, headers={"content-type": "application/json"}).json()
 
-def es_request(url, **kwargs):
-    elasticsearch = Elasticsearch([url])
-    return elasticsearch.search(**kwargs)
 
-async def fetch(url, session, block, process_fn, actions):
+async def fetch(url, session, block, process_fn):
     try:
         async with session.post(url, data=make_request(block), headers={"content-type": "application/json"}) as response:
-            process_fn(await response.json(), actions)
+            process_fn(await response.json())
+
     except (aiohttp.ClientError, asyncio.TimeoutError) as exception:
         logging.error("block: " + str(block))
         print("Issue with block {}:\n{}\n".format(block, exception))
 
 
-async def sema_fetch(sem, url, session, block, process_fn, actions):
+async def sema_fetch(sem, url, session, block, process_fn):
     async with sem:
-        await fetch(url, session, block, process_fn, actions)
+        await fetch(url, session, block, process_fn)
 
 
-async def run(block_range, process_fn, actions):
+async def run(block_range, process_fn):
     tasks = []
     sem = asyncio.Semaphore(SEM_SIZE)
 
@@ -75,74 +68,26 @@ async def run(block_range, process_fn, actions):
     async with aiohttp.ClientSession() as session:
         for i in block_range:
             # pass Semaphore and session to every POST request
-            task = asyncio.ensure_future(sema_fetch(sem, ETH_URL, session, i, process_fn, actions))
+            task = asyncio.ensure_future(sema_fetch(sem, ETH_URL, session, i, process_fn))
             tasks.append(task)
 
         await asyncio.gather(*tasks)
 
 
-def process_block(block, actions):
-    block = block["result"]
-
-    transactions = block["transactions"]
-    tx_hashes = list()
-    tx_value_sum = 0
-
-    block_nb = int(block["number"], 0)
-    block_timestamp = datetime.datetime.fromtimestamp(int(block["timestamp"], 0))
-
-    for tx in transactions:
-        tx["blockNumber"] = int(tx["blockNumber"], 0)
-        tx["blockTimestamp"] = block_timestamp
-        # Convert wei into ether
-        tx["value"] = int(tx["value"], 0) / WEI_ETH_FACTOR
-        tx_value_sum += tx["value"]
-        actions.append(
-            {"_index": TX_INDEX_NAME, "_type": "tx", "_id": tx["hash"], "_source": tx}
-        )
-        tx_hashes.append(tx["hash"])
-
-    block["transactions"] = tx_hashes
-    block["number"] = block_nb
-    block["timestamp"] = block_timestamp
-    block["gasLimit"] = int(block["gasLimit"], 0)
-    block["gasUsed"] = int(block["gasUsed"], 0)
-    block["size"] = int(block["size"], 0)
-    block["transactionCount"] = len(tx_hashes)
-    block["txValueSum"] = tx_value_sum
-
-    actions.append({"_index": B_INDEX_NAME, "_type": "b", "_id": block_nb, "_source": block})
-
-
 def setup_process(block_range):
-    out_actions = list()
-
-    elasticsearch = Elasticsearch([ES_URL], maxsize=ES_MAXSIZE, timeout=30, max_retries=10, retry_on_timeout=True)
 
     loop = asyncio.get_event_loop()
-    future = asyncio.ensure_future(run(block_range, process_block, out_actions))
+    future = asyncio.ensure_future(run(block_range, ELASTIC.extract))
     loop.run_until_complete(future)
 
-    blocks = [act for act in out_actions if act["_type"] == "b"]
-    txs = [act for act in out_actions if act["_type"] == "tx"]
-
-    if blocks or txs:
-        try:
-            helpers.bulk(elasticsearch, out_actions)
-            print("#{}: ({}b, {}tx)".format(
-                max([int(b["_id"]) for b in blocks]), len(blocks), len(txs)
-            ))
-        except helpers.BulkIndexError as exception:
-            print("Issue with {} blocks:\n{}\n".format(len(blocks), exception))
-            for act in blocks:
-                logging.error("block: " + str(act["_id"]))
+    ELASTIC.save()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-s', '--start', dest='start_block', type=int,
-                        help='What block to start indexing. If nothing is provided, the lastest block indexed in ElasticSearch will be used.')
+                        help='What block to start indexing. If nothing is provided, the latest block indexed will be used.')
     parser.add_argument('-e', '--end', dest='end_block', type=int,
                         help='What block to finish indexing. If nothing is provided, the latest one will be used.')
     parser.add_argument('-f', '--file', default=None,
@@ -153,17 +98,22 @@ if __name__ == "__main__":
     parser.add_argument('-r', '--ethrpcurl', default=ETH_URL, help='The Ethereum RPC node url and port.')
     args = parser.parse_args()
 
+    # Setup all datastores
+    ELASTIC = elasticdatastore.ElasticDatastore(ES_URL, ES_MAXSIZE)
+
     # Determine start block number if needed
     if not args.start_block:
         try:
-            args.start_block = es_request(ES_URL, index=B_INDEX_NAME, size=1, sort="number:desc")["hits"]["hits"][0]["_source"]["number"]
+            args.start_block = ELASTIC.request(index=ELASTIC.B_INDEX_NAME,
+                                               size=1, sort="number:desc")["hits"]["hits"][0]["_source"]["number"]
+
         except (es_exceptions.NotFoundError, es_exceptions.RequestError):
             args.start_block = 0
         print("Start block automatically set to: {}".format(args.start_block))
 
     # Determine last block number if needed
     if not args.end_block:
-        args.end_block = int(post_request(ETH_URL, make_request("latest", False))["result"]["number"], 0) + 1
+        args.end_block = int(http_post_request(ETH_URL, make_request("latest", False))["result"]["number"], 0) + 1
         print("Last block automatically set to: {}".format(args.end_block))
 
     if args.file:
