@@ -90,12 +90,9 @@ Few benchmarks of copying blocks into ElasticSearch as well as all related trans
 | 4 |   3'000'000 | 3'475'450 |     475'440 |                      39 |
 
 ## Planned features
+* Support of a graph database
 * Indexing of addresses / contracts
-* Automatically get the last current block (as default param)
-* Continuous sync of blocks and transactions
 
 ## To-do
 * Friendly help/doc inside the script
 * Include some unit-testing
-* Better architecture to add other databases easily
-
