@@ -8,84 +8,109 @@ import requests
 import aiohttp
 
 from elasticsearch import exceptions as es_exceptions
-
-import elasticdatastore
+from elasticdatastore import ElasticDatastore
 
 logging.basicConfig(filename='error_blocks.log', level=logging.ERROR)
 
-# Elasticsearch maximum number of connections
-ES_MAXSIZE = 25
-# Elasticsearch default url
-ES_URL = "http://localhost:9200"
-# Ethereum RPC endpoint
-ETH_URL = "http://localhost:8545"
-# Parallel processing semaphore size
-SEM_SIZE = 256
-# Size of chunk size in blocks
-CHUNK_SIZE = 250
-# Size of multiprocessing Pool processing the chunks
-POOL_SIZE = mp.cpu_count() + 2
+class Ethdrain:
+
+    # Holds the list of datastore classes
+    data_store_classes = ()
+
+    eth_url = "http://localhost:8545"
+    sem_size = 256
+
+    def __init__(self, block_range):
+        self.block_range = block_range
+        self.data_stores = list()
+
+    @classmethod
+    def load_datastore_classes(cls, *data_store_classes):
+        cls.data_store_classes = data_store_classes
+
+    @classmethod
+    def create_drain(cls, block_range):
+        inst = cls(block_range)
+        for data_class in cls.data_store_classes:
+            inst.data_stores.append(data_class())
+        inst.setup_process()
 
 
-def chunks(lst, nb_chunks):
-    for i in range(0, len(lst), nb_chunks):
-        yield lst[i:i + nb_chunks]
+    def setup_process(self):
+        loop = asyncio.get_event_loop()
+        future = asyncio.ensure_future(self.run(self.block_range))
+        loop.run_until_complete(future)
+
+        # Now that everything has been "extracted", perform the "save" action
+        for data_store in self.data_stores:
+            msg = data_store.save()
+            print("{}: {}".format(data_store.__class__.__name__, msg))
 
 
-def make_request(block, use_hex=True):
-    return json.dumps({
-        "jsonrpc": "2.0",
-        "method": "eth_getBlockByNumber",
-        "params": [hex(block) if use_hex else block, True],
-        "id": 1
-    })
+    async def fetch(self, session, block_nb):
+        try:
+            async with session.post(self.__class__.eth_url,
+                                    data=Ethdrain.make_request(block_nb),
+                                    headers={"content-type": "application/json"}) as response:
+                for data_store in self.data_stores:
+                    data_store.extract(await response.json())
 
-def http_post_request(url, request):
-    return requests.post(url, data=request, headers={"content-type": "application/json"}).json()
-
-
-async def fetch(url, session, block, process_fn):
-    try:
-        async with session.post(url, data=make_request(block), headers={"content-type": "application/json"}) as response:
-            process_fn(await response.json())
-
-    except (aiohttp.ClientError, asyncio.TimeoutError) as exception:
-        logging.error("block: " + str(block))
-        print("Issue with block {}:\n{}\n".format(block, exception))
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exception:
+            logging.error("block: " + str(block_nb))
+            print("Issue with block {}:\n{}\n".format(block_nb, exception))
 
 
-async def sema_fetch(sem, url, session, block, process_fn):
-    async with sem:
-        await fetch(url, session, block, process_fn)
+    async def sema_fetch(self, sem, session, block_nb):
+        async with sem:
+            await self.fetch(session, block_nb)
 
 
-async def run(block_range, process_fn):
-    tasks = []
-    sem = asyncio.Semaphore(SEM_SIZE)
+    async def run(self, block_range):
+        tasks = []
+        sem = asyncio.Semaphore(self.__class__.sem_size)
 
-    # Create client session that will ensure we dont open new connection
-    # per each request.
-    async with aiohttp.ClientSession() as session:
-        for i in block_range:
-            # pass Semaphore and session to every POST request
-            task = asyncio.ensure_future(sema_fetch(sem, ETH_URL, session, i, process_fn))
-            tasks.append(task)
+        # Create client session that will ensure we dont open new connection
+        # per each request.
+        async with aiohttp.ClientSession() as session:
+            for block_nb in block_range:
+                # pass Semaphore and session to every POST request
+                task = asyncio.ensure_future(self.sema_fetch(sem, session, block_nb))
+                tasks.append(task)
 
-        await asyncio.gather(*tasks)
+            await asyncio.gather(*tasks)
 
 
-def setup_process(block_range):
-
-    loop = asyncio.get_event_loop()
-    future = asyncio.ensure_future(run(block_range, ELASTIC.extract))
-    loop.run_until_complete(future)
-
-    ELASTIC.save()
+    @staticmethod
+    def make_request(block_nb, use_hex=True):
+        return json.dumps({
+            "jsonrpc": "2.0",
+            "method": "eth_getBlockByNumber",
+            "params": [hex(block_nb) if use_hex else block_nb, True],
+            "id": 1
+        })
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
 
+    def http_post_request(url, request):
+        return requests.post(url, data=request, headers={"content-type": "application/json"}).json()
+
+
+    def chunks(lst, nb_chunks=250):
+        for i in range(0, len(lst), nb_chunks):
+            yield lst[i:i + nb_chunks]
+
+
+    # Elasticsearch maximum number of connections
+    ES_MAXSIZE = 25
+    # Elasticsearch default url
+    ES_URL = "http://localhost:9200"
+    # Ethereum RPC endpoint
+    ETH_URL = "http://localhost:8545"
+    # Size of multiprocessing Pool processing the chunks
+    POOL_SIZE = mp.cpu_count() + 2
+
+    parser = argparse.ArgumentParser()
     parser.add_argument('-s', '--start', dest='start_block', type=int,
                         help='What block to start indexing. If nothing is provided, the latest block indexed will be used.')
     parser.add_argument('-e', '--end', dest='end_block', type=int,
@@ -94,18 +119,20 @@ if __name__ == "__main__":
                         help='Use an input file, each block number on a new line.')
     parser.add_argument('-u', '--esurl', default=ES_URL,
                         help='The elasticsearch url and port. Accepts all the same parameters needed as a normal Elasticsearch client expects.')
-    parser.add_argument('-m', '--esmaxsize', default=ES_MAXSIZE, help='The elasticsearch max chunk size.')
-    parser.add_argument('-r', '--ethrpcurl', default=ETH_URL, help='The Ethereum RPC node url and port.')
+    parser.add_argument('-m', '--esmaxsize', default=ES_MAXSIZE,
+                        help='The elasticsearch max chunk size.')
+    parser.add_argument('-r', '--ethrpcurl', default=ETH_URL,
+                        help='The Ethereum RPC node url and port.')
     args = parser.parse_args()
 
     # Setup all datastores
-    ELASTIC = elasticdatastore.ElasticDatastore(ES_URL, ES_MAXSIZE)
+    ElasticDatastore.config(args.esurl, args.esmaxsize)
 
     # Determine start block number if needed
     if not args.start_block:
         try:
-            args.start_block = ELASTIC.request(index=ELASTIC.B_INDEX_NAME,
-                                               size=1, sort="number:desc")["hits"]["hits"][0]["_source"]["number"]
+            args.start_block = ElasticDatastore.request(args.esurl, index=ElasticDatastore.B_INDEX_NAME,
+                                                        size=1, sort="number:desc")["hits"]["hits"][0]["_source"]["number"]
 
         except (es_exceptions.NotFoundError, es_exceptions.RequestError):
             args.start_block = 0
@@ -113,25 +140,30 @@ if __name__ == "__main__":
 
     # Determine last block number if needed
     if not args.end_block:
-        args.end_block = int(http_post_request(ETH_URL, make_request("latest", False))["result"]["number"], 0) + 1
+        args.end_block = int(http_post_request(ETH_URL,
+                                               Ethdrain.make_request("latest", False))["result"]["number"], 0) + 1
         print("Last block automatically set to: {}".format(args.end_block))
 
     if args.file:
         with open(args.file) as f:
             CONTENT = f.readlines()
-            block_list = [int(x) for x in CONTENT if x.strip() and len(x.strip()) <= 8]
+            BLOCK_LIST = [int(x) for x in CONTENT if x.strip() and len(x.strip()) <= 8]
     else:
-        block_list = list(range(int(args.start_block), int(args.end_block)))
+        BLOCK_LIST = list(range(int(args.start_block), int(args.end_block)))
 
-    ES_MAXSIZE = int(args.esmaxsize)
-    ES_URL = args.esurl
-    ETH_URL = args.ethrpcurl
+    CHUNKS_ARR = list(chunks(BLOCK_LIST))
 
-    chunks_arr = list(chunks(block_list, CHUNK_SIZE))
-
-    print("~~Processing {} blocks split into {} chunks~~\n".format(
-        len(block_list), len(chunks_arr)
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    print("~~~~~~~~~~ Ethdrain ~~~~~~~~~~")
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    print("Processing {} blocks split into {} chunks on {} processes:".format(
+        len(BLOCK_LIST), len(CHUNKS_ARR), POOL_SIZE
     ))
 
+    Ethdrain.eth_url = args.ethrpcurl
+    Ethdrain.load_datastore_classes(ElasticDatastore)
+
     POOL = mp.Pool(POOL_SIZE)
-    POOL.map(setup_process, chunks_arr)
+    POOL.map(Ethdrain.create_drain, CHUNKS_ARR)
+
+    print("\nDone!")

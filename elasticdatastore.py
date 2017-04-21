@@ -10,10 +10,15 @@ class ElasticDatastore(Datastore):
     TX_INDEX_NAME = "ethereum-transaction"
     B_INDEX_NAME = "ethereum-block"
 
-    def __init__(self, es_url, es_maxsize):
+    def __init__(self):
         super().__init__()
-        self.elastic = Elasticsearch([es_url], maxsize=es_maxsize,
+        self.elastic = Elasticsearch([self.es_url], maxsize=self.es_maxsize,
                                      timeout=30, max_retries=10, retry_on_timeout=True)
+
+    @classmethod
+    def config(cls, es_url, es_maxsize):
+        cls.es_url = es_url
+        cls.es_maxsize = es_maxsize
 
 
     def extract(self, rpc_block):
@@ -58,7 +63,9 @@ class ElasticDatastore(Datastore):
         if self.actions:
             try:
                 helpers.bulk(self.elastic, self.actions)
-                print("# saved: ({}b, {}tx)".format(nb_blocks, nb_txs))
+                return "{} blocks and {} transactions indexed".format(
+                    nb_blocks, nb_txs
+                )
 
             except helpers.BulkIndexError as exception:
                 print("Issue with {} blocks:\n{}\n".format(nb_blocks, exception))
@@ -67,5 +74,6 @@ class ElasticDatastore(Datastore):
                     logging.error("block: " + str(block["_id"]))
 
 
-    def request(self, **kwargs):
-        return self.elastic.search(**kwargs)
+    @staticmethod
+    def request(url, **kwargs):
+        return Elasticsearch([url]).search(**kwargs)
