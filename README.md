@@ -53,6 +53,13 @@ POOL_SIZE  = 8
 > ./ethdrain.py
 ```
 
+## Continuous sync
+In order to perform continuous sync of the blockchain, you can run the script without any parameters and use the `watch` command:
+```bash
+# Will index the missing block in elastic search every 10 seconds
+watch -n 10 ./ethdrain.py
+```
+
 ## Usage
 ```bash
 >  ./ethdrain.py -h
