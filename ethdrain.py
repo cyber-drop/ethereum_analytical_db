@@ -165,5 +165,3 @@ if __name__ == "__main__":
 
     POOL = mp.Pool(POOL_SIZE)
     POOL.map(Ethdrain.create_drain, CHUNKS_ARR)
-
-    print("\nDone!")
