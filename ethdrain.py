@@ -29,7 +29,11 @@ class Ethdrain:
         cls.data_store_classes = data_store_classes
 
     @classmethod
-    def create_drain(cls, block_range):
+    def launch(cls, block_range):
+        """
+        This class method will instanciate Ethdrain classes (one per process)
+        and then instanciate and attach every datastore available to each on them
+        """
         inst = cls(block_range)
         for data_class in cls.data_store_classes:
             inst.data_stores.append(data_class())
@@ -164,4 +168,4 @@ if __name__ == "__main__":
     Ethdrain.load_datastore_classes(ElasticDatastore)
 
     POOL = mp.Pool(POOL_SIZE)
-    POOL.map(Ethdrain.create_drain, CHUNKS_ARR)
+    POOL.map(Ethdrain.launch, CHUNKS_ARR)
