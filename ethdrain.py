@@ -114,6 +114,8 @@ if __name__ == "__main__":
     # Size of multiprocessing Pool processing the chunks
     POOL_SIZE = mp.cpu_count() + 2
 
+    BLOCK_WAIT = 10
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', '--start', dest='start_block', type=int,
                         help='What block to start indexing. If nothing is provided, the latest block indexed will be used.')
@@ -145,7 +147,7 @@ if __name__ == "__main__":
     # Determine last block number if needed
     if not args.end_block:
         args.end_block = int(http_post_request(ETH_URL,
-                                               Ethdrain.make_request("latest", False))["result"]["number"], 0) + 1
+                                               Ethdrain.make_request("latest", False))["result"]["number"], 0) - BLOCK_WAIT
         print("Last block automatically set to: {}".format(args.end_block))
 
     if args.file:
