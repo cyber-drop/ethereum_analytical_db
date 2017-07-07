@@ -32,7 +32,7 @@ class ElasticDatastore(Datastore):
         block_timestamp = datetime.datetime.fromtimestamp(int(block["timestamp"], 0))
 
         for tx in transactions:
-            tx["blockNumber"] = int(tx["blockNumber"], 0)
+            tx["blockNumber"] = block_nb
             tx["blockTimestamp"] = block_timestamp
             # Convert wei into ether
             tx["value"] = int(tx["value"], 0) / self.WEI_ETH_FACTOR
