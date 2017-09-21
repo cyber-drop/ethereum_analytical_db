@@ -9,6 +9,7 @@ class ElasticDatastore(Datastore):
 
     TX_INDEX_NAME = "ethereum-transaction"
     B_INDEX_NAME = "ethereum-block"
+    DELTA_BLOCKS = 100000
 
     def __init__(self):
         super().__init__()
@@ -75,5 +76,77 @@ class ElasticDatastore(Datastore):
 
 
     @staticmethod
-    def request(url, **kwargs):
+    def request_search(url, **kwargs):
         return Elasticsearch([url]).search(**kwargs)
+
+    @staticmethod
+    def request_count(url, **kwargs):
+        return Elasticsearch([url]).count(**kwargs)
+
+    @staticmethod
+    def request_delete(url, **kwargs):
+        return Elasticsearch([url]).delete_by_query(**kwargs)
+
+    @staticmethod
+    def find_start_block(url):
+        max_block_number_in_table = ElasticDatastore.request_search(url,
+                                                                    index=ElasticDatastore.B_INDEX_NAME,
+                                                                    doc_type='b',
+                                                                    size=0,
+                                                                    body={"aggs" : {
+                                                                        "max_number" : { "max" : { "field" : "number" } }
+                                                                        }})['aggregations']['max_number']['value']
+        count_blocks_in_table = ElasticDatastore.request_count(url,
+                                                               index=ElasticDatastore.B_INDEX_NAME,
+                                                               doc_type='b'
+                                                               )['count']
+        for i in range(int(count_blocks_in_table/ElasticDatastore.DELTA_BLOCKS)):
+            if max_block_number_in_table + 1 == count_blocks_in_table:
+                return  max_block_number_in_table
+            elif count_blocks_in_table <= ElasticDatastore.DELTA_BLOCKS:
+                return 0
+            else:
+                count_blocks_in_table -= ElasticDatastore.DELTA_BLOCKS
+                max_block_number_in_table = ElasticDatastore.request_search(url,
+                                                                    index=ElasticDatastore.B_INDEX_NAME,
+                                                                    doc_type='b',
+                                                                    size=0,
+                                                                    body={"query":{"range": {
+                                                                             "number": {
+                                                                                 "lte": count_blocks_in_table
+                                                                             }}},
+                                                                        "aggs" : {
+                                                                            "max_number" : { "max" : { "field" : "number" } }
+                                                                        }})['aggregations']['max_number']['value']
+        return 0
+
+
+    @staticmethod
+    def delete_replacement_rows(url, start_block):
+        try:
+            ElasticDatastore.request_delete(url,
+                                           index=ElasticDatastore.B_INDEX_NAME,
+                                           doc_type='b',
+                                           body={"query": {
+                                               "range": {
+                                                   "number": {
+                                                       "gte": start_block
+                                                   }
+                                               }
+                                           }},
+                                           request_timeout = 3000)
+            ElasticDatastore.request_delete(url,
+                           index=ElasticDatastore.TX_INDEX_NAME,
+                           doc_type='tx',
+                           body={"query": {
+                               "range": {
+                                   "blockNumber": {
+                                       "gte": start_block
+                                   }
+                               }
+                           }},
+                           request_timeout=3000)
+            return 1
+        except Exception as ex:
+            print ('Exception: ',ex)
+            return 0
