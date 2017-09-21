@@ -6,9 +6,13 @@ import multiprocessing as mp
 import argparse
 import requests
 import aiohttp
+import psycopg2
+import sqlalchemy
 
 from elasticsearch import exceptions as es_exceptions
 from elasticdatastore import ElasticDatastore
+from postgresqldatastore import PostgreSQLDatastore
+from csvdatastore import CSVDatastore
 
 logging.basicConfig(filename='error_blocks.log', level=logging.ERROR)
 
@@ -18,7 +22,8 @@ class Ethdrain:
     data_store_classes = ()
 
     eth_url = "http://localhost:8545"
-    sem_size = 128
+    sem_size = 256
+ #   chunk_counter = 0
 
     def __init__(self, block_range, block):
         self.block = block
@@ -35,6 +40,8 @@ class Ethdrain:
         This class method will instanciate Ethdrain classes (one per process)
         and then instanciate and attach every datastore available to each on them
         """
+ #       cls.chunk_counter = cls.chunk_counter + 1
+ #       print("Chunk counter: {}".format(chunk_counter))
         inst = cls(block_range, 0)
         for data_class in cls.data_store_classes:
             inst.data_stores.append(data_class())
@@ -144,6 +151,7 @@ class Ethdrain:
 if __name__ == "__main__":
 
     def http_post_request(url, request):
+    #    print(str(url))
         return requests.post(url, data=request, headers={"content-type": "application/json"}).json()
 
 
@@ -156,10 +164,17 @@ if __name__ == "__main__":
     ES_MAXSIZE = 25
     # Elasticsearch default url
     ES_URL = "http://localhost:9200"
+    # PostgreSQL default url
+    POSTRES_URL = "postgresql://postgres:postgres@localhost:5432/Ethereum"
     # Ethereum RPC endpoint
     ETH_URL = "http://localhost:8545"
     # Size of multiprocessing Pool processing the chunks
-    POOL_SIZE = mp.cpu_count()
+    POOL_SIZE = mp.cpu_count()-2
+    # Database output, may be one of this: ["postgres", "elasticsearch","csv"]
+    OUTPUT = "postgres"
+    OUTPUT_ELASTICSEARCH = "elasticsearch"
+    OUTPUT_POSTRES = "postgres"
+    OUTPUT_CSV = "csv"
 
     BLOCK_WAIT = 10
 
@@ -174,51 +189,129 @@ if __name__ == "__main__":
                         help='The elasticsearch url and port. Accepts all the same parameters needed as a normal Elasticsearch client expects.')
     parser.add_argument('-m', '--esmaxsize', default=ES_MAXSIZE,
                         help='The elasticsearch max chunk size.')
+    parser.add_argument('-pg', '--postgresurl', default=POSTRES_URL,
+                        help='The PostgreSQL url and port. Accepts all the same parameters needed as a normal PostgreSQL client expects.')
     parser.add_argument('-r', '--ethrpcurl', default=ETH_URL,
                         help='The Ethereum RPC node url and port.')
+    parser.add_argument('-o', '--output', default=OUTPUT,
+                        help='System for output data from Ethereum (may be: "postgres", "elasticsearch","csv").')
+
 
     args = parser.parse_args()
 
-    # Setup all datastores
-    ElasticDatastore.config(args.esurl, args.esmaxsize)
-
-    # Determine start block number if needed
-    if not args.start_block:
-        try:
-            args.start_block = ElasticDatastore.request(args.esurl, index=ElasticDatastore.B_INDEX_NAME,
-                                                        size=1, sort="number:desc")["hits"]["hits"][0]["_source"]["number"]
-
-        except (es_exceptions.NotFoundError, es_exceptions.RequestError):
-            args.start_block = 0
-        print("Start block automatically set to: {}".format(args.start_block))
 
     # Determine last block number if needed
     if not args.end_block:
         args.end_block = int(http_post_request(ETH_URL,
-                                               Ethdrain.make_request("latest", False))["result"]["number"], 0) - BLOCK_WAIT
+                                               Ethdrain.make_request("latest", False))["result"]["number"],
+                             0) - BLOCK_WAIT
         print("Last block automatically set to: {}".format(args.end_block))
 
-    if args.file:
-        with open(args.file) as f:
-            CONTENT = f.readlines()
-            BLOCK_LIST = [int(x) for x in CONTENT if x.strip() and len(x.strip()) <= 8]
-    else:
-        BLOCK_LIST = list(range(int(args.start_block), int(args.end_block)))
 
-    CHUNKS_ARR = list(chunks(BLOCK_LIST))
 
-    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-    print("~~~~~~~~~~ Ethdrain ~~~~~~~~~~")
-    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-    print("Processing {} blocks split into {} chunks on {} processes:".format(
-        len(BLOCK_LIST), len(CHUNKS_ARR), POOL_SIZE
-    ))
 
     Ethdrain.eth_url = args.ethrpcurl
-    Ethdrain.load_datastore_classes(ElasticDatastore)
+
+    if args.output == OUTPUT_ELASTICSEARCH:
+
+        # Determine start block number if needed
+        if not args.start_block:
+            try:
+                args.start_block = ElasticDatastore.find_start_block(args.esurl)
+            except (es_exceptions.NotFoundError, es_exceptions.RequestError):
+                args.start_block = 0
+            print("Start block automatically set to: {}".format(args.start_block))
+
+        if args.file:
+            with open(args.file) as f:
+                CONTENT = f.readlines()
+                BLOCK_LIST = [int(x) for x in CONTENT if x.strip() and len(x.strip()) <= 8]
+        else:
+            BLOCK_LIST = list(range(int(args.start_block), int(args.end_block)))
+
+        CHUNKS_ARR = list(chunks(BLOCK_LIST))
+
+        # Setup all datastores
+        ElasticDatastore.config(args.esurl, args.esmaxsize)
+
+        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        print("~~~~~~~~~~ Ethdrain ~~~~~~~~~~")
+        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        print("Processing {} blocks split into {} chunks on {} processes:".format(
+            len(BLOCK_LIST), len(CHUNKS_ARR), POOL_SIZE
+        ))
+        ElasticDatastore.delete_replacement_rows(args.esurl, args.start_block)
+        Ethdrain.load_datastore_classes(ElasticDatastore)
+
+
+    elif args.output == OUTPUT_POSTRES:
+
+        # Determine start block number if needed
+        if not args.start_block:
+            try:
+                args.start_block = PostgreSQLDatastore.start_block(args.postgresurl)
+
+
+            except (sqlalchemy.exc.ProgrammingError, psycopg2.ProgrammingError):
+                args.start_block = 0
+            print("Start block automatically set to: {}".format(args.start_block))
+
+        if args.file:
+            with open(args.file) as f:
+                CONTENT = f.readlines()
+                BLOCK_LIST = [int(x) for x in CONTENT if x.strip() and len(x.strip()) <= 8]
+        else:
+            BLOCK_LIST = list(range(int(args.start_block), int(args.end_block)))
+
+        CHUNKS_ARR = list(chunks(BLOCK_LIST))
+
+        # Setup all datastores
+        PostgreSQLDatastore.config(args.postgresurl)
+
+        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        print("~~~~~~~~~~ Ethdrain ~~~~~~~~~~")
+        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        print("Processing {} blocks split into {} chunks on {} processes:".format(
+            len(BLOCK_LIST), len(CHUNKS_ARR), POOL_SIZE
+        ))
+        PostgreSQLDatastore.delete_replacement_rows(args.postgresurl, args.start_block)
+        Ethdrain.load_datastore_classes(PostgreSQLDatastore)
+
+    elif args.output == OUTPUT_CSV:
+        # Determine start block number if needed
+        if not args.start_block:
+            try:
+                args.start_block =  CSVDatastore.request(CSVDatastore.NAME_FILE_BLOCKS)
+
+            except FileNotFoundError:
+                args.start_block = 0
+            print("Start block automatically set to: {}".format(args.start_block))
+
+        if args.file:
+            with open(args.file) as f:
+                CONTENT = f.readlines()
+                BLOCK_LIST = [int(x) for x in CONTENT if x.strip() and len(x.strip()) <= 8]
+        else:
+            BLOCK_LIST = list(range(int(args.start_block), int(args.end_block)))
+
+        CHUNKS_ARR = list(chunks(BLOCK_LIST))
+
+        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        print("~~~~~~~~~~ Ethdrain ~~~~~~~~~~")
+        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        print("Processing {} blocks split into {} chunks on {} processes:".format(
+            len(BLOCK_LIST), len(CHUNKS_ARR), POOL_SIZE
+        ))
+
+        Ethdrain.load_datastore_classes(CSVDatastore)
+
+    else:
+        print("Not specified correctly Output system")
+        exit()
 
     POOL = mp.Pool(POOL_SIZE)
     POOL.map(Ethdrain.launch_history_sync, CHUNKS_ARR)
     print("[message] Ended history sync")
+
     block = args.end_block + 1
     Ethdrain.launch_continuous_sync(block)
