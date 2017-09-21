@@ -1,6 +1,6 @@
 # Ethdrain
 
-Python 3 script allowing to copy and index the Ethereum blockchain in an efficient way to ElasticSearch by connecting to a local node supporting RPC (tried with Parity).
+Python 3 script allowing to copy and index the Ethereum blockchain in an efficient way to ElasticSearch, PostgreSQL, csv by connecting to a local node supporting RPC (tried with Parity).
 
 I hardcoded the use of Elasticsearch but feel free to fork it to support others.
 
@@ -67,23 +67,31 @@ usage: ethdrain.py [-h] [-s START_BLOCK] [-e END_BLOCK] [-f FILE] [-u ESURL]
                    [-m ESMAXSIZE] [-r ETHRPCURL]
 
 optional arguments:
+optional arguments:
   -h, --help            show this help message and exit
   -s START_BLOCK, --start START_BLOCK
                         What block to start indexing. If nothing is provided,
-                        the lastest block indexed in ElasticSearch will be
-                        used.
+                        the latest block indexed will be used.
   -e END_BLOCK, --end END_BLOCK
                         What block to finish indexing. If nothing is provided,
                         the latest one will be used.
   -f FILE, --file FILE  Use an input file, each block number on a new line.
-  -u ESURL, --esurl ESURL
+  -es ESURL, --esurl ESURL
                         The elasticsearch url and port. Accepts all the same
                         parameters needed as a normal Elasticsearch client
                         expects.
   -m ESMAXSIZE, --esmaxsize ESMAXSIZE
                         The elasticsearch max chunk size.
+  -pg POSTGRESURL, --postgresurl POSTGRESURL
+                        The PostgreSQL url and port. Accepts all the same
+                        parameters needed as a normal PostgreSQL client
+                        expects.
   -r ETHRPCURL, --ethrpcurl ETHRPCURL
                         The Ethereum RPC node url and port.
+  -o OUTPUT, --output OUTPUT
+                        System for output data from Ethereum (may be:
+                        "postgres", "elasticsearch","csv").
+
 ```
 
 ## Benchmarks
