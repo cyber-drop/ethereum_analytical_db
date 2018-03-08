@@ -32,7 +32,7 @@ class CSVDatastore(Datastore):
             tx["blockTimestamp"] = block_timestamp
             # Convert wei into ether
             tx["value"] = int(tx["value"], 0) / self.WEI_ETH_FACTOR
-            for key_tx in ("gas", "gasPrice", "blockHash", "condition", "creates", 'hash', 'networkId', 'nonce', 'publicKey', 'r', 'raw', 's', 'standardV', 'transactionIndex', 'v'): del tx[key_tx]
+            for key_tx in ("gas", "gasPrice", "blockHash", "condition", "creates", 'nonce', 'publicKey', 'r', 'raw', 's', 'standardV', 'transactionIndex', 'v'): del tx[key_tx]
             tx_value_sum += tx["value"]
             self.actions.append(
                 {"_index": self.TX_INDEX_NAME, "_type": "tx", "_id": tx["hash"], "_source": tx}
