@@ -42,6 +42,15 @@ class InternalTransactionsTestCase(unittest.TestCase):
     trace = transaction['trace']
     self.assertSequenceEqual(trace, TEST_TRANSACTION_TRACE)
 
+  def test_extract_traces(self):
+    self.client.index(TEST_INDEX, 'tx', {'input': TEST_TRANSACTION_INPUT}, id=1)
+    self.client.index(TEST_INDEX, 'tx', {'input': TEST_TRANSACTION_INPUT + 'a'}, id=2)
+    self.internal_transactions.extract_traces([{"_id": '1', "_source": {"hash": TEST_TRANSACTION_HASH}}])
+    transaction1 = self.client.get(TEST_INDEX, 'tx', 1)['_source']
+    transaction2 = self.client.get(TEST_INDEX, 'tx', 2)['_source']
+    self.assertSequenceEqual(transaction1['trace'], TEST_TRANSACTION_TRACE)
+    assert 'trace' not in transaction2.keys()
+
 TEST_INDEX = 'test-ethereum-transactions'
 TEST_TRANSACTION_HASH = '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a'
 TEST_TRANSACTION_INPUT = '0xb1631db29e09ec5581a0ec398f1229abaf105d3524c49727621841af947bdc44'

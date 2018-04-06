@@ -1,6 +1,7 @@
 from pyelasticsearch import ElasticSearch
 import requests
 import json
+import click
 
 class InternalTransactions:
   def __init__(self, elasticsearch_index, elasticsearch_host="http://localhost:9200", ethereum_api_host="http://localhost:8545"):
@@ -20,7 +21,6 @@ class InternalTransactions:
     }
 
   def get_trace(self, hash):
-    # Returns empty request
     request = self._make_trace_request(hash)
     request_string = json.dumps(request)
 
@@ -36,3 +36,20 @@ class InternalTransactions:
     self.client.update(self.index, 'tx', transaction_id, doc={
       'trace': trace
     })
+
+  def extract_traces(self, transactions):
+    for transaction in transactions:
+      transaction_id = transaction["_id"]
+      transaction_hash = transaction["_source"]["hash"]
+      trace = self.get_trace(transaction_hash)
+      self.save_trace(transaction_id, trace)
+
+@click.command()
+@click.option('--index', help='Elasticsearch index name', default='ethereum-transactions')
+def start_process(index):
+  internal_transactions = InternalTransactions(index)
+  transactions = internal_transactions.get_transactions_to_contracts()
+  internal_transactions.extract_traces(transactions)
+
+if __name__ == '__main__':
+  start_process()
