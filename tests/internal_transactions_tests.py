@@ -13,44 +13,70 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.client.create_index(TEST_INDEX)
     self.internal_transactions = InternalTransactions(TEST_INDEX)
 
-  def test_transactions_to_contracts(self):
-    self.client.index(TEST_INDEX, 'tx', {'input': '0x'}, id=1)
-    self.client.index(TEST_INDEX, 'tx', {'input': TEST_TRANSACTION_INPUT}, id=2)
-    self.client.index(TEST_INDEX, 'tx', {'input': None}, id=3)
-    self.client.index(TEST_INDEX, 'nottx', {'input': TEST_TRANSACTION_INPUT}, id=4)
-    sleep(1)
-    transactions = self.internal_transactions.get_transactions_to_contracts()
+  def test_get_transactions_to_contracts(self):
+    self.client.index(TEST_INDEX, 'tx', {'to_contract': False}, id=1, refresh=True)
+    self.client.index(TEST_INDEX, 'tx', {'to_contract': True, 'trace': {'test': 1}}, id=2, refresh=True)
+    self.client.index(TEST_INDEX, 'tx', {'to_contract': True}, id=3, refresh=True)
+    self.client.index(TEST_INDEX, 'nottx', {'to_contract': True}, id=4, refresh=True)
+    transactions = self.internal_transactions._get_transactions_to_contracts()
+    transactions = [transaction["_id"] for transaction in transactions]
+    self.assertCountEqual(transactions, ['3'])
+
+  def test_paginate_transactions(self):
+    for i in range(TEST_TRANSACTIONS_NUMBER + 1):
+      self.client.index(TEST_INDEX, 'tx', {'to_contract': True}, id=i, refresh=True)
+    transactions = self.internal_transactions._get_transactions_to_contracts(size=TEST_TRANSACTIONS_NUMBER, page=1)
     assert len(transactions) == 1
-    assert transactions[0]['_id'] == '2'
 
-  def test_make_trace_request(self):
-    request = self.internal_transactions._make_trace_request(TEST_TRANSACTION_HASH)
-    assert request["jsonrpc"] == "2.0"
-    assert request["id"] == 1
-    assert request["method"] == "trace_replayTransaction"
-    assert request["params"][0] == TEST_TRANSACTION_HASH
-    assert request["params"][1][0] == "trace"
+  def test_count_transactions(self):
+    for i in range(TEST_TRANSACTIONS_NUMBER*10):
+      self.client.index(TEST_INDEX, 'tx', {'to_contract': True}, id=i, refresh=True)
+    transactions_count = self.internal_transactions._count_transactions_to_contracts()
+    assert transactions_count == TEST_TRANSACTIONS_NUMBER*10
 
-  def test_get_trace(self):
-    trace = self.internal_transactions.get_trace(TEST_TRANSACTION_HASH)
-    self.assertSequenceEqual(trace, TEST_TRANSACTION_TRACE)
+  def test_make_trace_requests(self):
+    requests = self.internal_transactions._make_trace_requests({i: TEST_TRANSACTION_HASH for i in range(TEST_TRANSACTIONS_NUMBER)})
+    assert len(requests) == TEST_TRANSACTIONS_NUMBER    
+    for i, request in enumerate(requests):
+      assert request["jsonrpc"] == "2.0"
+      assert request["id"] == i
+      assert request["method"] == "trace_replayTransaction"
+      assert request["params"][0] == TEST_TRANSACTION_HASH
+      assert request["params"][1][0] == "trace"
 
-  def test_save_trace(self):
-    self.client.index(TEST_INDEX, 'tx', {'input': TEST_TRANSACTION_INPUT, "hash": TEST_TRANSACTION_HASH}, id=1)
-    self.internal_transactions.save_trace(1, TEST_TRANSACTION_TRACE)
+  def test_get_traces(self):
+    traces = self.internal_transactions._get_traces({i: TEST_TRANSACTION_HASH for i in range(TEST_TRANSACTIONS_NUMBER)})
+    for index, trace in traces.items():
+      self.assertSequenceEqual(trace, TEST_TRANSACTION_TRACE)
+
+  def test_save_traces(self):
+    self.client.index(TEST_INDEX, 'tx', {"hash": TEST_TRANSACTION_HASH}, id=1, refresh=True)
+    self.internal_transactions._save_traces({1: TEST_TRANSACTION_TRACE})
     transaction = self.client.get(TEST_INDEX, 'tx', 1)['_source']
     trace = transaction['trace']
     self.assertSequenceEqual(trace, TEST_TRANSACTION_TRACE)
 
-  def test_extract_traces(self):
-    self.client.index(TEST_INDEX, 'tx', {'input': TEST_TRANSACTION_INPUT}, id=1)
-    self.client.index(TEST_INDEX, 'tx', {'input': TEST_TRANSACTION_INPUT + 'a'}, id=2)
-    self.internal_transactions.extract_traces([{"_id": '1', "_source": {"hash": TEST_TRANSACTION_HASH}}])
-    transaction1 = self.client.get(TEST_INDEX, 'tx', 1)['_source']
-    transaction2 = self.client.get(TEST_INDEX, 'tx', 2)['_source']
-    self.assertSequenceEqual(transaction1['trace'], TEST_TRANSACTION_TRACE)
-    assert 'trace' not in transaction2.keys()
+  def test_extract_traces_chunk(self):
+    docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'id': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
+    self.client.bulk_index(TEST_INDEX, 'tx', docs, refresh=True)
+    self.internal_transactions._extract_traces_chunk([{"_id": i, "_source": {"hash": TEST_TRANSACTION_HASH}} for i in range(TEST_TRANSACTIONS_NUMBER)])
+    transactions = self.client.search("_exists_:trace", index=TEST_INDEX, doc_type='tx', size=TEST_TRANSACTIONS_NUMBER)['hits']['hits']
+    transactions = [transaction["_id"] for transaction in transactions]
+    self.assertCountEqual(transactions, [str(i) for i in range(TEST_TRANSACTIONS_NUMBER)])
 
+  def test_extract_traces(self):
+    docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'id': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
+    self.client.bulk_index(TEST_INDEX, 'tx', docs, refresh=True)
+    self.internal_transactions.extract_traces()
+    transactions = self.client.search("_exists_:trace", index=TEST_INDEX, doc_type='tx', size=TEST_BIG_TRANSACTIONS_NUMBER)['hits']['hits']
+    transactions = [transaction["_id"] for transaction in transactions]
+    self.assertCountEqual(transactions, [str(i) for i in range(TEST_BIG_TRANSACTIONS_NUMBER)])
+
+  def test_no_full_text_index(self):
+    pass
+
+TEST_TRANSACTIONS_NUMBER = 10
+TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 100
 TEST_INDEX = 'test-ethereum-transactions'
 TEST_TRANSACTION_HASH = '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a'
 TEST_TRANSACTION_INPUT = '0xb1631db29e09ec5581a0ec398f1229abaf105d3524c49727621841af947bdc44'
