@@ -2,6 +2,7 @@ import unittest
 from pyelasticsearch import ElasticSearch
 from internal_transactions import InternalTransactions, elasticsearch_iterate
 from time import sleep
+import random
 
 class InternalTransactionsTestCase(unittest.TestCase):
   def setUp(self):
@@ -23,6 +24,29 @@ class InternalTransactionsTestCase(unittest.TestCase):
     item = next(iterator)
     assert len(items) == 10
     assert len(item) == 1
+
+  def test_iterate_elasticsearch_data_with_pagination(self):
+    for i in range(11):
+      self.client.index(TEST_INDEX, 'item', {'paginate': True}, id=i + 1, refresh=True)
+    iterator = elasticsearch_iterate(self.client, index=TEST_INDEX, doc_type='item', query='paginate:true', per=10, paginate=True)
+    items = next(iterator)
+    item = next(iterator)
+    assert len(items) == 10
+    assert len(item) == 1
+
+  def test_deep_pagination(self):
+    for i in range(100):
+      self.client.index(TEST_INDEX, 'item', {'paginate': True}, id=i + 1, refresh=True)
+    iterator = elasticsearch_iterate(self.client, index=TEST_INDEX, doc_type='item', query='paginate:true', per=10, paginate=True)
+    items = []
+    for items_list in iterator:
+      items.append(items_list)
+      for j in range(20):
+        self.client.update(TEST_INDEX, 'item', id=random.randint(1, 100), doc={'some_failing_flag': True})
+    items = [i["_id"] for items_list in items for i in items_list]
+    items = set(items)
+    print(len(list(items)))
+    assert len(list(items)) == 100
 
   def test_iterate_transactions(self):
     self.client.index(TEST_INDEX, 'tx', {'to_contract': False}, id=1, refresh=True)

@@ -5,13 +5,16 @@ import click
 from time import sleep
 from tqdm import *
 
-NUMBER_OF_JOBS = 100
+NUMBER_OF_JOBS = 10
 
-def elasticsearch_iterate(client, index, doc_type, query, per=NUMBER_OF_JOBS):
+def elasticsearch_iterate(client, index, doc_type, query, per=NUMBER_OF_JOBS, paginate=False):
   items_count = client.count(query, index=index, doc_type=doc_type)['count']
   pages = round(items_count / per + 0.4999)
-  for page in range(pages):
-    page_items = client.search(query, index=index, doc_type=doc_type, size=per)['hits']['hits']
+  es_from = 0
+  for page in tqdm(range(pages)):
+    if paginate:
+      es_from = page*per
+    page_items = client.search(query, index=index, doc_type=doc_type, size=per, es_from=es_from)['hits']['hits']
     yield page_items
 
 class InternalTransactions:
@@ -62,24 +65,16 @@ class ContractTransactions:
     self.client = ElasticSearch(elasticsearch_host)
     self.ethereum_api_host = ethereum_api_host
 
-  def _count_transactions_to_contracts(self):
-    return self.client.count('input:0x?*', index=self.index, doc_type='tx')['count']
+  def _iterate_contract_transactions(self):
+    return elasticsearch_iterate(self.client, self.index, 'tx', 'input:0x?*', paginate=True)
 
-  def extract_contract_addresses(self):
-    # contract_transactions_count = self._count_transactions_to_contracts()
-    # pages = int(contract_transactions_count / NUMBER_OF_JOBS)
-    contract_transactions = self.client.search('input:0x?*', index=self.index, doc_type='tx')['hits']['hits']
-    contracts = [transaction["_source"]["to"] for transaction in contract_transactions]
-    for contract in tqdm(contracts):
-      self.client.index(
-        self.index, 
-        'contract', 
-        {'address': contract},
-        id=contract,
-        refresh=True
-      )
+  def _extract_contract_addresses(self):
+    for contract_transactions in self._iterate_contract_transactions():
+      contracts = [transaction["_source"]["to"] for transaction in contract_transactions]
+      docs = [{'address': contract, 'id': contract} for contract in contracts]
+      self.client.bulk_index(docs=docs, doc_type='contract', index=self.index, refresh=True)
 
-  def _search_transactions_by_target(self, targets):
+  def _iterate_transactions_by_target(self, targets):
     elasticsearch_filter = {
       "query": {
         "terms": {
@@ -87,19 +82,18 @@ class ContractTransactions:
         }
       }
     }
-    return self.client.search(elasticsearch_filter, index=self.index, doc_type='tx')['hits']['hits']
+    return elasticsearch_iterate(self.client, self.index, 'tx', elasticsearch_filter, paginate=True)
+
+  def _iterate_contracts(self):
+    return elasticsearch_iterate(self.client, self.index, 'contract', 'address:*', paginate=True)
 
   def detect_contract_transactions(self):
-    contracts = self.client.search("address:*", index=self.index, doc_type='contract')['hits']['hits']
-    contracts = [contract["_source"]["address"] for contract in contracts]
-    transactions_to_contracts = self._search_transactions_by_target(contracts)
-    for transaction in tqdm(transactions_to_contracts):
-      transaction_id = transaction["_id"]
-      self.client.update(
-        self.index, 'tx', transaction_id, 
-        doc={'to_contract': True},
-        refresh=True
-      )
+    self._extract_contract_addresses()
+    for contracts in self._iterate_contracts():
+      contracts = [contract["_source"]["address"] for contract in contracts]
+      for transactions_to_contracts in self._iterate_transactions_by_target(contracts):
+        operations = [self.client.update_op(doc={'to_contract': True}, id=transaction["_id"]) for transaction in transactions_to_contracts]
+        self.client.bulk(operations, doc_type='tx', index=self.index, refresh=True)
 
 @click.command()
 @click.option('--index', help='Elasticsearch index name', default='ethereum-transaction')
