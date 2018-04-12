@@ -7,18 +7,21 @@ from tqdm import *
 
 NUMBER_OF_JOBS = 1000
 
-def elasticsearch_iterate(client, index, doc_type, query, per=NUMBER_OF_JOBS, paginate=False):
+def elasticsearch_iterate(client, index, doc_type, query, per=NUMBER_OF_JOBS, paginate=False, scrolling=True):
   items_count = client.count(query, index=index, doc_type=doc_type)['count']
   pages = round(items_count / per + 0.4999)
   scroll_id = None
   for page in tqdm(range(pages)):
     if paginate:
-      if not scroll_id:
-        response = client.send_request('GET', [index, doc_type, '_search'], query_params={'scroll': '1m', 'size': per, 'q': query})
-        scroll_id = response['_scroll_id']
-        page_items = response['hits']['hits']
+      if scrolling:
+        if not scroll_id:
+          response = client.send_request('GET', [index, doc_type, '_search'], query_params={'scroll': '1m', 'size': per, 'q': query})
+          scroll_id = response['_scroll_id']
+          page_items = response['hits']['hits']
+        else:
+          page_items = client.send_request('POST', ['_search', 'scroll'], {'scroll': '1m', 'scroll_id': scroll_id}, {})['hits']['hits']
       else:
-        page_items = client.send_request('POST', ['_search', 'scroll'], {'scroll': '1m', 'scroll_id': scroll_id}, {})['hits']['hits']
+        page_items = client.search(query, index=index, doc_type=doc_type, size=per, es_from=per*page)['hits']['hits']
     else:
       page_items = client.search(query, index=index, doc_type=doc_type, size=per)['hits']['hits']
     yield page_items
@@ -72,7 +75,7 @@ class ContractTransactions:
     self.ethereum_api_host = ethereum_api_host
 
   def _iterate_contract_transactions(self):
-    return elasticsearch_iterate(self.client, self.index, 'tx', 'input:0x?*', paginate=True)
+    return elasticsearch_iterate(self.client, self.index, 'tx', 'input:0x?*', paginate=True, scrolling=False)
 
   def _extract_contract_addresses(self):
     for contract_transactions in self._iterate_contract_transactions():
@@ -85,7 +88,7 @@ class ContractTransactions:
     return elasticsearch_iterate(self.client, self.index, 'tx', query, paginate=True)
 
   def _iterate_contracts(self):
-    return elasticsearch_iterate(self.client, self.index, 'contract', 'address:*', paginate=True)
+    return elasticsearch_iterate(self.client, self.index, 'contract', 'address:*', paginate=True, scrolling=False)
 
   def detect_contract_transactions(self):
     self._extract_contract_addresses()
