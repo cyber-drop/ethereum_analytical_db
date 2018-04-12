@@ -1,6 +1,6 @@
 import unittest
 from pyelasticsearch import ElasticSearch
-from internal_transactions import InternalTransactions
+from internal_transactions import InternalTransactions, elasticsearch_iterate
 from time import sleep
 
 class InternalTransactionsTestCase(unittest.TestCase):
@@ -13,26 +13,26 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.client.create_index(TEST_INDEX)
     self.internal_transactions = InternalTransactions(TEST_INDEX)
 
-  def test_get_transactions_to_contracts(self):
+  def test_iterate_elasticsearch_data(self):
+    for i in range(11):
+      self.client.index(TEST_INDEX, 'item', {'paginate': True}, id=i + 1, refresh=True)
+    iterator = elasticsearch_iterate(self.client, index=TEST_INDEX, doc_type='item', query='paginate:true', per=10)
+    items = next(iterator)
+    operations = [self.client.update_op(doc={'paginate': False}, id=i + 1) for i, item in enumerate(items)]
+    self.client.bulk(operations, doc_type='item', index=TEST_INDEX, refresh=True)
+    item = next(iterator)
+    assert len(items) == 10
+    assert len(item) == 1
+
+  def test_iterate_transactions(self):
     self.client.index(TEST_INDEX, 'tx', {'to_contract': False}, id=1, refresh=True)
     self.client.index(TEST_INDEX, 'tx', {'to_contract': True, 'trace': {'test': 1}}, id=2, refresh=True)
     self.client.index(TEST_INDEX, 'tx', {'to_contract': True}, id=3, refresh=True)
     self.client.index(TEST_INDEX, 'nottx', {'to_contract': True}, id=4, refresh=True)
-    transactions = self.internal_transactions._get_transactions_to_contracts()
+    iterator = self.internal_transactions._iterate_transactions()
+    transactions = next(iterator)
     transactions = [transaction["_id"] for transaction in transactions]
     self.assertCountEqual(transactions, ['3'])
-
-  def test_paginate_transactions(self):
-    for i in range(TEST_TRANSACTIONS_NUMBER + 1):
-      self.client.index(TEST_INDEX, 'tx', {'to_contract': True}, id=i, refresh=True)
-    transactions = self.internal_transactions._get_transactions_to_contracts(size=TEST_TRANSACTIONS_NUMBER, page=1)
-    assert len(transactions) == 1
-
-  def test_count_transactions(self):
-    for i in range(TEST_TRANSACTIONS_NUMBER*10):
-      self.client.index(TEST_INDEX, 'tx', {'to_contract': True}, id=i, refresh=True)
-    transactions_count = self.internal_transactions._count_transactions_to_contracts()
-    assert transactions_count == TEST_TRANSACTIONS_NUMBER*10
 
   def test_make_trace_requests(self):
     requests = self.internal_transactions._make_trace_requests({i: TEST_TRANSACTION_HASH for i in range(TEST_TRANSACTIONS_NUMBER)})
@@ -76,7 +76,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
     pass
 
 TEST_TRANSACTIONS_NUMBER = 10
-TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 100
+TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 10
 TEST_INDEX = 'test-ethereum-transactions'
 TEST_TRANSACTION_HASH = '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a'
 TEST_TRANSACTION_INPUT = '0xb1631db29e09ec5581a0ec398f1229abaf105d3524c49727621841af947bdc44'

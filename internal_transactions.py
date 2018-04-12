@@ -3,8 +3,16 @@ import requests
 import json
 import click
 from time import sleep
+from tqdm import *
 
 NUMBER_OF_JOBS = 100
+
+def elasticsearch_iterate(client, index, doc_type, query, per=NUMBER_OF_JOBS):
+  items_count = client.count(query, index=index, doc_type=doc_type)['count']
+  pages = round(items_count / per + 0.4999)
+  for page in range(pages):
+    page_items = client.search(query, index=index, doc_type=doc_type, size=per)['hits']['hits']
+    yield page_items
 
 class InternalTransactions:
   def __init__(self, elasticsearch_index, elasticsearch_host="http://localhost:9200", ethereum_api_host="http://localhost:8545"):
@@ -12,11 +20,8 @@ class InternalTransactions:
     self.client = ElasticSearch(elasticsearch_host)
     self.ethereum_api_host = ethereum_api_host
 
-  def _get_transactions_to_contracts(self, size=NUMBER_OF_JOBS, page=0):
-    return self.client.search('to_contract:true AND !(_exists_:trace)', index=self.index, doc_type='tx', es_from=page*size, size=size)['hits']['hits']
-
-  def _count_transactions_to_contracts(self):
-    return self.client.count('to_contract:true AND !(_exists_:trace)', index=self.index, doc_type='tx')['count']
+  def _iterate_transactions(self):
+    return elasticsearch_iterate(self.client, self.index, 'tx', 'to_contract:true AND !(_exists_:trace)')
 
   def _make_trace_requests(self, hashes):
     return [{
@@ -48,12 +53,8 @@ class InternalTransactions:
     self._save_traces(traces)
 
   def extract_traces(self):
-    transactions_count = self._count_transactions_to_contracts()
-    pages = int(transactions_count / NUMBER_OF_JOBS)
-    for page in range(pages):
-      transactions = self._get_transactions_to_contracts(size=NUMBER_OF_JOBS)
-      if len(transactions):
-        self._extract_traces_chunk(transactions)
+    for transactions in self._iterate_transactions():
+      self._extract_traces_chunk(transactions)
 
 class ContractTransactions:
   def __init__(self, elasticsearch_index, elasticsearch_host="http://localhost:9200", ethereum_api_host="http://localhost:8545"):
@@ -61,16 +62,21 @@ class ContractTransactions:
     self.client = ElasticSearch(elasticsearch_host)
     self.ethereum_api_host = ethereum_api_host
 
+  def _count_transactions_to_contracts(self):
+    return self.client.count('input:0x?*', index=self.index, doc_type='tx')['count']
+
   def extract_contract_addresses(self):
+    # contract_transactions_count = self._count_transactions_to_contracts()
+    # pages = int(contract_transactions_count / NUMBER_OF_JOBS)
     contract_transactions = self.client.search('input:0x?*', index=self.index, doc_type='tx')['hits']['hits']
     contracts = [transaction["_source"]["to"] for transaction in contract_transactions]
-    # TODO add bulk
-    for contract in contracts:
+    for contract in tqdm(contracts):
       self.client.index(
         self.index, 
         'contract', 
         {'address': contract},
-        id=contract
+        id=contract,
+        refresh=True
       )
 
   def _search_transactions_by_target(self, targets):
@@ -87,17 +93,24 @@ class ContractTransactions:
     contracts = self.client.search("address:*", index=self.index, doc_type='contract')['hits']['hits']
     contracts = [contract["_source"]["address"] for contract in contracts]
     transactions_to_contracts = self._search_transactions_by_target(contracts)
-    for transaction in transactions_to_contracts:
+    for transaction in tqdm(transactions_to_contracts):
       transaction_id = transaction["_id"]
       self.client.update(
         self.index, 'tx', transaction_id, 
-        doc={'to_contract': True}
+        doc={'to_contract': True},
+        refresh=True
       )
 
 @click.command()
-@click.option('--index', help='Elasticsearch index name', default='ethereum-transactions')
+@click.option('--index', help='Elasticsearch index name', default='ethereum-transaction')
 def start_process(index):
-  pass
+  contract_transactions = ContractTransactions(index)
+  internal_transactions = InternalTransactions(index)
+
+  contract_transactions.extract_contract_addresses()
+  contract_transactions.detect_contract_transactions()
+  internal_transactions.extract_traces()
+
 
 if __name__ == '__main__':
   start_process()
