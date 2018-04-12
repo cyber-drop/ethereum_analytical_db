@@ -10,11 +10,18 @@ NUMBER_OF_JOBS = 10
 def elasticsearch_iterate(client, index, doc_type, query, per=NUMBER_OF_JOBS, paginate=False):
   items_count = client.count(query, index=index, doc_type=doc_type)['count']
   pages = round(items_count / per + 0.4999)
+  scroll_id = None
   es_from = 0
   for page in tqdm(range(pages)):
     if paginate:
       es_from = page*per
-    page_items = client.search(query, index=index, doc_type=doc_type, size=per, es_from=es_from)['hits']['hits']
+    if not scroll_id:
+      response = client.send_request('GET', [index, doc_type, '_search'], query_params={'scroll': '1m'})
+      scroll_id = response['_scroll_id']
+      page_items = response['hits']['hits']
+    else:
+      page_items = client.send_request('POST', ['_search', 'scroll'], {'scroll': '1m', 'scroll_id': scroll_id}, {})['hits']['hits']
+    print([p["_id"] for p in page_items])
     yield page_items
 
 class InternalTransactions:
