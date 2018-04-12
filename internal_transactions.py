@@ -5,7 +5,7 @@ import click
 from time import sleep
 from tqdm import *
 
-NUMBER_OF_JOBS = 10
+NUMBER_OF_JOBS = 1000
 
 def elasticsearch_iterate(client, index, doc_type, query, per=NUMBER_OF_JOBS, paginate=False):
   items_count = client.count(query, index=index, doc_type=doc_type)['count']
@@ -20,8 +20,7 @@ def elasticsearch_iterate(client, index, doc_type, query, per=NUMBER_OF_JOBS, pa
       else:
         page_items = client.send_request('POST', ['_search', 'scroll'], {'scroll': '1m', 'scroll_id': scroll_id}, {})['hits']['hits']
     else:
-      page_items = client.search(query, index=index, doc_type=doc_type)['hits']['hits']
-    print([p["_id"] for p in page_items])
+      page_items = client.search(query, index=index, doc_type=doc_type, size=per)['hits']['hits']
     yield page_items
 
 class InternalTransactions:
@@ -101,11 +100,8 @@ class ContractTransactions:
 def start_process(index):
   contract_transactions = ContractTransactions(index)
   internal_transactions = InternalTransactions(index)
-
-  contract_transactions.extract_contract_addresses()
   contract_transactions.detect_contract_transactions()
   internal_transactions.extract_traces()
-
 
 if __name__ == '__main__':
   start_process()
