@@ -11,16 +11,16 @@ def elasticsearch_iterate(client, index, doc_type, query, per=NUMBER_OF_JOBS, pa
   items_count = client.count(query, index=index, doc_type=doc_type)['count']
   pages = round(items_count / per + 0.4999)
   scroll_id = None
-  es_from = 0
   for page in tqdm(range(pages)):
     if paginate:
-      es_from = page*per
-    if not scroll_id:
-      response = client.send_request('GET', [index, doc_type, '_search'], query_params={'scroll': '1m'})
-      scroll_id = response['_scroll_id']
-      page_items = response['hits']['hits']
+      if not scroll_id:
+        response = client.send_request('GET', [index, doc_type, '_search'], query_params={'scroll': '1m', 'size': per, 'q': query})
+        scroll_id = response['_scroll_id']
+        page_items = response['hits']['hits']
+      else:
+        page_items = client.send_request('POST', ['_search', 'scroll'], {'scroll': '1m', 'scroll_id': scroll_id}, {})['hits']['hits']
     else:
-      page_items = client.send_request('POST', ['_search', 'scroll'], {'scroll': '1m', 'scroll_id': scroll_id}, {})['hits']['hits']
+      page_items = client.search(query, index=index, doc_type=doc_type)['hits']['hits']
     print([p["_id"] for p in page_items])
     yield page_items
 
@@ -82,14 +82,8 @@ class ContractTransactions:
       self.client.bulk_index(docs=docs, doc_type='contract', index=self.index, refresh=True)
 
   def _iterate_transactions_by_target(self, targets):
-    elasticsearch_filter = {
-      "query": {
-        "terms": {
-          "to": targets
-        }
-      }
-    }
-    return elasticsearch_iterate(self.client, self.index, 'tx', elasticsearch_filter, paginate=True)
+    query = " OR ".join(["to:" + target for target in targets])
+    return elasticsearch_iterate(self.client, self.index, 'tx', query, paginate=True)
 
   def _iterate_contracts(self):
     return elasticsearch_iterate(self.client, self.index, 'contract', 'address:*', paginate=True)
