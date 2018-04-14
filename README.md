@@ -119,8 +119,11 @@ $ python3 ./internal_transactions.oy --index ELASTICSEARCH_INDEX --operation CHO
 ```
 Operation type can be selected from list below:
 - detect-contracts
+
 Runs a process of contract addresses detection for saved transactions. All transactions to contracts will be highlighted with 'to_contract' flag, each contract address will be extracted to a 'contract' collection of a selected index
 - extract-traces
+
 Starts traces extraction. Each transaction highlighted with 'to_contract' flag will get a field 'trace' with a trace extracted from parity
 - parse-inputs
+
 Starts input parsing. (Not implemented yet)
