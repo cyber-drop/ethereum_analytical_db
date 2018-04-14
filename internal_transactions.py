@@ -100,11 +100,14 @@ class ContractTransactions:
 
 @click.command()
 @click.option('--index', help='Elasticsearch index name', default='ethereum-transaction')
-def start_process(index):
+@click.option('--operation', help='Action to perform (detect-contracts, extract-traces, parse-inputs)', default='detect-contracts')
+def start_process(index, operation):
   contract_transactions = ContractTransactions(index)
   internal_transactions = InternalTransactions(index)
-  contract_transactions.detect_contract_transactions()
-  internal_transactions.extract_traces()
+  if operation == "detect-contracts":
+    contract_transactions.detect_contract_transactions()
+  elif operation == "extract-traces":
+    internal_transactions.extract_traces()
 
 if __name__ == '__main__':
   start_process()
