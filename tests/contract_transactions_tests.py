@@ -77,8 +77,8 @@ class ContractTransactionsTestCase(unittest.TestCase):
     self.assertCountEqual(["1", "2"], transactions)
 
   def test_detect_big_amount_of_contract_transactions(self):
-    for i in tqdm(range(100)):
-      self.client.index(TEST_INDEX, 'tx', {'to': str((i % 10) + 1), 'input': TEST_TRANSACTION_INPUT}, id=i + 1, refresh=True)
+    docs = [{'to': str((i % 10) + 1), 'input': TEST_TRANSACTION_INPUT, 'id': i + 1} for i in range(100)]
+    self.client.bulk_index(docs=docs, doc_type='tx', index=TEST_INDEX, refresh=True)
     self.contract_transactions.detect_contract_transactions()
     transactions = self.client.search("to_contract:true", index=TEST_INDEX, doc_type="tx", size=100)['hits']['hits']
     print(len(transactions))

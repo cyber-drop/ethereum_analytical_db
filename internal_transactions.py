@@ -5,15 +5,18 @@ import click
 from time import sleep
 from tqdm import *
 
-NUMBER_OF_JOBS = 1000
+NUMBER_OF_JOBS = 10
 
-def elasticsearch_iterate(client, index, doc_type, query, per=NUMBER_OF_JOBS, paginate=False, scrolling=True):
-  items_count = client.count(query, index=index, doc_type=doc_type)['count']
-  pages = round(items_count / per + 0.4999)
-  scroll_id = None
-  for page in tqdm(range(pages)):
-    if paginate:
-      if scrolling:
+class CustomElasticSearch(ElasticSearch):
+  def update_by_query(client, index, doc_type, query, script):
+    client.send_request('POST', [index, doc_type, '_update_by_query'], {'script': {'inline': script}}, {'refresh': True, 'q': query})
+
+  def iterate(client, index, doc_type, query, per=NUMBER_OF_JOBS, paginate=False, scrolling=True):
+    items_count = client.count(query, index=index, doc_type=doc_type)['count']
+    pages = round(items_count / per + 0.4999)
+    scroll_id = None
+    for page in tqdm(range(pages)):
+      if paginate:
         if not scroll_id:
           response = client.send_request('GET', [index, doc_type, '_search'], query_params={'scroll': '1m', 'size': per, 'q': query})
           scroll_id = response['_scroll_id']
@@ -21,19 +24,17 @@ def elasticsearch_iterate(client, index, doc_type, query, per=NUMBER_OF_JOBS, pa
         else:
           page_items = client.send_request('POST', ['_search', 'scroll'], {'scroll': '1m', 'scroll_id': scroll_id}, {})['hits']['hits']
       else:
-        page_items = client.search(query, index=index, doc_type=doc_type, size=per, es_from=per*page)['hits']['hits']
-    else:
-      page_items = client.search(query, index=index, doc_type=doc_type, size=per)['hits']['hits']
-    yield page_items
+        page_items = client.search(query, index=index, doc_type=doc_type, size=per)['hits']['hits']
+      yield page_items
 
 class InternalTransactions:
   def __init__(self, elasticsearch_index, elasticsearch_host="http://localhost:9200", ethereum_api_host="http://localhost:8545"):
     self.index = elasticsearch_index
-    self.client = ElasticSearch(elasticsearch_host)
+    self.client = CustomElasticSearch(elasticsearch_host)
     self.ethereum_api_host = ethereum_api_host
 
   def _iterate_transactions(self):
-    return elasticsearch_iterate(self.client, self.index, 'tx', 'to_contract:true AND !(_exists_:trace)')
+    return self.client.iterate(self.index, 'tx', 'to_contract:true AND !(_exists_:trace)')
 
   def _make_trace_requests(self, hashes):
     return [{
@@ -71,11 +72,11 @@ class InternalTransactions:
 class ContractTransactions:
   def __init__(self, elasticsearch_index, elasticsearch_host="http://localhost:9200", ethereum_api_host="http://localhost:8545"):
     self.index = elasticsearch_index
-    self.client = ElasticSearch(elasticsearch_host)
+    self.client = CustomElasticSearch(elasticsearch_host)
     self.ethereum_api_host = ethereum_api_host
 
   def _iterate_contract_transactions(self):
-    return elasticsearch_iterate(self.client, self.index, 'tx', 'input:0x?*', paginate=True, scrolling=False)
+    return self.client.iterate(self.index, 'tx', 'input:0x?*', paginate=True, scrolling=False)
 
   def _extract_contract_addresses(self):
     for contract_transactions in self._iterate_contract_transactions():
@@ -85,18 +86,17 @@ class ContractTransactions:
 
   def _iterate_transactions_by_target(self, targets):
     query = " OR ".join(["to:" + target for target in targets])
-    return elasticsearch_iterate(self.client, self.index, 'tx', query, paginate=True)
+    return self.client.iterate(self.index, 'tx', query, paginate=True)
 
   def _iterate_contracts(self):
-    return elasticsearch_iterate(self.client, self.index, 'contract', 'address:*', paginate=True, scrolling=False)
+    return self.client.iterate(self.index, 'contract', 'address:*', paginate=True, scrolling=False)
 
   def detect_contract_transactions(self):
     self._extract_contract_addresses()
     for contracts in self._iterate_contracts():
       contracts = [contract["_source"]["address"] for contract in contracts]
-      for transactions_to_contracts in self._iterate_transactions_by_target(contracts):
-        operations = [self.client.update_op(doc={'to_contract': True}, id=transaction["_id"]) for transaction in transactions_to_contracts]
-        self.client.bulk(operations, doc_type='tx', index=self.index, refresh=True)
+      query = " OR ".join(["to:" + contract for contract in contracts])
+      self.client.update_by_query(self.index, 'tx', query, "ctx._source.to_contract = true")
 
 @click.command()
 @click.option('--index', help='Elasticsearch index name', default='ethereum-transaction')

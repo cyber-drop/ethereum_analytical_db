@@ -1,53 +1,10 @@
 import unittest
 from pyelasticsearch import ElasticSearch
-from internal_transactions import InternalTransactions, elasticsearch_iterate
-from time import sleep
+from internal_transactions import InternalTransactions, elasticsearch_iterate, elasticsearch_update_by_query
+from time import sleep, time
 import random
 
 class InternalTransactionsTestCase(unittest.TestCase):
-  def setUp(self):
-    self.client = ElasticSearch('http://localhost:9200')
-    try:
-      self.client.delete_index(TEST_INDEX)
-    except:
-      pass
-    self.client.create_index(TEST_INDEX)
-    self.internal_transactions = InternalTransactions(TEST_INDEX)
-
-  def test_iterate_elasticsearch_data(self):
-    for i in range(11):
-      self.client.index(TEST_INDEX, 'item', {'paginate': True}, id=i + 1, refresh=True)
-    iterator = elasticsearch_iterate(self.client, index=TEST_INDEX, doc_type='item', query='paginate:true', per=10)
-    items = next(iterator)
-    operations = [self.client.update_op(doc={'paginate': False}, id=i + 1) for i, item in enumerate(items)]
-    self.client.bulk(operations, doc_type='item', index=TEST_INDEX, refresh=True)
-    item = next(iterator)
-    assert len(items) == 10
-    assert len(item) == 1
-
-  def test_iterate_elasticsearch_data_with_pagination(self):
-    for i in range(11):
-      self.client.index(TEST_INDEX, 'item', {'paginate': True}, id=i + 1, refresh=True)
-    iterator = elasticsearch_iterate(self.client, index=TEST_INDEX, doc_type='item', query='paginate:true', per=10, paginate=True)
-    items = next(iterator)
-    item = next(iterator)
-    assert len(items) == 10
-    assert len(item) == 1
-
-  def test_deep_pagination(self):
-    for i in range(100):
-      self.client.index(TEST_INDEX, 'item', {'paginate': True}, id=i + 1, refresh=True)
-    iterator = elasticsearch_iterate(self.client, index=TEST_INDEX, doc_type='item', query='paginate:true', per=10, paginate=True)
-    items = []
-    for items_list in iterator:
-      items.append(items_list)
-      for j in range(20):
-        self.client.update(TEST_INDEX, 'item', id=random.randint(1, 100), doc={'some_failing_flag': True})
-    items = [i["_id"] for items_list in items for i in items_list]
-    items = set(items)
-    print(len(list(items)))
-    assert len(list(items)) == 100
-
   def test_iterate_transactions(self):
     self.client.index(TEST_INDEX, 'tx', {'to_contract': False}, id=1, refresh=True)
     self.client.index(TEST_INDEX, 'tx', {'to_contract': True, 'trace': {'test': 1}}, id=2, refresh=True)
@@ -73,12 +30,20 @@ class InternalTransactionsTestCase(unittest.TestCase):
     for index, trace in traces.items():
       self.assertSequenceEqual(trace, TEST_TRANSACTION_TRACE)
 
+  def test_get_traces_with_error(self):
+    traces = self.internal_transactions._get_traces({1: TEST_INCORRECT_TRANSACTION_HASH})
+    assert 1 not in traces.keys()
+
   def test_save_traces(self):
     self.client.index(TEST_INDEX, 'tx', {"hash": TEST_TRANSACTION_HASH}, id=1, refresh=True)
     self.internal_transactions._save_traces({1: TEST_TRANSACTION_TRACE})
     transaction = self.client.get(TEST_INDEX, 'tx', 1)['_source']
     trace = transaction['trace']
     self.assertSequenceEqual(trace, TEST_TRANSACTION_TRACE)
+
+  def test_save_empty_traces(self):
+    self.internal_transactions._save_traces({})
+    assert True
 
   def test_extract_traces_chunk(self):
     docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'id': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
@@ -104,6 +69,7 @@ TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 10
 TEST_INDEX = 'test-ethereum-transactions'
 TEST_TRANSACTION_HASH = '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a'
 TEST_TRANSACTION_INPUT = '0xb1631db29e09ec5581a0ec398f1229abaf105d3524c49727621841af947bdc44'
+TEST_INCORRECT_TRANSACTION_HASH = "0x"
 TEST_TRANSACTION_TRACE = [
   {
     "action": {
