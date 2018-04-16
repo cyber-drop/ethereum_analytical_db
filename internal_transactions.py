@@ -9,7 +9,14 @@ NUMBER_OF_JOBS = 10
 
 class CustomElasticSearch(ElasticSearch):
   def update_by_query(client, index, doc_type, query, script):
-    client.send_request('POST', [index, doc_type, '_update_by_query'], {'script': {'inline': script}}, {'refresh': True, 'q': query})
+    body = {'script': {'inline': script}}
+    parameters = {'refresh': True}
+    if type(query) is dict:
+      body['query'] = query
+    else:
+      parameters['q'] = query
+    client.send_request('POST', [index, doc_type, '_update_by_query'], body, parameters)
+
 
   def iterate(client, index, doc_type, query, per=NUMBER_OF_JOBS, paginate=False, scrolling=True):
     items_count = client.count(query, index=index, doc_type=doc_type)['count']
@@ -84,19 +91,22 @@ class ContractTransactions:
       docs = [{'address': contract, 'id': contract} for contract in contracts]
       self.client.bulk_index(docs=docs, doc_type='contract', index=self.index, refresh=True)
 
-  def _iterate_transactions_by_target(self, targets):
-    query = " OR ".join(["to:" + target for target in targets])
-    return self.client.iterate(self.index, 'tx', query, paginate=True)
-
   def _iterate_contracts(self):
     return self.client.iterate(self.index, 'contract', 'address:*', paginate=True, scrolling=False)
+
+  def _detect_transactions_by_contracts(self, contracts):
+    query = {
+      "terms": {
+        "to": contracts
+      }
+    }
+    self.client.update_by_query(self.index, 'tx', query, "ctx._source.to_contract = true")
 
   def detect_contract_transactions(self):
     self._extract_contract_addresses()
     for contracts in self._iterate_contracts():
       contracts = [contract["_source"]["address"] for contract in contracts]
-      query = " OR ".join(["to:" + contract for contract in contracts])
-      self.client.update_by_query(self.index, 'tx', query, "ctx._source.to_contract = true")
+      self._detect_transactions_by_contracts(contracts)
 
 @click.command()
 @click.option('--index', help='Elasticsearch index name', default='ethereum-transaction')

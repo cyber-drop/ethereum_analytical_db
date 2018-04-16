@@ -50,15 +50,6 @@ class ContractTransactionsTestCase(unittest.TestCase):
     print(len(contracts))
     assert len(contracts) == 100
 
-  def test_iterate_transactions_by_target(self):
-    self.client.index(TEST_INDEX, 'tx', {'to': TEST_TRANSACTION_TO}, id=1, refresh=True)
-    self.client.index(TEST_INDEX, 'tx', {'to': TEST_TRANSACTION_TO_CONTRACT}, id=2, refresh=True)
-    self.client.index(TEST_INDEX, 'tx', {'to': TEST_TRANSACTION_TO_COMMON}, id=3, refresh=True)
-    iterator = self.contract_transactions._iterate_transactions_by_target([TEST_TRANSACTION_TO, TEST_TRANSACTION_TO_CONTRACT])
-    transactions = next(iterator)
-    transactions = [transaction['_id'] for transaction in transactions]
-    self.assertCountEqual(["1", "2"], transactions)
-
   def test_iterate_contracts(self):
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_TRANSACTION_TO}, id=1, refresh=True)
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_TRANSACTION_TO_CONTRACT}, id=2, refresh=True)
@@ -82,8 +73,15 @@ class ContractTransactionsTestCase(unittest.TestCase):
     self.contract_transactions.detect_contract_transactions()
     transactions = self.client.search("to_contract:true", index=TEST_INDEX, doc_type="tx", size=100)['hits']['hits']
     print(len(transactions))
-    assert len(transactions) == 100
+    assert len(transactions) == 100    
 
+  def test_detect_transactions_by_big_portion_of_contracts(self):
+    docs = [{'to': TEST_TRANSACTION_TO + str(i), 'input': TEST_TRANSACTION_INPUT, 'id': i + 1} for i in range(1000)]
+    self.client.bulk_index(docs=docs, doc_type='tx', index=TEST_INDEX, refresh=True)
+    self.contract_transactions._detect_transactions_by_contracts([TEST_TRANSACTION_TO + str(i) for i in range(1000)])
+    transactions = self.client.search("to_contract:true", index=TEST_INDEX, doc_type="tx", size=1000)['hits']['hits']
+    print(len(transactions))
+    assert len(transactions) == 1000
 
 TEST_INDEX = 'test-ethereum-transactions'
 TEST_TRANSACTION_INPUT = '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a'

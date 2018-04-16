@@ -70,13 +70,23 @@ class ElasticSearchTestCase(unittest.TestCase):
     assert all(attemps)
 
   def test_elasticsearch_update_by_query(self):
-    for i in range(5):
-      self.client.index(TEST_INDEX, 'item', {'will_update': True}, id=i + 1, refresh=True)
-    for i in range(5):
-      self.client.index(TEST_INDEX, 'item', {'will_update': False}, id=i + 6, refresh=True)
+    self.add_transactions_for_update()
     self.new_client.update_by_query(TEST_INDEX, 'item', 'will_update:true', 'ctx._source.updated = true')
     updated_records = self.client.search("updated:true", index=TEST_INDEX, doc_type='item')['hits']['hits']
     updated_records = [record["_id"] for record in updated_records]
     self.assertCountEqual(updated_records, [str(i + 1) for i in range(5)])
+
+  def test_elasticsearch_update_by_query_object(self):
+    self.add_transactions_for_update()
+    self.new_client.update_by_query(TEST_INDEX, 'item', {'term': {'will_update': True}}, 'ctx._source.updated = true')
+    updated_records = self.client.search("updated:true", index=TEST_INDEX, doc_type='item')['hits']['hits']
+    updated_records = [record["_id"] for record in updated_records]
+    self.assertCountEqual(updated_records, [str(i + 1) for i in range(5)])
+
+  def add_transactions_for_update(self):
+    for i in range(5):
+      self.client.index(TEST_INDEX, 'item', {'will_update': True}, id=i + 1, refresh=True)
+    for i in range(5):
+      self.client.index(TEST_INDEX, 'item', {'will_update': False}, id=i + 6, refresh=True)
 
 TEST_INDEX = 'test-ethereum-transactions'
