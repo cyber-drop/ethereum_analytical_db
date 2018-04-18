@@ -49,6 +49,11 @@ class InputParsingTestCase(unittest.TestCase):
     response = self.contracts._decode_input(TEST_CONTRACT_PARAMETERS)
     self.assertSequenceEqual(response, TEST_CONTRACT_DECODED_PARAMETERS)
 
+  def test_decode_input_for_wrong_contract_abi(self):
+    self.contracts._add_contract_abi("0x0")
+    response = self.contracts._decode_input(TEST_CONTRACT_PARAMETERS)
+    self.assertSequenceEqual(response, {"contract_without_abi": True})
+
   def test_iterate_contracts(self):
     for i in tqdm(range(20)):
       self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS}, id=i + 1, refresh=True)

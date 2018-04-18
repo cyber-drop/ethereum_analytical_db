@@ -26,7 +26,10 @@ class Contracts():
 
   def _decode_input(self, encoded_params):
     response = requests.get(DECODE_PARAMS_URL.format(encoded_params))
-    return response.json()
+    if response.text:
+      return response.json()
+    else:
+      return {'contract_without_abi': True}
 
   def _iterate_contracts(self):
     return self.client.iterate(self.index, 'contract', 'address:*', paginate=True)
