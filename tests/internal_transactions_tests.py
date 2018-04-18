@@ -1,8 +1,28 @@
 import unittest
 from pyelasticsearch import ElasticSearch
-from internal_transactions import InternalTransactions, elasticsearch_iterate, elasticsearch_update_by_query
+from internal_transactions import InternalTransactions
 from time import sleep, time
 import random
+import requests
+import json
+
+class SergeImplementation():
+  def _http_post_request(self, url, request):
+    return requests.post(url, data=request, headers={"content-type": "application/json"}).json()
+
+  def _make_request_trace(self, hash):
+    return json.dumps({
+        "jsonrpc": "2.0",
+        "method": "trace_replayTransaction",
+        "params": [hash,
+                   ["trace"]],
+        "id": 1
+    })
+
+  def get_traces(self, hashes):
+    return [self._http_post_request(
+      'http://localhost:8545', 
+      self._make_request_trace(hash))['result']['trace'] for hash in hashes]
 
 class InternalTransactionsTestCase(unittest.TestCase):
   def setUp(self):
@@ -12,7 +32,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
     except:
       pass
     self.client.create_index(TEST_INDEX)
-    self.contract_transactions = ContractTransactions(TEST_INDEX)
+    self.internal_transactions = InternalTransactions(TEST_INDEX)
 
   def test_iterate_transactions(self):
     self.client.index(TEST_INDEX, 'tx', {'to_contract': False}, id=1, refresh=True)
@@ -38,6 +58,23 @@ class InternalTransactionsTestCase(unittest.TestCase):
     traces = self.internal_transactions._get_traces({i: TEST_TRANSACTION_HASH for i in range(TEST_TRANSACTIONS_NUMBER)})
     for index, trace in traces.items():
       self.assertSequenceEqual(trace, TEST_TRANSACTION_TRACE)
+
+  def test_get_traces_faster_than_serge(self):
+    attemps = []
+    serge_implementation = SergeImplementation()
+    for attemp in tqdm(range(5)):
+      start_time_for_serge_extractor = time()
+      response = serge_implementation.get_traces([TEST_TRANSACTION_HASH for i in range(TEST_BIG_TRANSACTIONS_NUMBER)])
+      assert len(response) == TEST_BIG_TRANSACTIONS_NUMBER
+      start_time_for_my_extractor = time()
+      response = self.internal_transactions._get_traces({i: TEST_TRANSACTION_HASH for i in range(TEST_BIG_TRANSACTIONS_NUMBER)})
+      assert len(response.keys()) == TEST_BIG_TRANSACTIONS_NUMBER
+      end_time = time()
+      serge_time = start_time_for_my_extractor - start_time_for_serge_extractor
+      my_time = end_time - start_time_for_my_extractor
+      attemps.append(my_time < serge_time)
+      print(my_time, serge_time)
+    assert all(attemps)
 
   def test_get_traces_with_error(self):
     traces = self.internal_transactions._get_traces({1: TEST_INCORRECT_TRANSACTION_HASH})
@@ -74,7 +111,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
     pass
 
 TEST_TRANSACTIONS_NUMBER = 10
-TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 10
+TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 100
 TEST_INDEX = 'test-ethereum-transactions'
 TEST_TRANSACTION_HASH = '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a'
 TEST_TRANSACTION_INPUT = '0xb1631db29e09ec5581a0ec398f1229abaf105d3524c49727621841af947bdc44'
