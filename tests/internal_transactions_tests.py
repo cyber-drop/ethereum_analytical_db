@@ -39,6 +39,11 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.client.create_index(TEST_INDEX)
     self.internal_transactions = InternalTransactions(TEST_INDEX)
 
+  def test_split_on_chunks(self):
+    test_list = list(range(10))
+    test_chunks = list(self.internal_transactions._split_on_chunks(test_list, 3))
+    self.assertSequenceEqual(test_chunks, [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]])
+
   def test_iterate_transactions(self):
     self.client.index(TEST_INDEX, 'tx', {'to_contract': False}, id=1, refresh=True)
     self.client.index(TEST_INDEX, 'tx', {'to_contract': True, 'trace': {'test': 1}}, id=2, refresh=True)
