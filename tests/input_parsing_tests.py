@@ -4,12 +4,13 @@ import unittest
 import subprocess
 from time import sleep
 from test_utils import TestElasticSearch
+from tqdm import *
 
 class InputParsingTestCase(unittest.TestCase):
   def setUp(self):
-    self.contracts = Contracts()
+    self.contracts = Contracts(TEST_INDEX)
     self.client = TestElasticSearch()
-    self.client.create_test_index(TEST_INDEX)
+    self.client.recreate_index(TEST_INDEX)
 
   def _run_shell_command(self, command):
     proc = subprocess.Popen(command,stdout=subprocess.PIPE,shell=True)
@@ -30,7 +31,7 @@ class InputParsingTestCase(unittest.TestCase):
 
   def test_restart_server_after_init(self):
     processes_before = self._run_shell_command('lsof -i tcp:3000')
-    self.contracts = Contracts()
+    self.contracts = Contracts(TEST_INDEX)
     processes_after = self._run_shell_command('lsof -i tcp:3000')
     assert processes_before != processes_after
 
@@ -46,21 +47,43 @@ class InputParsingTestCase(unittest.TestCase):
   def test_decode_input(self):
     self.contracts._add_contract_abi(TEST_CONTRACT_ADDRESS)
     response = self.contracts._decode_input(TEST_CONTRACT_PARAMETERS)
-    print(response)
     self.assertSequenceEqual(response, TEST_CONTRACT_DECODED_PARAMETERS)
 
   def test_iterate_contracts(self):
-    pass
-    # for i in range(20):
-    #   self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS}, id=i + 1)
-    # contracts = [c for c in self.contracts._iterate_contracts()]
-    # contracts = [c["_id"] for contracts_list in contracts for c in contracts_list]
+    for i in tqdm(range(20)):
+      self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS}, id=i + 1, refresh=True)
+    contracts = [c for c in self.contracts._iterate_contracts()]
+    contracts = [c["_id"] for contracts_list in contracts for c in contracts_list]
+    self.assertCountEqual(contracts, [str(i) for i in range(1, 21)])
+
+  def test_iterate_transactions_by_targets(self):
+    for i in tqdm(range(20)):
+      self.client.index(TEST_INDEX, 'tx', {'to': TEST_CONTRACT_ADDRESS}, id=i + 1, refresh=True)
+    for i in tqdm(range(20)):
+      self.client.index(TEST_INDEX, 'tx', {'to': "0x"}, id=i + 21, refresh=True)
+    targets = [TEST_CONTRACT_ADDRESS]
+    transactions = [c for c in self.contracts._iterate_transactions_by_targets(targets)]
+    transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
+    self.assertCountEqual(transactions, [str(i) for i in range(1, 21)])    
 
   def test_decode_inputs(self):
-    pass
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS}, id=1, refresh=True)
+    for i in tqdm(range(10)):
+      self.client.index(TEST_INDEX, 'tx', {'to': TEST_CONTRACT_ADDRESS, 'input': TEST_CONTRACT_PARAMETERS}, id=i + 1, refresh=True)
+    contracts = [TEST_CONTRACT_ADDRESS]
+    self.contracts._decode_inputs_for_contracts(contracts)
+    transactions = self.client.search(index=TEST_INDEX, doc_type='tx', query="decoded_input:*")['hits']['hits']
+    decoded_inputs = [t["_source"]["decoded_input"] for t in transactions]
+    self.assertCountEqual(decoded_inputs, [TEST_CONTRACT_DECODED_PARAMETERS for i in range(1, 11)])
 
   def test_decode_inputs_for_big_portion_of_contracts(self):
-    pass
+    for i in tqdm(range(10)):
+      self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS}, id=i + 1, refresh=True)
+    for i in tqdm(range(10)):
+      self.client.index(TEST_INDEX, 'tx', {'to': TEST_CONTRACT_ADDRESS, 'input': TEST_CONTRACT_PARAMETERS}, id=i + 1, refresh=True)
+    self.contracts.decode_inputs()
+    transactions = self.client.search(index=TEST_INDEX, doc_type='tx', query="decoded_input:*")['hits']['hits']
+    assert len(transactions) == 10
 
 TEST_CONTRACT_ADDRESS = '0x86fa049857e0209aa7d9e616f7eb3b3b78ecfdb0'
 TEST_CONTRACT_PARAMETERS = '0xa9059cbb000000000000000000000000d11b80088ce2623a9c017b93008405511cd951d200000000000000000000000000000000000000000000000d343b16da9c1a4000'

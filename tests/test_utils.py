@@ -7,7 +7,7 @@ class TestElasticSearch(ElasticSearch):
   def __init__(self):
     super().__init__("http://localhost:9200")
 
-  def create_test_index(self, index):
+  def recreate_index(self, index):
     try:
       self.delete_index(index)
     except:

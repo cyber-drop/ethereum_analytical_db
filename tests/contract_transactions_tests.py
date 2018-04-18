@@ -1,5 +1,5 @@
 import unittest 
-from internal_transactions import ContractTransactions
+from contract_transactions import ContractTransactions
 from pyelasticsearch import ElasticSearch
 from time import sleep
 from tqdm import *

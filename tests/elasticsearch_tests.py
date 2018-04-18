@@ -1,5 +1,5 @@
 from pyelasticsearch import ElasticSearch
-from internal_transactions import CustomElasticSearch as NewElasticSearch
+from custom_elastic_search import CustomElasticSearch as NewElasticSearch
 import unittest
 from time import time
 import random
@@ -35,6 +35,15 @@ class ElasticSearchTestCase(unittest.TestCase):
     assert len(items) == 10
     assert len(item) == 1
 
+  def test_iterate_elasticsearch_data_with_object_query(self):
+    for i in range(11):
+      self.client.index(TEST_INDEX, 'item', {'paginate': True}, id=i + 1, refresh=True)
+    iterator = self.new_client.iterate(index=TEST_INDEX, doc_type='item', query={"term": {"paginate": True}}, per=10, paginate=True)
+    items = next(iterator)
+    item = next(iterator)
+    assert len(items) == 10
+    assert len(item) == 1
+
   def test_deep_pagination(self):
     for i in range(100):
       self.client.index(TEST_INDEX, 'item', {'paginate': True}, id=i + 1, refresh=True)
@@ -49,7 +58,7 @@ class ElasticSearchTestCase(unittest.TestCase):
     print(len(list(items)))
     assert len(list(items)) == 100
 
-  def unimplemented_test_pagination_without_scrolling(self):
+  def unimplemented_pagination_without_scrolling(self):
     docs = [{'paginate': True, 'id': i + 1} for i in range(1000)]
     self.client.bulk_index(docs=docs, doc_type='item', index=TEST_INDEX, refresh=True)
     attemps = []
