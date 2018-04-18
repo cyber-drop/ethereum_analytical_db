@@ -5,6 +5,7 @@ from time import sleep, time
 import random
 import requests
 import json
+from multiprocessing import Pool
 
 class SergeImplementation():
   def _http_post_request(self, url, request):
@@ -20,9 +21,12 @@ class SergeImplementation():
     })
 
   def get_traces(self, hashes):
-    return [self._http_post_request(
+    pool = Pool(processes=10)
+    def f(hash):
+      self._http_post_request(
       'http://localhost:8545', 
-      self._make_request_trace(hash))['result']['trace'] for hash in hashes]
+      self._make_request_trace(hash))['result']['trace']
+    return pool.map(f, hashes)
 
 class InternalTransactionsTestCase(unittest.TestCase):
   def setUp(self):
