@@ -30,12 +30,13 @@ class InternalTransactions:
       data=request_string, 
       headers={"content-type": "application/json"}
     ).json()
-    traces = {response["id"]: response["result"]['trace'] for response in responses}
+    traces = {response["id"]: response["result"]['trace'] for response in responses if "result" in response.keys()}
     return traces
 
   def _save_traces(self, traces):
-    operations = [self.client.update_op(doc={'trace': trace}, id=id) for id, trace in traces.items()]
-    self.client.bulk(operations, doc_type='tx', index=self.index, refresh=True)
+    if traces:
+      operations = [self.client.update_op(doc={'trace': trace}, id=id) for id, trace in traces.items()]
+      self.client.bulk(operations, doc_type='tx', index=self.index, refresh=True)
 
   def _extract_traces_chunk(self, transactions):
     hashes = {transaction["_id"]: transaction["_source"]["hash"] for transaction in transactions}
