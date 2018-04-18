@@ -3,6 +3,28 @@ import requests
 import json
 from time import sleep
 from tqdm import *
+from multiprocessing import Pool
+
+def _make_trace_requests(hashes):
+  return [{
+    "jsonrpc": "2.0",
+    "id": id,
+    "method": "trace_replayTransaction", 
+    "params": [hash, ["trace"]]
+  } for id, hash in hashes.items()]
+
+def _get_traces_sync(hashes):
+  hashes = dict(hashes)
+  request = _make_trace_requests(hashes)
+  request_string = json.dumps(request)
+
+  responses = requests.post(
+    "http://localhost:8545", 
+    data=request_string, 
+    headers={"content-type": "application/json"}
+  ).json()
+  traces = {response["id"]: response["result"]['trace'] for response in responses if "result" in response.keys()}
+  return traces
 
 class InternalTransactions:
   def __init__(self, elasticsearch_index, elasticsearch_host="http://localhost:9200", ethereum_api_host="http://localhost:8545"):
@@ -10,28 +32,24 @@ class InternalTransactions:
     self.client = CustomElasticSearch(elasticsearch_host)
     self.ethereum_api_host = ethereum_api_host
 
+  def _split_on_chunks(self, iterable, size):
+    iterable = iter(iterable)
+    for element in iterable:
+      elements = [element]
+      try:
+        for i in range(size - 1):
+          elements.append(next(iterable))
+      except StopIteration:
+        pass
+      yield elements
+
   def _iterate_transactions(self):
     return self.client.iterate(self.index, 'tx', 'to_contract:true AND !(_exists_:trace)')
 
-  def _make_trace_requests(self, hashes):
-    return [{
-      "jsonrpc": "2.0",
-      "id": id,
-      "method": "trace_replayTransaction", 
-      "params": [hash, ["trace"]]
-    } for id, hash in hashes.items()]
-
   def _get_traces(self, hashes):
-    request = self._make_trace_requests(hashes)
-    request_string = json.dumps(request)
-
-    responses = requests.post(
-      self.ethereum_api_host, 
-      data=request_string, 
-      headers={"content-type": "application/json"}
-    ).json()
-    traces = {response["id"]: response["result"]['trace'] for response in responses if "result" in response.keys()}
-    return traces
+    pool = Pool(processes=10)
+    traces = pool.map(_get_traces_sync, self._split_on_chunks(hashes.items(), 10))
+    return {id: trace for traces_dict in traces for id, trace in traces_dict.items()}
 
   def _save_traces(self, traces):
     if traces:
