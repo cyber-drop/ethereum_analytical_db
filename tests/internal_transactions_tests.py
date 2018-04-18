@@ -5,6 +5,15 @@ from time import sleep, time
 import random
 
 class InternalTransactionsTestCase(unittest.TestCase):
+  def setUp(self):
+    self.client = ElasticSearch('http://localhost:9200')
+    try:
+      self.client.delete_index(TEST_INDEX)
+    except:
+      pass
+    self.client.create_index(TEST_INDEX)
+    self.contract_transactions = ContractTransactions(TEST_INDEX)
+
   def test_iterate_transactions(self):
     self.client.index(TEST_INDEX, 'tx', {'to_contract': False}, id=1, refresh=True)
     self.client.index(TEST_INDEX, 'tx', {'to_contract': True, 'trace': {'test': 1}}, id=2, refresh=True)

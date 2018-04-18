@@ -1,38 +1,8 @@
-from pyelasticsearch import ElasticSearch
+from custom_elastic_search import CustomElasticSearch
 import requests
 import json
-import click
 from time import sleep
 from tqdm import *
-
-NUMBER_OF_JOBS = 10
-
-class CustomElasticSearch(ElasticSearch):
-  def update_by_query(client, index, doc_type, query, script):
-    body = {'script': {'inline': script}}
-    parameters = {'refresh': True}
-    if type(query) is dict:
-      body['query'] = query
-    else:
-      parameters['q'] = query
-    client.send_request('POST', [index, doc_type, '_update_by_query'], body, parameters)
-
-
-  def iterate(client, index, doc_type, query, per=NUMBER_OF_JOBS, paginate=False, scrolling=True):
-    items_count = client.count(query, index=index, doc_type=doc_type)['count']
-    pages = round(items_count / per + 0.4999)
-    scroll_id = None
-    for page in tqdm(range(pages)):
-      if paginate:
-        if not scroll_id:
-          response = client.send_request('GET', [index, doc_type, '_search'], query_params={'scroll': '1m', 'size': per, 'q': query})
-          scroll_id = response['_scroll_id']
-          page_items = response['hits']['hits']
-        else:
-          page_items = client.send_request('POST', ['_search', 'scroll'], {'scroll': '1m', 'scroll_id': scroll_id}, {})['hits']['hits']
-      else:
-        page_items = client.search(query, index=index, doc_type=doc_type, size=per)['hits']['hits']
-      yield page_items
 
 class InternalTransactions:
   def __init__(self, elasticsearch_index, elasticsearch_host="http://localhost:9200", ethereum_api_host="http://localhost:8545"):
@@ -75,49 +45,3 @@ class InternalTransactions:
   def extract_traces(self):
     for transactions in self._iterate_transactions():
       self._extract_traces_chunk(transactions)
-
-class ContractTransactions:
-  def __init__(self, elasticsearch_index, elasticsearch_host="http://localhost:9200", ethereum_api_host="http://localhost:8545"):
-    self.index = elasticsearch_index
-    self.client = CustomElasticSearch(elasticsearch_host)
-    self.ethereum_api_host = ethereum_api_host
-
-  def _iterate_contract_transactions(self):
-    return self.client.iterate(self.index, 'tx', 'input:0x?*', paginate=True, scrolling=False)
-
-  def _extract_contract_addresses(self):
-    for contract_transactions in self._iterate_contract_transactions():
-      contracts = [transaction["_source"]["to"] for transaction in contract_transactions]
-      docs = [{'address': contract, 'id': contract} for contract in contracts]
-      self.client.bulk_index(docs=docs, doc_type='contract', index=self.index, refresh=True)
-
-  def _iterate_contracts(self):
-    return self.client.iterate(self.index, 'contract', 'address:*', paginate=True, scrolling=False)
-
-  def _detect_transactions_by_contracts(self, contracts):
-    query = {
-      "terms": {
-        "to": contracts
-      }
-    }
-    self.client.update_by_query(self.index, 'tx', query, "ctx._source.to_contract = true")
-
-  def detect_contract_transactions(self):
-    self._extract_contract_addresses()
-    for contracts in self._iterate_contracts():
-      contracts = [contract["_source"]["address"] for contract in contracts]
-      self._detect_transactions_by_contracts(contracts)
-
-@click.command()
-@click.option('--index', help='Elasticsearch index name', default='ethereum-transaction')
-@click.option('--operation', help='Action to perform (detect-contracts, extract-traces, parse-inputs)', default='detect-contracts')
-def start_process(index, operation):
-  contract_transactions = ContractTransactions(index)
-  internal_transactions = InternalTransactions(index)
-  if operation == "detect-contracts":
-    contract_transactions.detect_contract_transactions()
-  elif operation == "extract-traces":
-    internal_transactions.extract_traces()
-
-if __name__ == '__main__':
-  start_process()
