@@ -21,13 +21,14 @@ class SergeImplementation():
         "id": 1
     })
 
-  def get_traces(self, hashes):
-    pool = Pool(processes=10)
-    def f(hash):
-      self._http_post_request(
+  def _get_trace(self, hash):
+    self._http_post_request(
       'http://localhost:8545',
       self._make_request_trace(hash))['result']['trace']
-    return pool.map(f, hashes)
+
+  def get_traces(self, hashes):
+    pool = Pool(processes=10)
+    return pool.map(self._get_trace, hashes)
 
 class InternalTransactionsTestCase(unittest.TestCase):
   def setUp(self):
