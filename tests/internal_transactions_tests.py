@@ -60,14 +60,19 @@ class InternalTransactionsTestCase(unittest.TestCase):
       self.assertSequenceEqual(trace, TEST_TRANSACTION_TRACE)
 
   def test_get_traces_faster_than_serge(self):
+    real_client = ElasticSearch('http://localhost:9200')
     attemps = []
+    real_hashes = real_client.search(index=INDEX_WITH_REAL_DATA, doc_type="tx", query='to_contract:true', size=TEST_BIG_TRANSACTIONS_NUMBER*TEST_ATTEMPS)['hits']['hits']
+    real_hashes = [t["_source"]["hash"] for t in real_hashes]
     serge_implementation = SergeImplementation()
-    for attemp in tqdm(range(5)):
+    for attemp in range(TEST_ATTEMPS):
+      start_chunk = attemp * TEST_BIG_TRANSACTIONS_NUMBER
+      end_chunk = (attemp + 1) * TEST_BIG_TRANSACTIONS_NUMBER  
       start_time_for_serge_extractor = time()
-      response = serge_implementation.get_traces([TEST_TRANSACTION_HASH for i in range(TEST_BIG_TRANSACTIONS_NUMBER)])
+      response = serge_implementation.get_traces(real_hashes[start_chunk:end_chunk])
       assert len(response) == TEST_BIG_TRANSACTIONS_NUMBER
       start_time_for_my_extractor = time()
-      response = self.internal_transactions._get_traces({i: TEST_TRANSACTION_HASH for i in range(TEST_BIG_TRANSACTIONS_NUMBER)})
+      response = self.internal_transactions._get_traces({i: hash for i, hash in enumerate(real_hashes[start_chunk:end_chunk])})
       assert len(response.keys()) == TEST_BIG_TRANSACTIONS_NUMBER
       end_time = time()
       serge_time = start_time_for_my_extractor - start_time_for_serge_extractor
@@ -154,3 +159,5 @@ TEST_TRANSACTION_TRACE = [
     "type": "call"
   }
 ]
+INDEX_WITH_REAL_DATA = "ethereum-transaction"
+TEST_ATTEMPS = 5
