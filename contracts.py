@@ -11,9 +11,9 @@ DECODE_PARAMS_URL = SERVER_URL.format("decode_params/{}")
 
 class Contracts():
   def __init__(self, index, host="http://localhost:9200"):
-    self._restart_server()
     self.index = index
     self.client = CustomElasticSearch()
+    self._restart_server()
 
   def _restart_server(self):
     os.system("kill `lsof -i tcp:3000 | awk 'NR == 2 {print $2}'`")
