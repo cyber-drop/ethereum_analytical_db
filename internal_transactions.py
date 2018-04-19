@@ -6,6 +6,10 @@ from tqdm import *
 from multiprocessing import Pool
 
 NUMBER_OF_PROCESSES = 10
+INPUT_TRANSACTION = 0
+INTERNAL_TRANSACTION = 1
+OUTPUT_TRANSACTION = 2
+OTHER_TRANSACTION = 3
 
 def _make_trace_requests(hashes):
   return [{
@@ -52,6 +56,22 @@ class InternalTransactions:
     pool = Pool(processes=NUMBER_OF_PROCESSES)
     traces = pool.map(_get_traces_sync, self._split_on_chunks(hashes.items(), NUMBER_OF_PROCESSES))
     return {id: trace for traces_dict in traces for id, trace in traces_dict.items()}
+
+  def _set_trace_hashes(self, transaction):
+    for i, internal_transaction in enumerate(transaction['trace']):
+      internal_transaction["hash"] = transaction["hash"] + str(i)
+
+  def _classify_trace(self, transaction):
+    for internal_transaction in transaction['trace']:
+      action = internal_transaction["action"]
+      if (action["from"] == transaction["from"]) and (action["to"] == transaction["to"]):
+        internal_transaction["class"] = INPUT_TRANSACTION
+      elif (action["from"] == transaction["to"]) and (action["to"] == transaction["from"]):
+        internal_transaction["class"] = INTERNAL_TRANSACTION
+      elif (action["from"] == transaction["from"]) and (action["to"] != action["from"]):
+        internal_transaction["class"] = OUTPUT_TRANSACTION
+      else:
+        internal_transaction["class"] = OTHER_TRANSACTION
 
   def _save_traces(self, traces):
     if traces:
