@@ -73,7 +73,6 @@ class InternalTransactionsTestCase(unittest.TestCase):
   def test_get_traces_faster_than_serge(self):
     real_client = ElasticSearch('http://localhost:9200')
     attemps = []
-<<<<<<< HEAD
     real_hashes = real_client.search(index=INDEX_WITH_REAL_DATA, doc_type="tx", query='to_contract:true', size=TEST_BIG_TRANSACTIONS_NUMBER*TEST_ATTEMPS*3)['hits']['hits']
     real_hashes = [t["_source"]["hash"] for t in real_hashes]
     serge_implementation = SergeImplementation()
@@ -174,8 +173,4 @@ TEST_TRANSACTION_TRACE = [
   }
 ]
 INDEX_WITH_REAL_DATA = "ethereum-transaction"
-<<<<<<< HEAD
 TEST_ATTEMPS = 5
-=======
-TEST_ATTEMPS = 5
->>>>>>> dcce0cc25ee6f39c1f7cc0e891d62d301441f2e6
