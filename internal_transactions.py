@@ -5,6 +5,8 @@ from time import sleep
 from tqdm import *
 from multiprocessing import Pool
 
+NUMBER_OF_PROCESSES = 10
+
 def _make_trace_requests(hashes):
   return [{
     "jsonrpc": "2.0",
@@ -47,8 +49,8 @@ class InternalTransactions:
     return self.client.iterate(self.index, 'tx', 'to_contract:true AND !(_exists_:trace)')
 
   def _get_traces(self, hashes):
-    pool = Pool(processes=10)
-    traces = pool.map(_get_traces_sync, self._split_on_chunks(hashes.items(), 10))
+    pool = Pool(processes=NUMBER_OF_PROCESSES)
+    traces = pool.map(_get_traces_sync, self._split_on_chunks(hashes.items(), NUMBER_OF_PROCESSES))
     return {id: trace for traces_dict in traces for id, trace in traces_dict.items()}
 
   def _save_traces(self, traces):
