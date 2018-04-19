@@ -1,8 +1,34 @@
 import unittest
 from pyelasticsearch import ElasticSearch
-from internal_transactions import InternalTransactions, elasticsearch_iterate, elasticsearch_update_by_query
+from internal_transactions import InternalTransactions
 from time import sleep, time
 import random
+import requests
+import json
+from multiprocessing import Pool
+from tqdm import *
+
+class SergeImplementation():
+  def _http_post_request(self, url, request):
+    return requests.post(url, data=request, headers={"content-type": "application/json"}).json()
+
+  def _make_request_trace(self, hash):
+    return json.dumps({
+        "jsonrpc": "2.0",
+        "method": "trace_replayTransaction",
+        "params": [hash,
+                   ["trace"]],
+        "id": 1
+    })
+
+  def _get_trace(self, hash):
+    self._http_post_request(
+      'http://localhost:8545',
+      self._make_request_trace(hash))['result']['trace']
+
+  def get_traces(self, hashes):
+    pool = Pool(processes=10)
+    return pool.map(self._get_trace, hashes)
 
 class InternalTransactionsTestCase(unittest.TestCase):
   def setUp(self):
@@ -12,7 +38,12 @@ class InternalTransactionsTestCase(unittest.TestCase):
     except:
       pass
     self.client.create_index(TEST_INDEX)
-    self.contract_transactions = ContractTransactions(TEST_INDEX)
+    self.internal_transactions = InternalTransactions(TEST_INDEX)
+
+  def test_split_on_chunks(self):
+    test_list = list(range(10))
+    test_chunks = list(self.internal_transactions._split_on_chunks(test_list, 3))
+    self.assertSequenceEqual(test_chunks, [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]])
 
   def test_iterate_transactions(self):
     self.client.index(TEST_INDEX, 'tx', {'to_contract': False}, id=1, refresh=True)
@@ -38,6 +69,31 @@ class InternalTransactionsTestCase(unittest.TestCase):
     traces = self.internal_transactions._get_traces({i: TEST_TRANSACTION_HASH for i in range(TEST_TRANSACTIONS_NUMBER)})
     for index, trace in traces.items():
       self.assertSequenceEqual(trace, TEST_TRANSACTION_TRACE)
+
+  def test_get_traces_faster_than_serge(self):
+    real_client = ElasticSearch('http://localhost:9200')
+    attemps = []
+<<<<<<< HEAD
+    real_hashes = real_client.search(index=INDEX_WITH_REAL_DATA, doc_type="tx", query='to_contract:true', size=TEST_BIG_TRANSACTIONS_NUMBER*TEST_ATTEMPS*3)['hits']['hits']
+    real_hashes = [t["_source"]["hash"] for t in real_hashes]
+    serge_implementation = SergeImplementation()
+    for attemp in tqdm(range(0, TEST_ATTEMPS*3, 3)):
+      start_serge_chunk = attemp * TEST_BIG_TRANSACTIONS_NUMBER
+      end_serge_chunk = (attemp + 1) * TEST_BIG_TRANSACTIONS_NUMBER
+      start_my_chunk = (attemp + 1) * TEST_BIG_TRANSACTIONS_NUMBER
+      end_my_chunk = (attemp + 2) * TEST_BIG_TRANSACTIONS_NUMBER
+      start_time_for_serge_extractor = time()
+      response = serge_implementation.get_traces(real_hashes[start_serge_chunk:end_serge_chunk])
+      assert len(response) == TEST_BIG_TRANSACTIONS_NUMBER
+      start_time_for_my_extractor = time()
+      response = self.internal_transactions._get_traces({i: hash for i, hash in enumerate(real_hashes[start_my_chunk:end_my_chunk])})
+      assert len(response.keys()) == TEST_BIG_TRANSACTIONS_NUMBER
+      end_time = time()
+      serge_time = start_time_for_my_extractor - start_time_for_serge_extractor
+      my_time = end_time - start_time_for_my_extractor
+      attemps.append(my_time < serge_time)
+      print(my_time, serge_time)
+    assert all(attemps)
 
   def test_get_traces_with_error(self):
     traces = self.internal_transactions._get_traces({1: TEST_INCORRECT_TRANSACTION_HASH})
@@ -74,7 +130,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
     pass
 
 TEST_TRANSACTIONS_NUMBER = 10
-TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 10
+TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 100
 TEST_INDEX = 'test-ethereum-transactions'
 TEST_TRANSACTION_HASH = '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a'
 TEST_TRANSACTION_INPUT = '0xb1631db29e09ec5581a0ec398f1229abaf105d3524c49727621841af947bdc44'
@@ -117,3 +173,9 @@ TEST_TRANSACTION_TRACE = [
     "type": "call"
   }
 ]
+INDEX_WITH_REAL_DATA = "ethereum-transaction"
+<<<<<<< HEAD
+TEST_ATTEMPS = 5
+=======
+TEST_ATTEMPS = 5
+>>>>>>> dcce0cc25ee6f39c1f7cc0e891d62d301441f2e6
