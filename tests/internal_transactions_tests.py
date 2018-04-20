@@ -1,6 +1,6 @@
 import unittest
 from pyelasticsearch import ElasticSearch
-from internal_transactions import *
+from internal_transactions import InternalTransactions, _make_trace_requests
 from time import sleep, time
 import random
 import requests
@@ -103,8 +103,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
       "hash": "0x1"
     }
     trace = [{}, {}, {}]
-    transaction["trace"] = trace
-    self.internal_transactions._set_trace_hashes(transaction)
+    self.internal_transactions._set_trace_hashes(transaction, trace)
     assert trace[0]["hash"] == "0x10"
     assert trace[1]["hash"] == "0x11"
     assert trace[2]["hash"] == "0x12"
@@ -137,10 +136,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     }]
     transaction = {
       "from": "0x0",
-      "to": "0x1",
-      'trace': trace
+      "to": "0x1"
     }
-    self.internal_transactions._classify_trace(transaction)
+    self.internal_transactions._classify_trace(transaction, trace)
     assert trace[0]["class"] == INPUT_TRANSACTION
     assert trace[1]["class"] == INTERNAL_TRANSACTION
     assert trace[2]["class"] == OUTPUT_TRANSACTION
@@ -167,9 +165,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.assertCountEqual(transactions, [str(i) for i in range(TEST_TRANSACTIONS_NUMBER)])
 
   def test_extract_traces_chunk_with_preprocessing(self):
-    docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'id': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
+    docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'to': TEST_TRANSACTION_HASH, 'from': TEST_TRANSACTION_HASH, 'id': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
     self.client.bulk_index(TEST_INDEX, 'tx', docs, refresh=True)
-    self.internal_transactions._extract_traces_chunk([{"_id": i, "_source": {"hash": TEST_TRANSACTION_HASH}} for i in range(TEST_TRANSACTIONS_NUMBER)])
+    self.internal_transactions._extract_traces_chunk([{"_id": i, "_source": {"hash": TEST_TRANSACTION_HASH, 'to': TEST_TRANSACTION_HASH, "from": TEST_TRANSACTION_HASH}} for i in range(TEST_TRANSACTIONS_NUMBER)])
     transactions = self.client.search("_exists_:trace", index=TEST_INDEX, doc_type='tx', size=TEST_TRANSACTIONS_NUMBER)['hits']['hits']
     transaction = transactions[0]["_source"]
     for internal_transaction in transaction["trace"]:
@@ -188,7 +186,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
     pass
 
 TEST_TRANSACTIONS_NUMBER = 10
-TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 100
+TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 10
 TEST_INDEX = 'test-ethereum-transactions'
 TEST_TRANSACTION_HASH = '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a'
 TEST_TRANSACTION_INPUT = '0xb1631db29e09ec5581a0ec398f1229abaf105d3524c49727621841af947bdc44'
