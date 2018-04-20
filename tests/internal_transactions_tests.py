@@ -1,6 +1,7 @@
 import unittest
 from pyelasticsearch import ElasticSearch
-from internal_transactions import InternalTransactions, _make_trace_requests
+from internal_transactions import *
+from internal_transactions import _make_trace_requests
 from time import sleep, time
 import random
 import requests
