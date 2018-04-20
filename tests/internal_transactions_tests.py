@@ -130,6 +130,10 @@ class InternalTransactionsTestCase(unittest.TestCase):
         "from": "0x0",
         "to": "0x0"
       }
+    }, {
+      "action": {
+        "from": "0x0"
+      }
     }]
     transaction = {
       "from": "0x0",
@@ -141,6 +145,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert trace[1]["class"] == INTERNAL_TRANSACTION
     assert trace[2]["class"] == OUTPUT_TRANSACTION
     assert trace[3]["class"] == OTHER_TRANSACTION
+    assert trace[4]["class"] == OTHER_TRANSACTION
 
   def test_save_traces(self):
     self.client.index(TEST_INDEX, 'tx', {"hash": TEST_TRANSACTION_HASH}, id=1, refresh=True)

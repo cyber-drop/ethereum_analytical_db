@@ -64,6 +64,9 @@ class InternalTransactions:
   def _classify_trace(self, transaction):
     for internal_transaction in transaction['trace']:
       action = internal_transaction["action"]
+      if ("from" not in action.keys()) or ("to" not in action.keys()):
+        internal_transaction["class"] = OTHER_TRANSACTION
+        continue
       if (action["from"] == transaction["from"]) and (action["to"] == transaction["to"]):
         internal_transaction["class"] = INPUT_TRANSACTION
       elif (action["from"] == transaction["to"]) and (action["to"] == transaction["from"]):
