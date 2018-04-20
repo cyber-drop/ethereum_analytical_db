@@ -50,11 +50,15 @@ class ContractTransactionsTestCase(unittest.TestCase):
     print(len(contracts))
     assert len(contracts) == 100
 
+  def test_set_flag_for_processed_transactions(self):
+    pass
+
   def test_iterate_contracts(self):
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_TRANSACTION_TO}, id=1, refresh=True)
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_TRANSACTION_TO_CONTRACT}, id=2, refresh=True)
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TRANSACTION_TO_CONTRACT, 'transactions_detected': True}, id=3, refresh=True)
     iterator = self.contract_transactions._iterate_contracts()
-    contracts = next(iterator)
+    contracts = [c for contracts_list in iterator for c in contracts_list]
     contracts = [contract['_id'] for contract in contracts]
     self.assertCountEqual(["1", "2"], contracts)   
 
@@ -82,6 +86,16 @@ class ContractTransactionsTestCase(unittest.TestCase):
     transactions = self.client.search("to_contract:true", index=TEST_INDEX, doc_type="tx", size=1000)['hits']['hits']
     print(len(transactions))
     assert len(transactions) == 1000
+
+  def test_set_flag_for_processed_contracts(self):
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TRANSACTION_TO}, id=1, refresh=True)
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TRANSACTION_TO_CONTRACT}, id=2, refresh=True)
+    self.client.index(TEST_INDEX, 'tx', {'to': TEST_TRANSACTION_TO, 'input': TEST_TRANSACTION_INPUT}, id=1, refresh=True)
+    self.client.index(TEST_INDEX, 'tx', {'to': TEST_TRANSACTION_TO, 'input': TEST_TRANSACTION_INPUT}, id=2, refresh=True)
+    self.client.index(TEST_INDEX, 'tx', {'to': TEST_TRANSACTION_TO, 'input': TEST_TRANSACTION_INPUT}, id=3, refresh=True)
+    self.contract_transactions._detect_transactions_by_contracts([TEST_TRANSACTION_TO])
+    contract = self.client.get(index=TEST_INDEX, doc_type="contract", id=1)["_source"]
+    assert contract["transactions_detected"]
 
 TEST_INDEX = 'test-ethereum-transactions'
 TEST_TRANSACTION_INPUT = '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a'
