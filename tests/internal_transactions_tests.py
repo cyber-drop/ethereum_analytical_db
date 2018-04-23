@@ -1,6 +1,7 @@
 import unittest
 from pyelasticsearch import ElasticSearch
-from internal_transactions import InternalTransactions
+from internal_transactions import *
+from internal_transactions import _make_trace_requests
 from time import sleep, time
 import random
 import requests
@@ -56,7 +57,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.assertCountEqual(transactions, ['3'])
 
   def test_make_trace_requests(self):
-    requests = self.internal_transactions._make_trace_requests({i: TEST_TRANSACTION_HASH for i in range(TEST_TRANSACTIONS_NUMBER)})
+    requests = _make_trace_requests({i: TEST_TRANSACTION_HASH for i in range(TEST_TRANSACTIONS_NUMBER)})
     assert len(requests) == TEST_TRANSACTIONS_NUMBER    
     for i, request in enumerate(requests):
       assert request["jsonrpc"] == "2.0"
@@ -98,6 +99,53 @@ class InternalTransactionsTestCase(unittest.TestCase):
     traces = self.internal_transactions._get_traces({1: TEST_INCORRECT_TRANSACTION_HASH})
     assert 1 not in traces.keys()
 
+  def test_set_trace_hashes(self):
+    transaction = {
+      "hash": "0x1"
+    }
+    trace = [{}, {}, {}]
+    self.internal_transactions._set_trace_hashes(transaction, trace)
+    assert trace[0]["hash"] == "0x10"
+    assert trace[1]["hash"] == "0x11"
+    assert trace[2]["hash"] == "0x12"
+
+  def test_classify_trace(self):
+    trace = [{
+      "action": {
+        "from": "0x0",
+        "to": "0x1"
+      }
+    }, {
+      "action": {
+        "from": "0x1",
+        "to": "0x0"
+      }
+    }, {
+      "action": {
+        "from": "0x0",
+        "to": "0x3"
+      }
+    }, {
+      "action": {
+        "from": "0x0",
+        "to": "0x0"
+      }
+    }, {
+      "action": {
+        "from": "0x0"
+      }
+    }]
+    transaction = {
+      "from": "0x0",
+      "to": "0x1"
+    }
+    self.internal_transactions._classify_trace(transaction, trace)
+    assert trace[0]["class"] == INPUT_TRANSACTION
+    assert trace[1]["class"] == INTERNAL_TRANSACTION
+    assert trace[2]["class"] == OUTPUT_TRANSACTION
+    assert trace[3]["class"] == OTHER_TRANSACTION
+    assert trace[4]["class"] == OTHER_TRANSACTION
+
   def test_save_traces(self):
     self.client.index(TEST_INDEX, 'tx', {"hash": TEST_TRANSACTION_HASH}, id=1, refresh=True)
     self.internal_transactions._save_traces({1: TEST_TRANSACTION_TRACE})
@@ -117,6 +165,16 @@ class InternalTransactionsTestCase(unittest.TestCase):
     transactions = [transaction["_id"] for transaction in transactions]
     self.assertCountEqual(transactions, [str(i) for i in range(TEST_TRANSACTIONS_NUMBER)])
 
+  def test_extract_traces_chunk_with_preprocessing(self):
+    docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'to': TEST_TRANSACTION_HASH, 'from': TEST_TRANSACTION_HASH, 'id': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
+    self.client.bulk_index(TEST_INDEX, 'tx', docs, refresh=True)
+    self.internal_transactions._extract_traces_chunk([{"_id": i, "_source": {"hash": TEST_TRANSACTION_HASH, 'to': TEST_TRANSACTION_HASH, "from": TEST_TRANSACTION_HASH}} for i in range(TEST_TRANSACTIONS_NUMBER)])
+    transactions = self.client.search("_exists_:trace", index=TEST_INDEX, doc_type='tx', size=TEST_TRANSACTIONS_NUMBER)['hits']['hits']
+    transaction = transactions[0]["_source"]
+    for internal_transaction in transaction["trace"]:
+      assert 'hash' in internal_transaction.keys()
+      assert 'class' in internal_transaction.keys()
+
   def test_extract_traces(self):
     docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'id': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
     self.client.bulk_index(TEST_INDEX, 'tx', docs, refresh=True)
@@ -129,7 +187,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
     pass
 
 TEST_TRANSACTIONS_NUMBER = 10
-TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 100
+TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 10
 TEST_INDEX = 'test-ethereum-transactions'
 TEST_TRANSACTION_HASH = '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a'
 TEST_TRANSACTION_INPUT = '0xb1631db29e09ec5581a0ec398f1229abaf105d3524c49727621841af947bdc44'
