@@ -111,7 +111,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
       'hash': TEST_TRANSACTION_HASH,
       'block': 90
     }})
-    assert traces[1] == "test_trace"
+    assert traces['1'] == "test_trace"
 
   def test_get_traces_faster_than_serge(self):
     real_client = ElasticSearch('http://localhost:9200')
@@ -139,7 +139,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
 
   def test_get_traces_with_error(self):
     traces = self.internal_transactions._get_traces({1: {'hash': TEST_INCORRECT_TRANSACTION_HASH, 'block': 1}})
-    assert 1 not in traces.keys()
+    assert '1' not in traces.keys()
 
   def test_set_trace_hashes(self):
     transaction = {
@@ -199,20 +199,20 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.internal_transactions._save_traces({})
     assert True
 
-  # TODO search chunk in elasticsearch
   def test_extract_traces_chunk(self):
     docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'id': i, 'blockNumber': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
     self.client.bulk_index(TEST_INDEX, 'tx', docs, refresh=True)
-    self.internal_transactions._extract_traces_chunk([{"_id": i, "_source": {"hash": TEST_TRANSACTION_HASH, 'blockNumber': i}} for i in range(TEST_TRANSACTIONS_NUMBER)])
-    transactions = self.client.search("_exists_:trace", index=TEST_INDEX, doc_type='tx', size=TEST_TRANSACTIONS_NUMBER)['hits']['hits']
+    chunk = self.client.search(index=TEST_INDEX, doc_type='tx', query="*")['hits']['hits']
+    self.internal_transactions._extract_traces_chunk(chunk)
+    transactions = self.client.search("_exists_:trace", index=TEST_INDEX, doc_type='tx', size=TEST_BIG_TRANSACTIONS_NUMBER)['hits']['hits']
     transactions = [transaction["_id"] for transaction in transactions]
-    self.assertCountEqual(transactions, [str(i) for i in range(TEST_TRANSACTIONS_NUMBER)])
+    self.assertCountEqual(transactions, [t["_id"] for t in chunk])
 
-  # TODO search chunk in elasticsearch
   def test_extract_traces_chunk_with_preprocessing(self):
     docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'to': TEST_TRANSACTION_HASH, 'from': TEST_TRANSACTION_HASH, 'id': i, 'blockNumber': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
     self.client.bulk_index(TEST_INDEX, 'tx', docs, refresh=True)
-    self.internal_transactions._extract_traces_chunk([{"_id": i, "_source": {"hash": TEST_TRANSACTION_HASH, 'to': TEST_TRANSACTION_HASH, "from": TEST_TRANSACTION_HASH, 'blockNumber': i}} for i in range(TEST_TRANSACTIONS_NUMBER)])
+    chunk = self.client.search(index=TEST_INDEX, doc_type='tx', query="*")['hits']['hits']
+    self.internal_transactions._extract_traces_chunk(chunk)
     transactions = self.client.search("_exists_:trace", index=TEST_INDEX, doc_type='tx', size=TEST_TRANSACTIONS_NUMBER)['hits']['hits']
     transaction = transactions[0]["_source"]
     for internal_transaction in transaction["trace"]:

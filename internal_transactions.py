@@ -46,7 +46,7 @@ def _get_traces_sync(transactions):
       data=request_string, 
       headers={"content-type": "application/json"}
     ).json()
-    traces.update({response["id"]: response["result"]['trace'] for response in responses if "result" in response.keys()})
+    traces.update({str(response["id"]): response["result"]['trace'] for response in responses if "result" in response.keys()})
   return traces
 
 class InternalTransactions:
