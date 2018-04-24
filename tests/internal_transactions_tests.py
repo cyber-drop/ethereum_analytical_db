@@ -1,8 +1,7 @@
 import unittest
 from pyelasticsearch import ElasticSearch
 from internal_transactions import *
-from internal_transactions import _make_trace_requests, _get_parity_url_by_block
-from time import sleep, time
+from internal_transactions import _make_trace_requests, _get_parity_url_by_block, _get_traces_sync
 import random
 import requests
 import json
@@ -70,7 +69,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert _get_parity_url_by_block(9) == "url2"
     assert _get_parity_url_by_block(10000) == "url3"
 
+  # TODO get rid of an error on this test
   def test_get_traces(self):
+    del PARITY_HOSTS[:]
     traces = self.internal_transactions._get_traces({i: {'hash': TEST_TRANSACTION_HASH, "block": i} for i in range(TEST_TRANSACTIONS_NUMBER)})
     for index, trace in traces.items():
       self.assertSequenceEqual(trace, TEST_TRANSACTION_TRACE)

@@ -6,7 +6,7 @@ NUMBER_OF_JOBS = 1000
 class CustomElasticSearch(ElasticSearch):
   def update_by_query(client, index, doc_type, query, script):
     body = {'script': {'inline': script}}
-    parameters = {'refresh': True}
+    parameters = {'conflicts': 'proceed', 'refresh': True}
     if type(query) is dict:
       body['query'] = query
     else:

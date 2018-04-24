@@ -53,6 +53,7 @@ class InternalTransactions:
   def __init__(self, elasticsearch_index, elasticsearch_host="http://localhost:9200"):
     self.index = elasticsearch_index
     self.client = CustomElasticSearch(elasticsearch_host)
+    self.pool = Pool(processes=NUMBER_OF_PROCESSES)
 
   def _split_on_chunks(self, iterable, size):
     iterable = iter(iterable)
@@ -69,8 +70,7 @@ class InternalTransactions:
     return self.client.iterate(self.index, 'tx', 'to_contract:true AND !(_exists_:trace)')
 
   def _get_traces(self, transactions):
-    pool = Pool(processes=NUMBER_OF_PROCESSES)
-    traces = pool.map(_get_traces_sync, self._split_on_chunks(transactions.items(), NUMBER_OF_PROCESSES))
+    traces = self.pool.map(_get_traces_sync, self._split_on_chunks(transactions.items(), NUMBER_OF_PROCESSES))
     return {id: trace for traces_dict in traces for id, trace in traces_dict.items()}
 
   def _set_trace_hashes(self, transaction, trace):

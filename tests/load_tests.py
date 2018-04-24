@@ -67,10 +67,6 @@ class LoadTestCase(unittest.TestCase):
       print(my_time, serge_time)
     assert all(attemps)
 
-  def test_too_many_files_exception(self):
-    for i in range(100):
-      self.internal_transactions._get_traces({j: {'hash': TEST_TRANSACTION_HASH, 'block': j} for j in range(10)})
-
 TEST_TRANSACTIONS_NUMBER = 10
 TEST_TRANSACTION_HASH = '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a'
 TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 10

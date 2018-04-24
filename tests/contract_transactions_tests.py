@@ -24,7 +24,7 @@ class ContractTransactionsTestCase(unittest.TestCase):
     iterator = self.contract_transactions._iterate_contract_transactions()
     transactions = next(iterator)
     transactions = [transaction['_id'] for transaction in transactions]
-    self.assertCountEqual(['2'], transactions)
+    self.assertCountEqual(['2'], transactions)    
 
   def test_extract_contract_addresses(self):
     for i in range(11):
