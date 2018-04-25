@@ -14,6 +14,12 @@ class ElasticSearchTestCase(unittest.TestCase):
     self.client.create_index(TEST_INDEX)
     self.new_client = NewElasticSearch('http://localhost:9200')
 
+  def test_make_range_query(self):
+    assert self.new_client.make_range_query(0, 3) == "[0 TO 2]"
+    assert self.new_client.make_range_query(None, 3) == "[* TO 2]"
+    assert self.new_client.make_range_query(0, None) == "[0 TO *]"
+    assert self.new_client.make_range_query(None, None) == "[* TO *]"
+
   def test_iterate_elasticsearch_data(self):
     print(self.new_client)
     for i in range(11):

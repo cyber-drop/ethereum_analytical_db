@@ -4,6 +4,16 @@ from tqdm import *
 NUMBER_OF_JOBS = 1000
 
 class CustomElasticSearch(ElasticSearch):
+  def make_range_query(self, bottom_line, upper_bound):
+    if (bottom_line is not None) and (upper_bound is not None):
+      return "[{} TO {}]".format(bottom_line, upper_bound - 1)
+    elif (bottom_line is not None):
+      return "[{} TO *]".format(bottom_line)
+    elif (upper_bound is not None):
+      return "[* TO {}]".format(upper_bound - 1)
+    else:
+      return "[* TO *]"
+
   def update_by_query(client, index, doc_type, query, script):
     body = {'script': {'inline': script}}
     parameters = {'conflicts': 'proceed', 'refresh': True}

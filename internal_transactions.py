@@ -67,8 +67,9 @@ class InternalTransactions:
         pass
       yield elements
 
-  def _iterate_transactions(self):
-    return self.client.iterate(self.index, 'tx', 'to_contract:true AND !(_exists_:trace)')
+  def _iterate_transactions(self, bottom_line, upper_bound):
+    range_query = self.client.make_range_query(bottom_line, upper_bound)
+    return self.client.iterate(self.index, 'tx', 'to_contract:true AND !(_exists_:trace) AND blockNumber:' + range_query)
 
   def _get_traces(self, transactions):    
     chunks = self._split_on_chunks(transactions.items(), NUMBER_OF_PROCESSES)
@@ -119,5 +120,6 @@ class InternalTransactions:
     self._save_traces(traces)
 
   def extract_traces(self):
-    for transactions in self._iterate_transactions():
-      self._extract_traces_chunk(transactions)
+    for bottom_line, upper_bound, url in self.parity_hosts:
+      for transactions in self._iterate_transactions(bottom_line, upper_bound):
+        self._extract_traces_chunk(transactions)

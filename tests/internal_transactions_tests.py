@@ -26,11 +26,12 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.assertSequenceEqual(test_chunks, [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]])
 
   def test_iterate_transactions(self):
-    self.client.index(TEST_INDEX, 'tx', {'to_contract': False}, id=1, refresh=True)
-    self.client.index(TEST_INDEX, 'tx', {'to_contract': True, 'trace': {'test': 1}}, id=2, refresh=True)
-    self.client.index(TEST_INDEX, 'tx', {'to_contract': True}, id=3, refresh=True)
-    self.client.index(TEST_INDEX, 'nottx', {'to_contract': True}, id=4, refresh=True)
-    iterator = self.internal_transactions._iterate_transactions()
+    self.client.index(TEST_INDEX, 'tx', {'to_contract': False, 'blockNumber': 1}, id=1, refresh=True)
+    self.client.index(TEST_INDEX, 'tx', {'to_contract': True, 'trace': {'test': 1}, 'blockNumber': 2}, id=2, refresh=True)
+    self.client.index(TEST_INDEX, 'tx', {'to_contract': True, 'blockNumber': 2}, id=3, refresh=True)
+    self.client.index(TEST_INDEX, 'tx', {'to_contract': True, 'blockNumber': 3}, id=4, refresh=True)
+    self.client.index(TEST_INDEX, 'nottx', {'to_contract': True, 'blockNumber': 1}, id=5, refresh=True)
+    iterator = self.internal_transactions._iterate_transactions(1, 3)
     transactions = next(iterator)
     transactions = [transaction["_id"] for transaction in transactions]
     self.assertCountEqual(transactions, ['3'])
