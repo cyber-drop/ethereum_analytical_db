@@ -17,9 +17,8 @@ class InternalTransactionsTestCase(unittest.TestCase):
     except:
       pass
     self.client.create_index(TEST_INDEX)
-    self.internal_transactions = InternalTransactions(TEST_INDEX)
-    del PARITY_HOSTS[:]
-    PARITY_HOSTS.append((None, None, "http://localhost:8545"))
+    self.parity_hosts = [(None, None, "http://localhost:8545")]
+    self.internal_transactions = InternalTransactions(TEST_INDEX, parity_hosts=self.parity_hosts)
 
   def test_split_on_chunks(self):
     test_list = list(range(10))
@@ -37,7 +36,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.assertCountEqual(transactions, ['3'])
 
   def test_make_trace_requests(self):
-    requests = _make_trace_requests({i: {'hash': TEST_TRANSACTION_HASH, 'block': i} for i in range(TEST_TRANSACTIONS_NUMBER)})
+    requests = _make_trace_requests(self.parity_hosts, {i: {'hash': TEST_TRANSACTION_HASH, 'block': i} for i in range(TEST_TRANSACTIONS_NUMBER)})
     assert len(requests["http://localhost:8545"]) == TEST_TRANSACTIONS_NUMBER    
     for i, request in enumerate(requests["http://localhost:8545"]):
       assert request["jsonrpc"] == "2.0"
@@ -47,45 +46,44 @@ class InternalTransactionsTestCase(unittest.TestCase):
       assert request["params"][1][0] == "trace"
 
   def test_make_trace_requests_skip_requests_outside_ranges(self):
-    del PARITY_HOSTS[:]
-    PARITY_HOSTS.append((10, 100, "url1"))
-    requests = _make_trace_requests({1: {'hash': TEST_TRANSACTION_HASH, 'block': 1}})
+    parity_hosts = [(10, 100, "url1")]
+    requests = _make_trace_requests(parity_hosts, {1: {'hash': TEST_TRANSACTION_HASH, 'block': 1}})
     print(requests)
     assert requests == {}
 
   def test_get_parity_url_by_block(self):
-    del PARITY_HOSTS[:]
-    PARITY_HOSTS.append((0, 100, "url1"))
-    PARITY_HOSTS.append((100, 200, "url2"))
-    assert _get_parity_url_by_block(1) == "url1"
-    assert _get_parity_url_by_block(101) == "url2"
-    assert _get_parity_url_by_block(1000) == None
+    parity_hosts = [
+      (0, 100, "url1"),
+      (100, 200, "url2")
+    ]
+    assert _get_parity_url_by_block(parity_hosts, 1) == "url1"
+    assert _get_parity_url_by_block(parity_hosts, 101) == "url2"
+    assert _get_parity_url_by_block(parity_hosts, 1000) == None
 
   def test_get_default_parity_url(self):
-    del PARITY_HOSTS[:]
-    PARITY_HOSTS.append((10, 100, "url1"))
-    PARITY_HOSTS.append((None, 10, "url2"))
-    PARITY_HOSTS.append((100, None, "url3"))
-    assert _get_parity_url_by_block(9) == "url2"
-    assert _get_parity_url_by_block(10000) == "url3"
+    parity_hosts = [
+      (10, 100, "url1"),
+      (None, 10, "url2"),
+      (100, None, "url3")
+    ]
+    assert _get_parity_url_by_block(parity_hosts, 9) == "url2"
+    assert _get_parity_url_by_block(parity_hosts, 10000) == "url3"
 
-  # TODO get rid of an error on this test
   def test_get_traces(self):
-    del PARITY_HOSTS[:]
     traces = self.internal_transactions._get_traces({i: {'hash': TEST_TRANSACTION_HASH, "block": i} for i in range(TEST_TRANSACTIONS_NUMBER)})
     for index, trace in traces.items():
       self.assertSequenceEqual(trace, TEST_TRANSACTION_TRACE)
 
   @httpretty.activate
   def test_get_traces_from_predefined_url(self):
-    del PARITY_HOSTS[:]
-    PARITY_HOSTS.append((10, 100, "http://localhost:8546/"))
+    parity_hosts = [(10, 100, "http://localhost:8546/")]
     httpretty.register_uri(
       httpretty.POST, 
       "http://localhost:8546/", 
       body='[{"id": 1, "result": {"trace": "test_trace"}}]', 
       content_type='application/json'
     )
+    self.internal_transactions = InternalTransactions(TEST_INDEX, parity_hosts=parity_hosts)
     traces = self.internal_transactions._get_traces({1: {
       'hash': TEST_TRANSACTION_HASH,
       'block': 90

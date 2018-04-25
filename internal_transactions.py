@@ -4,25 +4,25 @@ import json
 from time import sleep
 from tqdm import *
 from multiprocessing import Pool
+from functools import partial
+from itertools import repeat
+from config import PARITY_HOSTS
 
 NUMBER_OF_PROCESSES = 10
 INPUT_TRANSACTION = 0
 INTERNAL_TRANSACTION = 1
 OUTPUT_TRANSACTION = 2
 OTHER_TRANSACTION = 3
-PARITY_HOSTS = [
-  (0, 2e6, "http://localhost:8545")
-]
 
-def _get_parity_url_by_block(block):
-  for bottom_line, upper_bound, url in PARITY_HOSTS:
+def _get_parity_url_by_block(parity_hosts, block):
+  for bottom_line, upper_bound, url in parity_hosts:
     if ((not bottom_line) or (block >= bottom_line)) and ((not upper_bound) or (block < upper_bound)):
       return url
 
-def _make_trace_requests(transactions):
+def _make_trace_requests(parity_hosts, transactions):
   requests = {}
   for transaction_id, transaction in transactions.items():
-    request_url = _get_parity_url_by_block(transaction["block"])
+    request_url = _get_parity_url_by_block(parity_hosts, transaction["block"])
     if not request_url:
       continue
     if request_url not in requests.keys():
@@ -35,9 +35,9 @@ def _make_trace_requests(transactions):
     })
   return requests
 
-def _get_traces_sync(transactions):
+def _get_traces_sync(parity_hosts, transactions):
   transactions = dict(transactions)
-  requests_dict = _make_trace_requests(transactions)
+  requests_dict = _make_trace_requests(parity_hosts, transactions)
   traces = {}
   for parity_url, request in requests_dict.items():
     request_string = json.dumps(request)
@@ -50,10 +50,11 @@ def _get_traces_sync(transactions):
   return traces
 
 class InternalTransactions:
-  def __init__(self, elasticsearch_index, elasticsearch_host="http://localhost:9200"):
+  def __init__(self, elasticsearch_index, elasticsearch_host="http://localhost:9200", parity_hosts=PARITY_HOSTS):
     self.index = elasticsearch_index
     self.client = CustomElasticSearch(elasticsearch_host)
     self.pool = Pool(processes=NUMBER_OF_PROCESSES)
+    self.parity_hosts = parity_hosts
 
   def _split_on_chunks(self, iterable, size):
     iterable = iter(iterable)
@@ -69,8 +70,10 @@ class InternalTransactions:
   def _iterate_transactions(self):
     return self.client.iterate(self.index, 'tx', 'to_contract:true AND !(_exists_:trace)')
 
-  def _get_traces(self, transactions):
-    traces = self.pool.map(_get_traces_sync, self._split_on_chunks(transactions.items(), NUMBER_OF_PROCESSES))
+  def _get_traces(self, transactions):    
+    chunks = self._split_on_chunks(transactions.items(), NUMBER_OF_PROCESSES)
+    arguments = zip(repeat(self.parity_hosts), chunks)
+    traces = self.pool.starmap(_get_traces_sync, arguments)
     return {id: trace for traces_dict in traces for id, trace in traces_dict.items()}
 
   def _set_trace_hashes(self, transaction, trace):
