@@ -16,15 +16,21 @@ class ContractTransactions:
       self.client.bulk_index(docs=docs, doc_type='contract', index=self.index, refresh=True)
 
   def _iterate_contracts(self):
-    return self.client.iterate(self.index, 'contract', 'address:*', paginate=True, scrolling=False)
+    return self.client.iterate(self.index, 'contract', 'address:* AND !(_exists_:transactions_detected)', paginate=True)
 
   def _detect_transactions_by_contracts(self, contracts):
-    query = {
+    transactions_query = {
       "terms": {
         "to": contracts
       }
     }
-    self.client.update_by_query(self.index, 'tx', query, "ctx._source.to_contract = true")
+    contracts_query = {
+      "terms": {
+        "address": contracts
+      }
+    }
+    self.client.update_by_query(self.index, 'tx', transactions_query, "ctx._source.to_contract = true")
+    self.client.update_by_query(self.index, 'contract', contracts_query, "ctx._source.transactions_detected = true")
 
   def detect_contract_transactions(self):
     self._extract_contract_addresses()
