@@ -4,6 +4,9 @@ import json
 from time import sleep
 from tqdm import *
 from multiprocessing import Pool
+from functools import partial
+from itertools import repeat
+from config import PARITY_HOSTS
 
 NUMBER_OF_PROCESSES = 10
 INPUT_TRANSACTION = 0
@@ -11,32 +14,47 @@ INTERNAL_TRANSACTION = 1
 OUTPUT_TRANSACTION = 2
 OTHER_TRANSACTION = 3
 
-def _make_trace_requests(hashes):
-  return [{
-    "jsonrpc": "2.0",
-    "id": id,
-    "method": "trace_replayTransaction", 
-    "params": [hash, ["trace"]]
-  } for id, hash in hashes.items()]
+def _get_parity_url_by_block(parity_hosts, block):
+  for bottom_line, upper_bound, url in parity_hosts:
+    if ((not bottom_line) or (block >= bottom_line)) and ((not upper_bound) or (block < upper_bound)):
+      return url
 
-def _get_traces_sync(hashes):
-  hashes = dict(hashes)
-  request = _make_trace_requests(hashes)
-  request_string = json.dumps(request)
+def _make_trace_requests(parity_hosts, transactions):
+  requests = {}
+  for transaction_id, transaction in transactions.items():
+    request_url = _get_parity_url_by_block(parity_hosts, transaction["block"])
+    if not request_url:
+      continue
+    if request_url not in requests.keys():
+      requests[request_url] = []
+    requests[request_url].append({
+      "jsonrpc": "2.0",
+      "id": transaction_id,
+      "method": "trace_replayTransaction", 
+      "params": [transaction["hash"], ["trace"]]
+    })
+  return requests
 
-  responses = requests.post(
-    "http://localhost:8545", 
-    data=request_string, 
-    headers={"content-type": "application/json"}
-  ).json()
-  traces = {response["id"]: response["result"]['trace'] for response in responses if "result" in response.keys()}
+def _get_traces_sync(parity_hosts, transactions):
+  transactions = dict(transactions)
+  requests_dict = _make_trace_requests(parity_hosts, transactions)
+  traces = {}
+  for parity_url, request in requests_dict.items():
+    request_string = json.dumps(request)
+    responses = requests.post(
+      parity_url, 
+      data=request_string, 
+      headers={"content-type": "application/json"}
+    ).json()
+    traces.update({str(response["id"]): response["result"]['trace'] for response in responses if "result" in response.keys()})
   return traces
 
 class InternalTransactions:
-  def __init__(self, elasticsearch_index, elasticsearch_host="http://localhost:9200", ethereum_api_host="http://localhost:8545"):
+  def __init__(self, elasticsearch_index, elasticsearch_host="http://localhost:9200", parity_hosts=PARITY_HOSTS):
     self.index = elasticsearch_index
     self.client = CustomElasticSearch(elasticsearch_host)
-    self.ethereum_api_host = ethereum_api_host
+    self.pool = Pool(processes=NUMBER_OF_PROCESSES)
+    self.parity_hosts = parity_hosts
 
   def _split_on_chunks(self, iterable, size):
     iterable = iter(iterable)
@@ -49,12 +67,14 @@ class InternalTransactions:
         pass
       yield elements
 
-  def _iterate_transactions(self):
-    return self.client.iterate(self.index, 'tx', 'to_contract:true AND !(_exists_:trace)')
+  def _iterate_transactions(self, bottom_line, upper_bound):
+    range_query = self.client.make_range_query(bottom_line, upper_bound)
+    return self.client.iterate(self.index, 'tx', 'to_contract:true AND !(_exists_:trace) AND blockNumber:' + range_query)
 
-  def _get_traces(self, hashes):
-    pool = Pool(processes=NUMBER_OF_PROCESSES)
-    traces = pool.map(_get_traces_sync, self._split_on_chunks(hashes.items(), NUMBER_OF_PROCESSES))
+  def _get_traces(self, transactions):    
+    chunks = self._split_on_chunks(transactions.items(), NUMBER_OF_PROCESSES)
+    arguments = zip(repeat(self.parity_hosts), chunks)
+    traces = self.pool.starmap(_get_traces_sync, arguments)
     return {id: trace for traces_dict in traces for id, trace in traces_dict.items()}
 
   def _set_trace_hashes(self, transaction, trace):
@@ -84,8 +104,13 @@ class InternalTransactions:
       self.client.bulk(operations, doc_type='tx', index=self.index, refresh=True)
 
   def _extract_traces_chunk(self, transactions):
-    hashes = {transaction["_id"]: transaction["_source"]["hash"] for transaction in transactions}
-    traces = self._get_traces(hashes)
+    transactions_dict = {
+      transaction["_id"]: {
+        'hash': transaction["_source"]["hash"], 
+        "block": transaction["_source"]["blockNumber"]
+      } for transaction in transactions
+    }
+    traces = self._get_traces(transactions_dict)
     for transaction in transactions:
       if transaction["_id"] in traces.keys():
         transaction_body = transaction["_source"]
@@ -95,5 +120,6 @@ class InternalTransactions:
     self._save_traces(traces)
 
   def extract_traces(self):
-    for transactions in self._iterate_transactions():
-      self._extract_traces_chunk(transactions)
+    for bottom_line, upper_bound, url in self.parity_hosts:
+      for transactions in self._iterate_transactions(bottom_line, upper_bound):
+        self._extract_traces_chunk(transactions)

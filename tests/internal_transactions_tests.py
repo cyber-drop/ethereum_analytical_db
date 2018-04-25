@@ -1,35 +1,13 @@
 import unittest
 from pyelasticsearch import ElasticSearch
 from internal_transactions import *
-from internal_transactions import _make_trace_requests
-from time import sleep, time
+from internal_transactions import _make_trace_requests, _get_parity_url_by_block, _get_traces_sync
 import random
 import requests
 import json
 from multiprocessing import Pool
 from tqdm import *
-
-class SergeImplementation():
-  def _http_post_request(self, url, request):
-    return requests.post(url, data=request, headers={"content-type": "application/json"}).json()
-
-  def _make_request_trace(self, hash):
-    return json.dumps({
-        "jsonrpc": "2.0",
-        "method": "trace_replayTransaction",
-        "params": [hash,
-                   ["trace"]],
-        "id": 1
-    })
-
-  def _get_trace(self, hash):
-    self._http_post_request(
-      'http://localhost:8545',
-      self._make_request_trace(hash))['result']['trace']
-
-  def get_traces(self, hashes):
-    pool = Pool(processes=10)
-    return pool.map(self._get_trace, hashes)
+import httpretty
 
 class InternalTransactionsTestCase(unittest.TestCase):
   def setUp(self):
@@ -39,7 +17,8 @@ class InternalTransactionsTestCase(unittest.TestCase):
     except:
       pass
     self.client.create_index(TEST_INDEX)
-    self.internal_transactions = InternalTransactions(TEST_INDEX)
+    self.parity_hosts = [(None, None, "http://localhost:8545")]
+    self.internal_transactions = InternalTransactions(TEST_INDEX, parity_hosts=self.parity_hosts)
 
   def test_split_on_chunks(self):
     test_list = list(range(10))
@@ -47,57 +26,74 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.assertSequenceEqual(test_chunks, [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]])
 
   def test_iterate_transactions(self):
-    self.client.index(TEST_INDEX, 'tx', {'to_contract': False}, id=1, refresh=True)
-    self.client.index(TEST_INDEX, 'tx', {'to_contract': True, 'trace': {'test': 1}}, id=2, refresh=True)
-    self.client.index(TEST_INDEX, 'tx', {'to_contract': True}, id=3, refresh=True)
-    self.client.index(TEST_INDEX, 'nottx', {'to_contract': True}, id=4, refresh=True)
-    iterator = self.internal_transactions._iterate_transactions()
+    self.client.index(TEST_INDEX, 'tx', {'to_contract': False, 'blockNumber': 1}, id=1, refresh=True)
+    self.client.index(TEST_INDEX, 'tx', {'to_contract': True, 'trace': {'test': 1}, 'blockNumber': 2}, id=2, refresh=True)
+    self.client.index(TEST_INDEX, 'tx', {'to_contract': True, 'blockNumber': 2}, id=3, refresh=True)
+    self.client.index(TEST_INDEX, 'tx', {'to_contract': True, 'blockNumber': 3}, id=4, refresh=True)
+    self.client.index(TEST_INDEX, 'nottx', {'to_contract': True, 'blockNumber': 1}, id=5, refresh=True)
+    iterator = self.internal_transactions._iterate_transactions(1, 3)
     transactions = next(iterator)
     transactions = [transaction["_id"] for transaction in transactions]
     self.assertCountEqual(transactions, ['3'])
 
   def test_make_trace_requests(self):
-    requests = _make_trace_requests({i: TEST_TRANSACTION_HASH for i in range(TEST_TRANSACTIONS_NUMBER)})
-    assert len(requests) == TEST_TRANSACTIONS_NUMBER    
-    for i, request in enumerate(requests):
+    requests = _make_trace_requests(self.parity_hosts, {i: {'hash': TEST_TRANSACTION_HASH, 'block': i} for i in range(TEST_TRANSACTIONS_NUMBER)})
+    assert len(requests["http://localhost:8545"]) == TEST_TRANSACTIONS_NUMBER    
+    for i, request in enumerate(requests["http://localhost:8545"]):
       assert request["jsonrpc"] == "2.0"
       assert request["id"] == i
       assert request["method"] == "trace_replayTransaction"
       assert request["params"][0] == TEST_TRANSACTION_HASH
       assert request["params"][1][0] == "trace"
 
+  def test_make_trace_requests_skip_requests_outside_ranges(self):
+    parity_hosts = [(10, 100, "url1")]
+    requests = _make_trace_requests(parity_hosts, {1: {'hash': TEST_TRANSACTION_HASH, 'block': 1}})
+    print(requests)
+    assert requests == {}
+
+  def test_get_parity_url_by_block(self):
+    parity_hosts = [
+      (0, 100, "url1"),
+      (100, 200, "url2")
+    ]
+    assert _get_parity_url_by_block(parity_hosts, 1) == "url1"
+    assert _get_parity_url_by_block(parity_hosts, 101) == "url2"
+    assert _get_parity_url_by_block(parity_hosts, 1000) == None
+
+  def test_get_default_parity_url(self):
+    parity_hosts = [
+      (10, 100, "url1"),
+      (None, 10, "url2"),
+      (100, None, "url3")
+    ]
+    assert _get_parity_url_by_block(parity_hosts, 9) == "url2"
+    assert _get_parity_url_by_block(parity_hosts, 10000) == "url3"
+
   def test_get_traces(self):
-    traces = self.internal_transactions._get_traces({i: TEST_TRANSACTION_HASH for i in range(TEST_TRANSACTIONS_NUMBER)})
+    traces = self.internal_transactions._get_traces({i: {'hash': TEST_TRANSACTION_HASH, "block": i} for i in range(TEST_TRANSACTIONS_NUMBER)})
     for index, trace in traces.items():
       self.assertSequenceEqual(trace, TEST_TRANSACTION_TRACE)
 
-  def test_get_traces_faster_than_serge(self):
-    real_client = ElasticSearch('http://localhost:9200')
-    attemps = []
-    real_hashes = real_client.search(index=INDEX_WITH_REAL_DATA, doc_type="tx", query='to_contract:true', size=TEST_BIG_TRANSACTIONS_NUMBER*TEST_ATTEMPS*3)['hits']['hits']
-    real_hashes = [t["_source"]["hash"] for t in real_hashes]
-    serge_implementation = SergeImplementation()
-    for attemp in tqdm(range(0, TEST_ATTEMPS*3, 3)):
-      start_serge_chunk = attemp * TEST_BIG_TRANSACTIONS_NUMBER
-      end_serge_chunk = (attemp + 1) * TEST_BIG_TRANSACTIONS_NUMBER
-      start_my_chunk = (attemp + 1) * TEST_BIG_TRANSACTIONS_NUMBER
-      end_my_chunk = (attemp + 2) * TEST_BIG_TRANSACTIONS_NUMBER
-      start_time_for_serge_extractor = time()
-      response = serge_implementation.get_traces(real_hashes[start_serge_chunk:end_serge_chunk])
-      assert len(response) == TEST_BIG_TRANSACTIONS_NUMBER
-      start_time_for_my_extractor = time()
-      response = self.internal_transactions._get_traces({i: hash for i, hash in enumerate(real_hashes[start_my_chunk:end_my_chunk])})
-      assert len(response.keys()) == TEST_BIG_TRANSACTIONS_NUMBER
-      end_time = time()
-      serge_time = start_time_for_my_extractor - start_time_for_serge_extractor
-      my_time = end_time - start_time_for_my_extractor
-      attemps.append(my_time < serge_time)
-      print(my_time, serge_time)
-    assert all(attemps)
+  @httpretty.activate
+  def test_get_traces_from_predefined_url(self):
+    parity_hosts = [(10, 100, "http://localhost:8546/")]
+    httpretty.register_uri(
+      httpretty.POST, 
+      "http://localhost:8546/", 
+      body='[{"id": 1, "result": {"trace": "test_trace"}}]', 
+      content_type='application/json'
+    )
+    self.internal_transactions = InternalTransactions(TEST_INDEX, parity_hosts=parity_hosts)
+    traces = self.internal_transactions._get_traces({1: {
+      'hash': TEST_TRANSACTION_HASH,
+      'block': 90
+    }})
+    assert traces['1'] == "test_trace"
 
   def test_get_traces_with_error(self):
-    traces = self.internal_transactions._get_traces({1: TEST_INCORRECT_TRANSACTION_HASH})
-    assert 1 not in traces.keys()
+    traces = self.internal_transactions._get_traces({1: {'hash': TEST_INCORRECT_TRANSACTION_HASH, 'block': 1}})
+    assert '1' not in traces.keys()
 
   def test_set_trace_hashes(self):
     transaction = {
@@ -158,17 +154,19 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert True
 
   def test_extract_traces_chunk(self):
-    docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'id': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
+    docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'id': i, 'blockNumber': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
     self.client.bulk_index(TEST_INDEX, 'tx', docs, refresh=True)
-    self.internal_transactions._extract_traces_chunk([{"_id": i, "_source": {"hash": TEST_TRANSACTION_HASH}} for i in range(TEST_TRANSACTIONS_NUMBER)])
-    transactions = self.client.search("_exists_:trace", index=TEST_INDEX, doc_type='tx', size=TEST_TRANSACTIONS_NUMBER)['hits']['hits']
+    chunk = self.client.search(index=TEST_INDEX, doc_type='tx', query="*")['hits']['hits']
+    self.internal_transactions._extract_traces_chunk(chunk)
+    transactions = self.client.search("_exists_:trace", index=TEST_INDEX, doc_type='tx', size=TEST_BIG_TRANSACTIONS_NUMBER)['hits']['hits']
     transactions = [transaction["_id"] for transaction in transactions]
-    self.assertCountEqual(transactions, [str(i) for i in range(TEST_TRANSACTIONS_NUMBER)])
+    self.assertCountEqual(transactions, [t["_id"] for t in chunk])
 
   def test_extract_traces_chunk_with_preprocessing(self):
-    docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'to': TEST_TRANSACTION_HASH, 'from': TEST_TRANSACTION_HASH, 'id': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
+    docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'to': TEST_TRANSACTION_HASH, 'from': TEST_TRANSACTION_HASH, 'id': i, 'blockNumber': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
     self.client.bulk_index(TEST_INDEX, 'tx', docs, refresh=True)
-    self.internal_transactions._extract_traces_chunk([{"_id": i, "_source": {"hash": TEST_TRANSACTION_HASH, 'to': TEST_TRANSACTION_HASH, "from": TEST_TRANSACTION_HASH}} for i in range(TEST_TRANSACTIONS_NUMBER)])
+    chunk = self.client.search(index=TEST_INDEX, doc_type='tx', query="*")['hits']['hits']
+    self.internal_transactions._extract_traces_chunk(chunk)
     transactions = self.client.search("_exists_:trace", index=TEST_INDEX, doc_type='tx', size=TEST_TRANSACTIONS_NUMBER)['hits']['hits']
     transaction = transactions[0]["_source"]
     for internal_transaction in transaction["trace"]:
@@ -176,7 +174,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
       assert 'class' in internal_transaction.keys()
 
   def test_extract_traces(self):
-    docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'id': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
+    docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'id': i, 'blockNumber': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
     self.client.bulk_index(TEST_INDEX, 'tx', docs, refresh=True)
     self.internal_transactions.extract_traces()
     transactions = self.client.search("_exists_:trace", index=TEST_INDEX, doc_type='tx', size=TEST_BIG_TRANSACTIONS_NUMBER)['hits']['hits']
@@ -230,5 +228,3 @@ TEST_TRANSACTION_TRACE = [
     "type": "call"
   }
 ]
-INDEX_WITH_REAL_DATA = "ethereum-transaction"
-TEST_ATTEMPS = 5
