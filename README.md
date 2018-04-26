@@ -16,9 +16,9 @@ Starts input parsing. Each transaction highlighted with 'to_contract' flag will 
 
 ## Operations speed
 
-| Operation                                  | Batch size | Speed               | Starts from stop point |
-|--------------------------------------------|------------|---------------------|------------------------|
-| detect-contracts (Find contract addresses) | 10000      | 1000 transactions/s | No                     |
-| detect-contracts (Set to_contract flag)    | 1000       | 16 contracts/s      | Yes                    |
-| extract-traces                             | 1000       | 75 transactions/s   | Yes                    |
-| parse-inputs                               | 1000       | 3 transactions/s    | No                     |
+| Operation                                  | Maximum allowed batch size | Speed               | Starts from stop point |
+|--------------------------------------------|----------------------------|---------------------|------------------------|
+| detect-contracts (Find contract addresses) | 10000                      | 1000 transactions/s | No                     |
+| detect-contracts (Set to_contract flag)    | 1000                       | 16 contracts/s      | Yes                    |
+| extract-traces                             | 1000                       | 75 transactions/s   | Yes                    |
+| parse-inputs                               | 1000                       | 3 transactions/s    | No                     |
