@@ -13,3 +13,12 @@ Starts traces extraction. Each transaction highlighted with 'to_contract' flag w
 - parse-inputs
 
 Starts input parsing. Each transaction highlighted with 'to_contract' flag will get a field 'decoded_input' with name of method called in contract and arguments for it.
+
+## Operations speed
+
+| Operation                                  | Batch size | Speed               | Starts from stop point |
+|--------------------------------------------|------------|---------------------|------------------------|
+| detect-contracts (Find contract addresses) | 10000      | 1000 transactions/s | No                     |
+| detect-contracts (Set to_contract flag)    | 1000       | 16 contracts/s      | Yes                    |
+| extract-traces                             | 1000       | 75 transactions/s   | Yes                    |
+| parse-inputs                               | 1000       | 3 transactions/s    | No                     |
