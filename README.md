@@ -1,4 +1,5 @@
 # Internal transactions parsing
+## Usage
 To run internal transactions parsing, you can use command 
 ```bash
 $ python3 ./extractor.py --index ELASTICSEARCH_INDEX --operation CHOSEN_OPERATION
@@ -22,3 +23,12 @@ Starts input parsing. Each transaction highlighted with 'to_contract' flag will 
 | detect-contracts (Set to_contract flag)    | 1000                       | 16 contracts/s      | Yes                    |
 | extract-traces                             | 1000                       | 75 transactions/s   | Yes                    |
 | parse-inputs                               | 1000                       | 3 transactions/s    | No                     |
+
+## Current status
+Current status of parsing can be seen on kibana dashboard:
+http://localhost:5601/app/kibana#/dashboard/4e400ef0-47af-11e8-a68a-cdcd3cdf86f2?embed=true&_g=()
+
+Don't forget to forward 5061 port from mercury.cyber.fund:
+```bash
+ssh -p 33325 -L 5601:localhost:5601 cyberanalytics@mercury.cyber.fund
+```
