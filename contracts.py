@@ -8,7 +8,9 @@ import json
 
 SERVER_URL = "http://localhost:3000/{}"
 ADD_ABI_URL = SERVER_URL.format("add_abi")
-GET_ABI_URL = SERVER_URL.format("get_abi/{}")
+GRAB_ABI_PATH = "./quickBlocks/bin/grabABI {}"
+GRAB_ABI_CACHE_PATH = "/home/anatoli/.quickBlocks/cache/abis/{}.json"
+
 DECODE_PARAMS_URL = SERVER_URL.format("decode_params/{}")
 
 class Contracts():
@@ -26,13 +28,23 @@ class Contracts():
   def _add_contract_abi(self, abi):
     response = requests.post(
       ADD_ABI_URL,
+      headers={"content-type": "application/json"},
       data=json.dumps(abi)
     )
     return response.json()
 
   def _get_contract_abi(self, address):
-    response = requests.get(GET_ABI_URL.format(address))
-    return response.json()
+    file_path = GRAB_ABI_CACHE_PATH.format(address)
+    if not os.path.exists(file_path):
+      os.system(GRAB_ABI_PATH.format(address)) 
+      for attemp in range(5):
+        if not os.path.exists(file_path):
+          sleep(1)
+    if os.path.exists(file_path):
+      abi_file = open(file_path)
+      return json.load(abi_file)
+    else:
+      return {"error": True}
 
   def _decode_inputs_batch(self, encoded_params):
     encoded_params_string = ",".join(encoded_params)
@@ -41,6 +53,12 @@ class Contracts():
 
   def _iterate_contracts_without_abi(self):
     return self.client.iterate(self.index, 'contract', 'address:* AND !(_exists_:abi)', paginate=True)
+
+  def _save_contracts_abi(self):
+    for contracts in self._iterate_contracts_without_abi():
+      abis = [self._get_contract_abi(contract["_source"]["address"]) for contract in contracts]
+      operations = [self.client.update_op(doc={'abi': abis[index]}, id=contract["_id"]) for index, contract in enumerate(contracts)]
+      self.client.bulk(operations, doc_type='contract', index=self.index, refresh=True)
 
   def _iterate_contracts_with_abi(self):
     return self.client.iterate(self.index, 'contract', 'address:* AND _exists_:abi', paginate=True)
@@ -54,17 +72,18 @@ class Contracts():
     return self.client.iterate(self.index, 'tx', query, paginate=True)
 
   def _decode_inputs_for_contracts(self, contracts):
-    for contract in contracts:
-      # Remove unsuccessfuly received contracts
-      self._add_contract_abi(contract)
+    contracts = [contract['_source']['address'] for contract in contracts]
     for transactions in self._iterate_transactions_by_targets(contracts):
       inputs = [transaction["_source"]["input"] for transaction in transactions]
       decoded_inputs = self._decode_inputs_batch(inputs)
+      print(decoded_inputs)
       operations = [self.client.update_op(doc={'decoded_input': decoded_inputs[index]}, id=transaction["_id"]) for index, transaction in enumerate(transactions)]
       self.client.bulk(operations, doc_type='tx', index=self.index, refresh=True)
 
   def decode_inputs(self):
-    for contracts in self._iterate_contracts():
-      contracts = [contract['_source']['address'] for contract in contracts]
-      self._decode_inputs_for_contracts(contracts)      
+    self._save_contracts_abi()
+    for contracts in self._iterate_contracts_with_abi():
+      for contract in contracts:
+        self._add_contract_abi(contract["_source"]["abi"]) 
+      self._decode_inputs_for_contracts(contracts)   
 

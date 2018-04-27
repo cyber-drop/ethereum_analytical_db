@@ -4,37 +4,15 @@ var app = express();
 var read = require('read-file');
 var cmd = require('node-run-cmd');
 var fs = require('fs');
+var bodyParser = require('body-parser');
 
-var ABI_CACHE = "/home/anatoli/.quickBlocks/cache/abis/"
-var GRAB_ABI_PATH = "../quickBlocks/bin/grabABI"
-
-function getABIFile(address) {
-  return ABI_CACHE + address + ".json"
-}
+app.use(bodyParser.json());
 
 app.post("/add_abi", function(request, response) {
-  console.log(request)
-  var abiJSON = JSON.parse(request.body)
-  decoder.addABI(abiJSON)
+  decoder.addABI(request.body)
   response.json({
     "added": true
   })
-});
-
-app.get("/get_abi/:address", function(request, response) {
-  var address = request.params.address
-  cmd.run(GRAB_ABI_PATH + " " + address);
-  var abiFile = getABIFile(address)
-  if (fs.existsSync(abiFile)) {
-    var abiJSONString = read.sync(abiFile, 'utf8');
-    var abiJSON = JSON.parse(abiJSONString)
-    response.json(abiJSON)
-  }
-  else {
-    response.json({
-      "error": true
-    })
-  }
 });
 
 app.get("/decode_params/:inputs", function(request, response) {
