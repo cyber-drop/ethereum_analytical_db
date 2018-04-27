@@ -36,8 +36,8 @@ class InputParsingTestCase(unittest.TestCase):
     processes_after = self._run_shell_command('lsof -i tcp:3000')
     assert processes_before != processes_after
 
-  def test_add_contract_abi(self):
-    response = self.contracts._add_contract_abi(TEST_CONTRACT_ABI)
+  def test_add_contracts_abi(self):
+    response = self.contracts._add_contracts_abi([TEST_CONTRACT_ABI])
     assert response['added']
 
   def test_get_contract_abi(self):
@@ -57,7 +57,7 @@ class InputParsingTestCase(unittest.TestCase):
     self.assertSequenceEqual(response, TEST_CONTRACT_ABI)
 
   def test_decode_inputs_batch(self):
-    self.contracts._add_contract_abi(TEST_CONTRACT_ABI)
+    self.contracts._add_contracts_abi([TEST_CONTRACT_ABI])
     response = self.contracts._decode_inputs_batch([TEST_CONTRACT_PARAMETERS, TEST_CONTRACT_PARAMETERS])
     self.assertSequenceEqual(response, [TEST_CONTRACT_DECODED_PARAMETERS, TEST_CONTRACT_DECODED_PARAMETERS])
 
@@ -98,7 +98,7 @@ class InputParsingTestCase(unittest.TestCase):
     self.assertCountEqual(transactions, [str(i) for i in range(1, 21)])    
 
   def test_decode_inputs_for_contracts(self):
-    print(self.contracts._add_contract_abi(TEST_CONTRACT_ABI))
+    print(self.contracts._add_contracts_abi([TEST_CONTRACT_ABI]))
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS, 'abi': TEST_CONTRACT_ABI}, id=1, refresh=True)
     for i in tqdm(range(10)):
       self.client.index(TEST_INDEX, 'tx', {'to': TEST_CONTRACT_ADDRESS, 'input': TEST_CONTRACT_PARAMETERS}, id=i + 1, refresh=True)

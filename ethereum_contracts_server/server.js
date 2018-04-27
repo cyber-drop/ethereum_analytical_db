@@ -9,7 +9,8 @@ var bodyParser = require('body-parser');
 app.use(bodyParser.json());
 
 app.post("/add_abi", function(request, response) {
-  decoder.addABI(request.body)
+  for (i in request.body) 
+    decoder.addABI(request.body[i])
   response.json({
     "added": true
   })

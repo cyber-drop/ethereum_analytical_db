@@ -25,11 +25,11 @@ class Contracts():
     call('node ethereum_contracts_server/server.js &', shell=True)
     sleep(3)
 
-  def _add_contract_abi(self, abi):
+  def _add_contracts_abi(self, abis):
     response = requests.post(
       ADD_ABI_URL,
       headers={"content-type": "application/json"},
-      data=json.dumps(abi)
+      data=json.dumps(abis)
     )
     return response.json()
 
@@ -83,7 +83,6 @@ class Contracts():
   def decode_inputs(self):
     self._save_contracts_abi()
     for contracts in self._iterate_contracts_with_abi():
-      for contract in contracts:
-        self._add_contract_abi(contract["_source"]["abi"]) 
+      self._add_contracts_abi([contract["_source"]["abi"] for contract in contracts]) 
       self._decode_inputs_for_contracts(contracts)   
 

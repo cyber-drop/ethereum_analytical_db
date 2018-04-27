@@ -1,7 +1,7 @@
 from pyelasticsearch import ElasticSearch
 from tqdm import *
 
-NUMBER_OF_JOBS = 1000
+NUMBER_OF_JOBS = 10
 
 class CustomElasticSearch(ElasticSearch):
   def update_by_query(client, index, doc_type, query, script):
