@@ -11,6 +11,9 @@ Runs a process of contract addresses detection for saved transactions. All trans
 - extract-traces
 
 Starts traces extraction. Each transaction highlighted with 'to_contract' flag will get a field 'trace' with a trace extracted from parity
+- index-traces
+
+Moves all transactions from 'trace' field to an 'itx' index.
 - parse-inputs
 
 Starts input parsing. Each transaction highlighted with 'to_contract' flag will get a field 'decoded_input' with name of method called in contract and arguments for it.
@@ -22,6 +25,7 @@ Starts input parsing. Each transaction highlighted with 'to_contract' flag will 
 | detect-contracts (Find contract addresses) | 10000                      | 1000 transactions/s | No                     |
 | detect-contracts (Set to_contract flag)    | 1000                       | 16 contracts/s      | Yes                    |
 | extract-traces                             | 1000                       | 75 transactions/s   | Yes                    |
+| index-traces                               | 1000                       | 3000 transactions/s | No                     |
 | parse-inputs                               | 1000                       | 3 transactions/s    | No                     |
 
 ## Current status
