@@ -1,37 +1,27 @@
-import requests
 import os
 from subprocess import call
 import pdb
 from time import sleep
 from custom_elastic_search import CustomElasticSearch
 import json
+from ethereum.abi import (
+    decode_abi,
+    normalize_name as normalize_abi_method_name,
+    method_id as get_abi_method_id)
+from ethereum.utils import encode_int, zpad, decode_hex
 
-SERVER_URL = "http://localhost:3000/{}"
-ADD_ABI_URL = SERVER_URL.format("add_abi")
 GRAB_ABI_PATH = "./quickBlocks/bin/grabABI {}"
 GRAB_ABI_CACHE_PATH = "/home/anatoli/.quickBlocks/cache/abis/{}.json"
 
-DECODE_PARAMS_URL = SERVER_URL.format("decode_params/{}")
-
 class Contracts():
+  _contracts_abi = []
+
   def __init__(self, index, host="http://localhost:9200"):
     self.index = index
     self.client = CustomElasticSearch()
-    self._restart_server()
 
-  def _restart_server(self):
-    sleep(1)
-    os.system("kill `lsof -i tcp:3000 | awk 'NR == 2 {print $2}'`")
-    call('node ethereum_contracts_server/server.js &', shell=True)
-    sleep(3)
-
-  def _add_contracts_abi(self, abis):
-    response = requests.post(
-      ADD_ABI_URL,
-      headers={"content-type": "application/json"},
-      data=json.dumps(abis)
-    )
-    return response.json()
+  def _set_contracts_abi(self, abis):
+    self._contracts_abi = [method for abi in abis for method in abi]
 
   def _get_contract_abi(self, address):
     file_path = GRAB_ABI_CACHE_PATH.format(address)
@@ -46,11 +36,27 @@ class Contracts():
     else:
       return {"error": True}
 
-  def _decode_inputs_batch(self, encoded_params):
-    encoded_params_string = ",".join(encoded_params)
-    response = requests.get(DECODE_PARAMS_URL.format(encoded_params_string))
-    return response.json()
+  # Solution from https://ethereum.stackexchange.com/questions/20897/how-to-decode-input-data-from-tx-using-python3?rq=1
+  def _decode_input(self, call_data):
+    call_data_bin = decode_hex(call_data)
+    method_signature = call_data_bin[:4]
+    for description in self._contracts_abi:
+      if description.get('type') != 'function':
+        continue
+      method_name = normalize_abi_method_name(description['name'])
+      arg_types = [item['type'] for item in description['inputs']]
+      method_id = get_abi_method_id(method_name, arg_types)
+      if zpad(encode_int(method_id), 4) == method_signature:
+        try:
+          args = decode_abi(arg_types, call_data_bin[4:])          
+          args = [{'type': arg_types[index], 'value': str(value)} for index, value in enumerate(args)]
+        except AssertionError:
+          continue
+        return {'name': method_name, 'params': args}
 
+  def _decode_inputs_batch(self, encoded_params):
+    return [self._decode_input(call_data) for call_data in encoded_params]
+      
   def _iterate_contracts_without_abi(self):
     return self.client.iterate(self.index, 'contract', 'address:* AND !(_exists_:abi)', paginate=True)
 
@@ -76,13 +82,12 @@ class Contracts():
     for transactions in self._iterate_transactions_by_targets(contracts):
       inputs = [transaction["_source"]["input"] for transaction in transactions]
       decoded_inputs = self._decode_inputs_batch(inputs)
-      print(decoded_inputs)
       operations = [self.client.update_op(doc={'decoded_input': decoded_inputs[index]}, id=transaction["_id"]) for index, transaction in enumerate(transactions)]
       self.client.bulk(operations, doc_type='tx', index=self.index, refresh=True)
 
   def decode_inputs(self):
     self._save_contracts_abi()
     for contracts in self._iterate_contracts_with_abi():
-      self._add_contracts_abi([contract["_source"]["abi"] for contract in contracts]) 
+      self._set_contracts_abi([contract["_source"]["abi"] for contract in contracts]) 
       self._decode_inputs_for_contracts(contracts)   
 
