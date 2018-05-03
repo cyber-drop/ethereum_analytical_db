@@ -1,7 +1,9 @@
 import requests
 from tqdm import *
 import json
+import re
 from web3 import Web3, HTTPProvider
+from elasticsearch import Elasticsearch, helpers
 
 NUMBER_OF_JOBS = 1000
 headers = {'Content-Type': 'application/json'}
@@ -11,6 +13,7 @@ class ContractMethods:
     elasticsearch_host="http://localhost:9200", 
     ethereum_api_host="http://localhost:8545"):
     self.index = elasticsearch_index
+    self.client = Elasticsearch(elasticsearch_host)
     self.elasticsearch_host = elasticsearch_host
     self.ethereum_api_host = ethereum_api_host
     self.w3 = Web3(HTTPProvider(ethereum_api_host))
@@ -55,14 +58,13 @@ class ContractMethods:
 
     for contracts_chunk in self.iterate_contracts():
       for contract in contracts_chunk:
-        code = w3.toHex(w3.eth.getCode(w3.toChecksumAddress(contract['_source']['address'])))
-
+        code = self.w3.toHex(self.w3.eth.getCode(self.w3.toChecksumAddress(contract['_source']['address'])))
+        avail_standards = []
         for standard in standards:
           methods = []
           for method in standards[standard]:
             res = re.search(r'' + standards[standard][method], code) != None
-            if res != False:
-              contract['methods'].append(standard + '_' + method)
             methods.append(res)
           if False not in methods:
-            contract[standards] = True
+            avail_standards.append(standard)
+        self.client.update(index=self.index, doc_type='contract', id=contract['_id'], body={'doc': {'standards': avail_standards}})
