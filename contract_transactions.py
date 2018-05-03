@@ -7,7 +7,7 @@ class ContractTransactions:
     self.ethereum_api_host = ethereum_api_host
 
   def _iterate_contract_transactions(self):
-    return self.client.iterate(self.index, 'tx', 'input:0x?*', paginate=True, scrolling=False)
+    return self.client.iterate(self.index, 'tx', 'input:0x?* AND !(_exists_:to_contract)', paginate=True, scrolling=False)
 
   def _extract_contract_addresses(self):
     for contract_transactions in self._iterate_contract_transactions():

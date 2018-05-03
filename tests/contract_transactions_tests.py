@@ -21,6 +21,7 @@ class ContractTransactionsTestCase(unittest.TestCase):
     self.client.index(TEST_INDEX, 'tx', {'input': TEST_TRANSACTION_INPUT, 'to': TEST_TRANSACTION_TO}, id=2, refresh=True)
     self.client.index(TEST_INDEX, 'tx', {'input': None, 'to': TEST_TRANSACTION_TO}, id=3, refresh=True)
     self.client.index(TEST_INDEX, 'nottx', {'input': TEST_TRANSACTION_INPUT, 'to': TEST_TRANSACTION_TO}, id=4, refresh=True)
+    self.client.index(TEST_INDEX, 'tx', {'input': TEST_TRANSACTION_INPUT, 'to': TEST_TRANSACTION_TO, 'to_contract': True}, id=5, refresh=True)
     iterator = self.contract_transactions._iterate_contract_transactions()
     transactions = next(iterator)
     transactions = [transaction['_id'] for transaction in transactions]
