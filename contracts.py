@@ -34,7 +34,7 @@ class Contracts():
       abi_file = open(file_path)
       return json.load(abi_file)
     else:
-      return {"error": True}
+      return []
 
   # Solution from https://ethereum.stackexchange.com/questions/20897/how-to-decode-input-data-from-tx-using-python3?rq=1
   def _decode_input(self, call_data):

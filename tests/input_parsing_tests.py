@@ -23,7 +23,7 @@ class InputParsingTestCase(unittest.TestCase):
 
   def test_get_wrong_contract_abi(self):
     response = self.contracts._get_contract_abi("0x0")
-    assert response['error']
+    assert response == []
 
   def test_get_uncached_contract_abi(self):
     try:
