@@ -11,7 +11,7 @@ from ethereum.abi import (
 from ethereum.utils import encode_int, zpad, decode_hex
 
 GRAB_ABI_PATH = "./quickBlocks/bin/grabABI {}"
-GRAB_ABI_CACHE_PATH = "/home/anatoli/.quickBlocks/cache/abis/{}.json"
+GRAB_ABI_CACHE_PATH = "/home/{}/.quickBlocks/cache/abis/{}.json"
 
 class Contracts():
   _contracts_abi = []
@@ -24,7 +24,7 @@ class Contracts():
     self._contracts_abi = [method for abi in abis for method in abi]
 
   def _get_contract_abi(self, address):
-    file_path = GRAB_ABI_CACHE_PATH.format(address)
+    file_path = GRAB_ABI_CACHE_PATH.format(os.environ["USER"], address)
     if not os.path.exists(file_path):
       os.system(GRAB_ABI_PATH.format(address)) 
       for attemp in range(5):
