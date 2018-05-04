@@ -4,7 +4,6 @@ from web3 import Web3, HTTPProvider
 from custom_elastic_search import CustomElasticSearch
 
 NUMBER_OF_JOBS = 1000
-headers = {'Content-Type': 'application/json'}
 
 class ContractMethods:
   def __init__(self, elasticsearch_index, elasticsearch_host="http://localhost:9200", ethereum_api_host="http://localhost:8545"):
@@ -45,4 +44,4 @@ class ContractMethods:
             methods.append(res)
           if False not in methods:
             avail_standards.append(standard)
-        self.client.update(self.index, 'contract', contract['_id'], doc={'doc': {'standards': avail_standards, 'bytecode': code}})
+        self.client.update(self.index, 'contract', contract['_id'], doc={'standards': avail_standards, 'bytecode': code})

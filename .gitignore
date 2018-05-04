@@ -14,6 +14,7 @@
 .idea/**/mongoSettings.xml
 *.iws
 /out/
+ethereum_contracts_server/node_modules/
 .idea_modules/
 atlassian-ide-plugin.xml
 com_crashlytics_export_strings.xml
