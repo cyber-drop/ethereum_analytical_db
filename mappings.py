@@ -1,0 +1,26 @@
+from custom_elastic_search import CustomElasticSearch
+
+STRING_PROPERTIES = ["from", "to", "hash", "input"]
+OBJECT_PROPERTIES = ["trace", "decoded_input"]
+
+class Mappings:
+  def __init__(self, elasticsearch_index, elasticsearch_host="http://localhost:9200"):
+    self.index = elasticsearch_index
+    self.client = CustomElasticSearch(elasticsearch_host)
+  
+  def _set_string_properties_mapping(self):
+    mapping = {}
+    for property in STRING_PROPERTIES:
+      mapping[property] = {"type": "text", "index": False}
+    self.client.put_mapping(self.index, 'tx', {'properties': mapping})
+
+  def _set_object_properties_mapping(self):
+    mapping = {}
+    for property in OBJECT_PROPERTIES:
+      mapping[property] = {"type": "object", "enabled": False}
+    self.client.put_mapping(self.index, 'tx', {'properties': mapping})
+
+  def reduce_index_size(self):
+    self.client.index(index=self.index, doc_type='tx', doc={'test': 1}, id='start')
+    self._set_string_properties_mapping()
+    self._set_object_properties_mapping()

@@ -14,8 +14,6 @@ class ContractTransactionsTestCase(unittest.TestCase):
     self.client.create_index(TEST_INDEX)
     self.contract_transactions = ContractTransactions(TEST_INDEX)
 
-  # Change to_contract mapping
-
   def test_iterate_contract_transactions(self):
     self.client.index(TEST_INDEX, 'tx', {'input': '0x', 'to': TEST_TRANSACTION_TO}, id=1, refresh=True)
     self.client.index(TEST_INDEX, 'tx', {'input': TEST_TRANSACTION_INPUT, 'to': TEST_TRANSACTION_TO}, id=2, refresh=True)
