@@ -3,15 +3,13 @@ from contract_transactions import ContractTransactions
 from pyelasticsearch import ElasticSearch
 from time import sleep
 from tqdm import *
+from test_utils import TestElasticSearch
 
 class ContractTransactionsTestCase(unittest.TestCase):
   def setUp(self):
-    self.client = ElasticSearch('http://localhost:9200')
-    try:
-      self.client.delete_index(TEST_INDEX)
-    except:
-      pass
-    self.client.create_index(TEST_INDEX)
+    self.client = TestElasticSearch()
+    self.client.recreate_index(TEST_INDEX)
+    self.client.reduce_index_size(TEST_INDEX)
     self.contract_transactions = ContractTransactions(TEST_INDEX)
 
   def test_iterate_contract_transactions(self):
@@ -46,7 +44,6 @@ class ContractTransactionsTestCase(unittest.TestCase):
       self.client.index(TEST_INDEX, 'tx', {'input': TEST_TRANSACTION_INPUT, 'to': TEST_TRANSACTION_TO + str(i)}, id=i, refresh=True)
     self.contract_transactions._extract_contract_addresses()
     contracts = self.client.search("address:*", index=TEST_INDEX, doc_type="contract", size=100)['hits']['hits']
-    print(len(contracts))
     assert len(contracts) == 100
 
   def test_set_flag_for_processed_transactions(self):
@@ -75,7 +72,6 @@ class ContractTransactionsTestCase(unittest.TestCase):
     self.client.bulk_index(docs=docs, doc_type='tx', index=TEST_INDEX, refresh=True)
     self.contract_transactions.detect_contract_transactions()
     transactions = self.client.search("to_contract:true", index=TEST_INDEX, doc_type="tx", size=100)['hits']['hits']
-    print(len(transactions))
     assert len(transactions) == 100    
 
   def test_detect_transactions_by_big_portion_of_contracts(self):
@@ -83,7 +79,6 @@ class ContractTransactionsTestCase(unittest.TestCase):
     self.client.bulk_index(docs=docs, doc_type='tx', index=TEST_INDEX, refresh=True)
     self.contract_transactions._detect_transactions_by_contracts([TEST_TRANSACTION_TO + str(i) for i in range(1000)])
     transactions = self.client.search("to_contract:true", index=TEST_INDEX, doc_type="tx", size=1000)['hits']['hits']
-    print(len(transactions))
     assert len(transactions) == 1000
 
   def test_set_flag_for_processed_contracts(self):

@@ -49,7 +49,6 @@ class InternalTransactionsTestCase(unittest.TestCase):
   def test_make_trace_requests_skip_requests_outside_ranges(self):
     parity_hosts = [(10, 100, "url1")]
     requests = _make_trace_requests(parity_hosts, {1: {'hash': TEST_TRANSACTION_HASH, 'block': 1}})
-    print(requests)
     assert requests == {}
 
   def test_get_parity_url_by_block(self):

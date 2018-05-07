@@ -1,7 +1,7 @@
 from custom_elastic_search import CustomElasticSearch
 
-STRING_PROPERTIES = ["from", "to", "hash", "input"]
-OBJECT_PROPERTIES = ["trace", "decoded_input"]
+STRING_PROPERTIES = ["from", "hash"]
+OBJECT_PROPERTIES = ["decoded_input", "trace"]
 
 class Mappings:
   def __init__(self, elasticsearch_index, elasticsearch_host="http://localhost:9200"):

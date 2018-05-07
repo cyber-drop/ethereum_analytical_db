@@ -3,6 +3,8 @@ from mappings import Mappings
 from test_utils import TestElasticSearch
 import subprocess
 import json
+import matplotlib.pyplot as plt
+from tqdm import *
 
 CURRENT_ELASTICSEARCH_SIZE = 290659165119
 
@@ -16,8 +18,8 @@ class MappingsTestCase(unittest.TestCase):
     result = subprocess.run(["du", "-sb", "/var/lib/elasticsearch"], stdout=subprocess.PIPE)
     return int(result.stdout.split()[0])
 
-  def _add_records(self, doc):
-    docs = [{**doc, **{"id": i + 1}} for i in range(0, 100000)]
+  def _add_records(self, doc, number=10000):
+    docs = [{**doc, **{"id": i + 1}} for i in range(0, number)]
     self.client.bulk_index(index=TEST_INDEX, doc_type='tx', docs=docs, refresh=True)
 
   def test_final_index_size(self):
@@ -37,6 +39,17 @@ class MappingsTestCase(unittest.TestCase):
     print("Current size: {:.1f}".format(CURRENT_ELASTICSEARCH_SIZE / (1024 ** 3)))
     print("Compressed size: {:.1f}".format(compression * CURRENT_ELASTICSEARCH_SIZE / (1024 ** 3)))
     assert size_after < size_before
+
+  def test_index_size_depending_on_records_number(self):
+    x = list(range(1, 10000, 1000))
+    y = []
+    for i in tqdm(x):
+      self.client.recreate_index(TEST_INDEX)
+      self._add_records(TEST_TRANSACTION, i)
+      y.append(self._get_elasticsearch_size())
+    plt.plot(x, y)
+    plt.show()
+
 
   def test_non_empty_index(self):
     self._add_records(TEST_TRANSACTION)
