@@ -2,6 +2,7 @@ from tqdm import *
 import re
 from web3 import Web3, HTTPProvider
 from custom_elastic_search import CustomElasticSearch
+import json
 
 NUMBER_OF_JOBS = 1000
 
@@ -31,9 +32,13 @@ class ContractMethods:
         'tokenFallback': self._extract_first_bytes('tokenFallback(address,uint256,bytes)')
       }
     }
-
+  def _get_standard_token_abi(self):
+    with open('standard-token-abi.json') as json_file:
+      standard_token_abi = json.load(json_file)
+    return standard_token_abi
   def search_methods(self):
     standards = self._extract_methods_signatures()
+    token_abi = self._get_standard_token_abi()
     for contracts_chunk in self._iterate_contracts():
       for contract in contracts_chunk:
         contract_checksum_addr = self.w3.toChecksumAddress(contract['_source']['address'])
@@ -47,4 +52,17 @@ class ContractMethods:
             methods.append(res)
           if False not in methods:
             avail_standards.append(standard)
-        self.client.update(self.index, 'contract', contract['_id'], doc={'standards': avail_standards, 'bytecode': code}, refresh=True)
+          if len(avail_standards) > 0:
+            contract_instance = self.w3.eth.contract(address=contract_checksum_addr, abi=token_abi)
+            try:
+              name = contract_instance.functions.name().call()
+            except:
+              name = None
+            try:
+              symbol = contract_instance.functions.symbol().call()
+            except:
+              symbol = None
+            update_body = {'standards': avail_standards, 'bytecode': code, 'token_name': name, 'token_symbol': symbol}
+          else:
+            update_body = {'standards': avail_standards, 'bytecode': code}
+        self.client.update(self.index, 'contract', contract['_id'], doc=update_body)

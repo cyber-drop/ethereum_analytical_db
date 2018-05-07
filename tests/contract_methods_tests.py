@@ -27,6 +27,10 @@ class ContractMethodsTestCase(unittest.TestCase):
     contracts = [c for contracts_list in iterator for c in contracts_list]
     bytecodes = [contract["_source"]["bytecode"] for contract in contracts]
     standards = [contract["_source"]["standards"] for contract in contracts]
+    contracts_names = [contract['_source']['token_name'] for contract in contracts]
+    contracts_symbols = [contract['_source']['token_symbol'] for contract in contracts]
+    self.assertCountEqual(['RUN COIN', 'bangbeipay', 'YNOTCoin'], contracts_names)
+    self.assertCountEqual(['RUN', 'BBP', 'YNOT'], contracts_symbols)
     self.assertCountEqual([['erc20'], ['erc20'], ['erc20']], standards)
     assert TEST_BYTECODE == bytecodes[0]
  
