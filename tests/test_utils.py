@@ -1,4 +1,5 @@
 from pyelasticsearch import ElasticSearch
+from mappings import Mappings
 # Create test index
 # Search ids
 # Create many documents
@@ -17,6 +18,6 @@ class TestElasticSearch(ElasticSearch):
   def search_ids(self, index, doc_type, query, size):
     self.search("_exists_:trace", index=TEST_INDEX, doc_type='tx', size=TEST_TRANSACTIONS_NUMBER)['hits']['hits']
 
-  def get_size(self, index):
-    return self.send_request("GET", [index, "_stats"], {}, {})['indices'][index]['total']['store']['size_in_bytes']
-
+  def reduce_index_size(self, index):
+    mappings = Mappings(index)
+    mappings.reduce_index_size()
