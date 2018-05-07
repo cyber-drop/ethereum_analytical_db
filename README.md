@@ -18,6 +18,10 @@ Moves all transactions from 'trace' field to an 'itx' index.
 
 Starts input parsing. Each transaction highlighted with 'to_contract' flag will get a field 'decoded_input' with name of method called in contract and arguments for it.
 
+- search-methods
+
+Downloads contract bytecode and check does it contain signatures of token standards-specific methods. The list of standards then stored in 'standards' field. It also saves contract bytecode in 'bytecode' field.  
+
 ## Operations speed
 
 | Operation                                  | Maximum allowed batch size | Speed               | Starts from stop point |
