@@ -13,8 +13,10 @@ class ContractMethods:
 
   def _extract_first_bytes(self, func):
     return str(self.w3.toHex(self.w3.sha3(text=func)[0:4]))[2:]
+
   def _iterate_contracts(self):
     return self.client.iterate(self.index, 'contract', 'address:*', paginate=True)
+
   def _extract_methods_signatures(self):
     return {
       'erc20': {
@@ -29,6 +31,7 @@ class ContractMethods:
         'tokenFallback': self._extract_first_bytes('tokenFallback(address,uint256,bytes)')
       }
     }
+
   def search_methods(self):
     standards = self._extract_methods_signatures()
     for contracts_chunk in self._iterate_contracts():
@@ -44,4 +47,4 @@ class ContractMethods:
             methods.append(res)
           if False not in methods:
             avail_standards.append(standard)
-        self.client.update(self.index, 'contract', contract['_id'], doc={'standards': avail_standards, 'bytecode': code})
+        self.client.update(self.index, 'contract', contract['_id'], doc={'standards': avail_standards, 'bytecode': code}, refresh=True)
