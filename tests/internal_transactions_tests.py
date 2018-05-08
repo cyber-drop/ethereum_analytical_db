@@ -1,5 +1,5 @@
 import unittest
-from pyelasticsearch import ElasticSearch
+from test_utils import TestElasticSearch
 from internal_transactions import *
 from internal_transactions import _make_trace_requests, _get_parity_url_by_block, _get_traces_sync
 import random
@@ -11,12 +11,8 @@ import httpretty
 
 class InternalTransactionsTestCase(unittest.TestCase):
   def setUp(self):
-    self.client = ElasticSearch('http://localhost:9200')
-    try:
-      self.client.delete_index(TEST_INDEX)
-    except:
-      pass
-    self.client.create_index(TEST_INDEX)
+    self.client = TestElasticSearch()
+    self.client.recreate_fast_index(TEST_INDEX)
     self.parity_hosts = [(None, None, "http://localhost:8545")]
     self.internal_transactions = InternalTransactions(TEST_INDEX, parity_hosts=self.parity_hosts)
 

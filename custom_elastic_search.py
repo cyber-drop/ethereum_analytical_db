@@ -1,6 +1,9 @@
 from pyelasticsearch import ElasticSearch
 from tqdm import *
+from pyelasticsearch.exceptions import ElasticHttpError
 
+STRING_PROPERTIES = ["from", "hash", "blockTimestamp"]
+OBJECT_PROPERTIES = ["decoded_input.params", "trace.action"]
 NUMBER_OF_JOBS = 10
 
 class CustomElasticSearch(ElasticSearch):
@@ -55,3 +58,47 @@ class CustomElasticSearch(ElasticSearch):
       else:
         page_items = client.search(query, index=index, doc_type=doc_type, size=per)['hits']['hits']
       yield page_items
+
+  def _set_string_properties_mapping(self, index):
+    mapping = {}
+    for property in STRING_PROPERTIES:
+      mapping[property] = {"type": "string", "index": "no"}
+    self.put_mapping(index, 'tx', {'properties': mapping})
+
+  def _set_object_properties_mapping(self, index):
+    mapping = {}
+    for property in OBJECT_PROPERTIES:
+      mapping[property] = {"type": "object", "enabled": False}
+    self.put_mapping(index, 'tx', {'properties': mapping})
+
+  def _disable_all_field(self, index):
+    self.put_mapping(index, '_default_', {'_all': {"enabled": False}})
+
+  def _create_index_with_best_compression(self, index):
+    self.send_request('PUT', [index], {
+      "settings": {
+        "index.codec": "best_compression",
+      }
+    }, {})
+
+  def _set_max_result_size(self, index):
+    self.update_settings(index, {
+      "index.max_result_window": 100000
+    })
+
+  def _index_exists(self, index):
+    try:
+      self.refresh(index)
+      return True
+    except ElasticHttpError as e:
+      return False
+
+  def prepare_fast_index(self, index):
+    if not self._index_exists(index):
+      self._create_index_with_best_compression(index)
+      self._set_max_result_size(index)
+      self._disable_all_field(index)
+      self.index(index=index, doc_type='tx', doc={'test': 1}, id='start')
+      self._set_object_properties_mapping(index)
+      self._set_string_properties_mapping(index)
+      self.delete(index=index, doc_type='tx', id='start')
