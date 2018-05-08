@@ -6,7 +6,7 @@ class ContractMethodsTestCase(unittest.TestCase):
   def setUp(self):
     self.client = TestElasticSearch()
     self.client.recreate_index(TEST_INDEX)
-    self.contract_methods = ContractMethods(TEST_INDEX)
+    self.contract_methods = ContractMethods({"contract": TEST_INDEX})
 
   def test_iterate_contracts(self):
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[0]}, id=1, refresh=True)
@@ -16,7 +16,6 @@ class ContractMethodsTestCase(unittest.TestCase):
     contracts = [c for contracts_list in iterator for c in contracts_list]
     contracts = [contract['_id'] for contract in contracts]
     self.assertCountEqual(["1", "2", "3"], contracts)
-
   
   def test_search_methods(self):
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[0]}, id=1, refresh=True)

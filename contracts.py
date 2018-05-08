@@ -16,8 +16,8 @@ GRAB_ABI_CACHE_PATH = "/home/{}/.quickBlocks/cache/abis/{}.json"
 class Contracts():
   _contracts_abi = []
 
-  def __init__(self, index, host="http://localhost:9200"):
-    self.index = index
+  def __init__(self, indices, host="http://localhost:9200"):
+    self.indices = indices
     self.client = CustomElasticSearch()
 
   def _set_contracts_abi(self, abis):
@@ -58,16 +58,16 @@ class Contracts():
     return [self._decode_input(call_data) for call_data in encoded_params]
       
   def _iterate_contracts_without_abi(self):
-    return self.client.iterate(self.index, 'contract', 'address:* AND !(_exists_:abi)', paginate=True)
+    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(_exists_:abi)', paginate=True)
 
   def _save_contracts_abi(self):
     for contracts in self._iterate_contracts_without_abi():
       abis = [self._get_contract_abi(contract["_source"]["address"]) for contract in contracts]
       operations = [self.client.update_op(doc={'abi': abis[index]}, id=contract["_id"]) for index, contract in enumerate(contracts)]
-      self.client.bulk(operations, doc_type='contract', index=self.index, refresh=True)
+      self.client.bulk(operations, doc_type='contract', index=self.indices["contract"], refresh=True)
 
   def _iterate_contracts_with_abi(self):
-    return self.client.iterate(self.index, 'contract', 'address:* AND _exists_:abi', paginate=True)
+    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND _exists_:abi', paginate=True)
 
   def _iterate_transactions_by_targets(self, targets):
     query = {
@@ -75,7 +75,7 @@ class Contracts():
         "to": targets
       }
     }
-    return self.client.iterate(self.index, 'tx', query, paginate=True)
+    return self.client.iterate(self.indices["transaction"], 'tx', query, paginate=True)
 
   def _decode_inputs_for_contracts(self, contracts):
     contracts = [contract['_source']['address'] for contract in contracts]
@@ -83,7 +83,7 @@ class Contracts():
       inputs = [transaction["_source"]["input"] for transaction in transactions]
       decoded_inputs = self._decode_inputs_batch(inputs)
       operations = [self.client.update_op(doc={'decoded_input': decoded_inputs[index]}, id=transaction["_id"]) for index, transaction in enumerate(transactions)]
-      self.client.bulk(operations, doc_type='tx', index=self.index, refresh=True)
+      self.client.bulk(operations, doc_type='tx', index=self.indices["transaction"], refresh=True)
 
   def decode_inputs(self):
     self._save_contracts_abi()
