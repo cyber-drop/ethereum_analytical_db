@@ -8,8 +8,7 @@ from test_utils import TestElasticSearch
 class ContractTransactionsTestCase(unittest.TestCase):
   def setUp(self):
     self.client = TestElasticSearch()
-    self.client.recreate_index(TEST_INDEX)
-    self.client.reduce_index_size(TEST_INDEX)
+    self.client.recreate_fast_index(TEST_INDEX)
     self.contract_transactions = ContractTransactions(TEST_INDEX)
 
   def test_iterate_contract_transactions(self):

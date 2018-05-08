@@ -11,8 +11,7 @@ class InputParsingTestCase(unittest.TestCase):
   def setUp(self):
     self.contracts = Contracts(TEST_INDEX)
     self.client = TestElasticSearch()
-    self.client.recreate_index(TEST_INDEX)
-    self.client.reduce_index_size(TEST_INDEX)
+    self.client.recreate_fast_index(TEST_INDEX)
 
   def test_set_contracts_abi(self):
     self.contracts._set_contracts_abi([TEST_CONTRACT_ABI, TEST_CONTRACT_ABI])
