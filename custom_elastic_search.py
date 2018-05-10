@@ -11,15 +11,22 @@ class CustomElasticSearch(ElasticSearch):
     kwargs["timeout"] = 600
     super().__init__(*args, **kwargs)
   
-  def make_range_query(self, bottom_line, upper_bound):
-    if (bottom_line is not None) and (upper_bound is not None):
-      return "[{} TO {}]".format(bottom_line, upper_bound - 1)
-    elif (bottom_line is not None):
-      return "[{} TO *]".format(bottom_line)
-    elif (upper_bound is not None):
-      return "[* TO {}]".format(upper_bound - 1)
+  def make_range_query(self, field, range_tuple, *args):
+    if len(args):
+      requests = [self.make_range_query(field, range_tuple) for range_tuple in [range_tuple] + list(args)]
+      result_request = " OR ".join(requests)
+      return "({})".format(result_request)
     else:
-      return "[* TO *]"
+      bottom_line = range_tuple[0]
+      upper_bound = range_tuple[1]
+      if (bottom_line is not None) and (upper_bound is not None):
+        return "{}:[{} TO {}]".format(field, bottom_line, upper_bound - 1)
+      elif (bottom_line is not None):
+        return "{}:[{} TO *]".format(field, bottom_line)
+      elif (upper_bound is not None):
+        return "{}:[* TO {}]".format(field, upper_bound - 1)
+      else:
+        return "{}:[* TO *]".format(field)
 
   def update_by_query(client, index, doc_type, query, script):
     body = {'script': {'inline': script}}
