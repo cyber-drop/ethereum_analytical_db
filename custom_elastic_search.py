@@ -7,6 +7,10 @@ OBJECT_PROPERTIES = ["decoded_input.params", "trace.action"]
 NUMBER_OF_JOBS = 10
 
 class CustomElasticSearch(ElasticSearch):
+  def __init__(self, *args, **kwargs):
+    kwargs["timeout"] = 600
+    super().__init__(*args, **kwargs)
+  
   def make_range_query(self, bottom_line, upper_bound):
     if (bottom_line is not None) and (upper_bound is not None):
       return "[{} TO {}]".format(bottom_line, upper_bound - 1)
@@ -44,7 +48,7 @@ class CustomElasticSearch(ElasticSearch):
     for page in tqdm(range(pages)):
       if paginate:
         if not scroll_id:
-          pagination_parameters = {'scroll': '1m', 'size': per}
+          pagination_parameters = {'scroll': '60m', 'size': per}
           pagination_body = {}
           if type(query) is str:
             pagination_parameters['q'] = query
@@ -54,7 +58,7 @@ class CustomElasticSearch(ElasticSearch):
           scroll_id = response['_scroll_id']
           page_items = response['hits']['hits']
         else:
-          page_items = client.send_request('POST', ['_search', 'scroll'], {'scroll': '1m', 'scroll_id': scroll_id}, {})['hits']['hits']
+          page_items = client.send_request('POST', ['_search', 'scroll'], {'scroll': '60m', 'scroll_id': scroll_id}, {})['hits']['hits']
       else:
         page_items = client.search(query, index=index, doc_type=doc_type, size=per)['hits']['hits']
       yield page_items
