@@ -50,8 +50,8 @@ def _get_traces_sync(parity_hosts, transactions):
   return traces
 
 class InternalTransactions:
-  def __init__(self, elasticsearch_index, elasticsearch_host="http://localhost:9200", parity_hosts=PARITY_HOSTS):
-    self.index = elasticsearch_index
+  def __init__(self, elasticsearch_indices, elasticsearch_host="http://localhost:9200", parity_hosts=PARITY_HOSTS):
+    self.indices = elasticsearch_indices
     self.client = CustomElasticSearch(elasticsearch_host)
     self.pool = Pool(processes=NUMBER_OF_PROCESSES)
     self.parity_hosts = parity_hosts
@@ -69,7 +69,7 @@ class InternalTransactions:
 
   def _iterate_transactions(self, bottom_line, upper_bound):
     range_query = self.client.make_range_query(bottom_line, upper_bound)
-    return self.client.iterate(self.index, 'tx', 'to_contract:true AND !(_exists_:trace) AND blockNumber:' + range_query)
+    return self.client.iterate(self.indices["transaction"], 'tx', 'to_contract:true AND !(_exists_:trace) AND blockNumber:' + range_query)
 
   def _get_traces(self, transactions):    
     chunks = self._split_on_chunks(transactions.items(), NUMBER_OF_PROCESSES)
@@ -79,7 +79,7 @@ class InternalTransactions:
 
   def _set_trace_hashes(self, transaction, trace):
     for i, internal_transaction in enumerate(trace):
-      internal_transaction["hash"] = transaction["hash"] + str(i)
+      internal_transaction["hash"] = transaction["hash"] + "." + str(i)
 
   def _classify_trace(self, transaction, trace):
     if "from" not in transaction.keys():
@@ -101,7 +101,19 @@ class InternalTransactions:
   def _save_traces(self, traces):
     if traces:
       operations = [self.client.update_op(doc={'trace': trace}, id=id) for id, trace in traces.items()]
-      self.client.bulk(operations, doc_type='tx', index=self.index, refresh=True)
+      self.client.bulk(operations, doc_type='tx', index=self.indices["transaction"], refresh=True)
+
+  def _preprocess_internal_transaction(self, transaction):
+    transaction = transaction.copy()
+    for field in ["action", "result"]:
+      transaction.update(transaction[field])
+      del transaction[field]
+    return transaction
+
+  def _save_internal_transactions(self, traces):
+    if traces:
+      docs = [self._preprocess_internal_transaction(transaction) for trace in traces.values() for transaction in trace]
+      self.client.bulk_index(docs=docs, index=self.indices["internal_transaction"], doc_type="itx", id_field="hash", refresh=True)
 
   def _extract_traces_chunk(self, transactions):
     transactions_dict = {
@@ -118,6 +130,7 @@ class InternalTransactions:
         self._set_trace_hashes(transaction_body, trace)
         self._classify_trace(transaction_body, trace)
     self._save_traces(traces)
+    self._save_internal_transactions(traces)
 
   def extract_traces(self):
     for bottom_line, upper_bound, url in self.parity_hosts:

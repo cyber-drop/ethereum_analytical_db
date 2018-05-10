@@ -10,11 +10,14 @@ from tqdm import *
 import httpretty
 
 class InternalTransactionsTestCase(unittest.TestCase):
+  maxDiff = None
+
   def setUp(self):
     self.client = TestElasticSearch()
-    self.client.recreate_fast_index(TEST_INDEX)
+    self.client.recreate_fast_index(TEST_TRANSACTIONS_INDEX)
+    self.client.recreate_fast_index(TEST_INTERNAL_TRANSACTIONS_INDEX)
     self.parity_hosts = [(None, None, "http://localhost:8545")]
-    self.internal_transactions = InternalTransactions(TEST_INDEX, parity_hosts=self.parity_hosts)
+    self.internal_transactions = InternalTransactions({"transaction": TEST_TRANSACTIONS_INDEX, "internal_transaction": TEST_INTERNAL_TRANSACTIONS_INDEX}, parity_hosts=self.parity_hosts)
 
   def test_split_on_chunks(self):
     test_list = list(range(10))
@@ -22,11 +25,11 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.assertSequenceEqual(test_chunks, [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]])
 
   def test_iterate_transactions(self):
-    self.client.index(TEST_INDEX, 'tx', {'to_contract': False, 'blockNumber': 1}, id=1, refresh=True)
-    self.client.index(TEST_INDEX, 'tx', {'to_contract': True, 'trace': {'test': 1}, 'blockNumber': 2}, id=2, refresh=True)
-    self.client.index(TEST_INDEX, 'tx', {'to_contract': True, 'blockNumber': 2}, id=3, refresh=True)
-    self.client.index(TEST_INDEX, 'tx', {'to_contract': True, 'blockNumber': 3}, id=4, refresh=True)
-    self.client.index(TEST_INDEX, 'nottx', {'to_contract': True, 'blockNumber': 1}, id=5, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': False, 'blockNumber': 1}, id=1, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': True, 'trace': {'test': 1}, 'blockNumber': 2}, id=2, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': True, 'blockNumber': 2}, id=3, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': True, 'blockNumber': 3}, id=4, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'to_contract': True, 'blockNumber': 1}, id=5, refresh=True)
     iterator = self.internal_transactions._iterate_transactions(1, 3)
     transactions = next(iterator)
     transactions = [transaction["_id"] for transaction in transactions]
@@ -79,7 +82,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
       body='[{"id": 1, "result": {"trace": "test_trace"}}]', 
       content_type='application/json'
     )
-    self.internal_transactions = InternalTransactions(TEST_INDEX, parity_hosts=parity_hosts)
+    self.internal_transactions = InternalTransactions(TEST_TRANSACTIONS_INDEX, parity_hosts=parity_hosts)
     traces = self.internal_transactions._get_traces({1: {
       'hash': TEST_TRANSACTION_HASH,
       'block': 90
@@ -96,9 +99,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     }
     trace = [{}, {}, {}]
     self.internal_transactions._set_trace_hashes(transaction, trace)
-    assert trace[0]["hash"] == "0x10"
-    assert trace[1]["hash"] == "0x11"
-    assert trace[2]["hash"] == "0x12"
+    assert trace[0]["hash"] == "0x1.0"
+    assert trace[1]["hash"] == "0x1.1"
+    assert trace[2]["hash"] == "0x1.2"
 
   def test_classify_trace(self):
     trace = [{
@@ -138,50 +141,75 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert trace[4]["class"] == OTHER_TRANSACTION
 
   def test_save_traces(self):
-    self.client.index(TEST_INDEX, 'tx', {"hash": TEST_TRANSACTION_HASH}, id=1, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {"hash": TEST_TRANSACTION_HASH}, id=1, refresh=True)
     self.internal_transactions._save_traces({1: TEST_TRANSACTION_TRACE})
-    transaction = self.client.get(TEST_INDEX, 'tx', 1)['_source']
+    transaction = self.client.get(TEST_TRANSACTIONS_INDEX, 'tx', 1)['_source']
     trace = transaction['trace']
     self.assertSequenceEqual(trace, TEST_TRANSACTION_TRACE)
+
+  def test_save_internal_transactions(self):
+    traces = {1: TEST_TRANSACTION_TRACE}
+    self.internal_transactions._save_internal_transactions(traces)
+    internal_transactions = self.client.search(index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type="itx", query="*")["hits"]["hits"]
+    internal_transactions = [transaction["_source"] for transaction in internal_transactions]
+    self.assertCountEqual(internal_transactions, TEST_INTERNAL_TRANSACTIONS)
+
+  def test_save_internal_transactions_with_ids(self):
+    trace = TEST_TRANSACTION_TRACE.copy()
+    for i, transaction in enumerate(trace):
+      transaction["hash"] = "0x1.{}".format(i)
+    traces = {1: trace}
+    self.internal_transactions._save_internal_transactions(traces)
+    internal_transactions = self.client.search(index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type="itx", query="*")["hits"]["hits"]
+    internal_transactions = [transaction["_id"] for transaction in internal_transactions]
+    self.assertCountEqual(internal_transactions, ["0x1.{}".format(i) for i, t in enumerate(trace)])
 
   def test_save_empty_traces(self):
     self.internal_transactions._save_traces({})
     assert True
 
+  def _add_transactions_and_return_chunk(self):
+    docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'to': TEST_TRANSACTION_HASH, 'from': TEST_TRANSACTION_HASH, 'id': i, 'blockNumber': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
+    self.client.bulk_index(TEST_TRANSACTIONS_INDEX, 'tx', docs, refresh=True)
+    return self.client.search(index=TEST_TRANSACTIONS_INDEX, doc_type='tx', query="*")['hits']['hits']
+
   def test_extract_traces_chunk(self):
-    docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'id': i, 'blockNumber': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
-    self.client.bulk_index(TEST_INDEX, 'tx', docs, refresh=True)
-    chunk = self.client.search(index=TEST_INDEX, doc_type='tx', query="*")['hits']['hits']
+    chunk = self._add_transactions_and_return_chunk()
     self.internal_transactions._extract_traces_chunk(chunk)
-    transactions = self.client.search("_exists_:trace", index=TEST_INDEX, doc_type='tx', size=TEST_BIG_TRANSACTIONS_NUMBER)['hits']['hits']
+    transactions = self.client.search("_exists_:trace", index=TEST_TRANSACTIONS_INDEX, doc_type='tx', size=TEST_BIG_TRANSACTIONS_NUMBER)['hits']['hits']
     transactions = [transaction["_id"] for transaction in transactions]
     self.assertCountEqual(transactions, [t["_id"] for t in chunk])
 
   def test_extract_traces_chunk_with_preprocessing(self):
-    docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'to': TEST_TRANSACTION_HASH, 'from': TEST_TRANSACTION_HASH, 'id': i, 'blockNumber': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
-    self.client.bulk_index(TEST_INDEX, 'tx', docs, refresh=True)
-    chunk = self.client.search(index=TEST_INDEX, doc_type='tx', query="*")['hits']['hits']
+    chunk = self._add_transactions_and_return_chunk()
     self.internal_transactions._extract_traces_chunk(chunk)
-    transactions = self.client.search("_exists_:trace", index=TEST_INDEX, doc_type='tx', size=TEST_TRANSACTIONS_NUMBER)['hits']['hits']
+    transactions = self.client.search("_exists_:trace", index=TEST_TRANSACTIONS_INDEX, doc_type='tx', size=TEST_TRANSACTIONS_NUMBER)['hits']['hits']
     transaction = transactions[0]["_source"]
     for internal_transaction in transaction["trace"]:
       assert 'hash' in internal_transaction.keys()
       assert 'class' in internal_transaction.keys()
 
+  def test_extract_traces_chunk_with_internal_transactions(self):
+    chunk = self._add_transactions_and_return_chunk()
+    self.internal_transactions._extract_traces_chunk(chunk)
+    internal_transactions = self.client.search("*", index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type='itx', size=TEST_BIG_TRANSACTIONS_NUMBER)['hits']['hits']
+    internal_transactions = [transaction["_source"] for transaction in internal_transactions]
+    for transaction in internal_transactions:
+      del transaction["class"]
+    self.assertCountEqual(internal_transactions, TEST_INTERNAL_TRANSACTIONS)
+
   def test_extract_traces(self):
     docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'id': i, 'blockNumber': i} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
-    self.client.bulk_index(TEST_INDEX, 'tx', docs, refresh=True)
+    self.client.bulk_index(TEST_TRANSACTIONS_INDEX, 'tx', docs, refresh=True)
     self.internal_transactions.extract_traces()
-    transactions = self.client.search("_exists_:trace", index=TEST_INDEX, doc_type='tx', size=TEST_BIG_TRANSACTIONS_NUMBER)['hits']['hits']
+    transactions = self.client.search("_exists_:trace", index=TEST_TRANSACTIONS_INDEX, doc_type='tx', size=TEST_BIG_TRANSACTIONS_NUMBER)['hits']['hits']
     transactions = [transaction["_id"] for transaction in transactions]
     self.assertCountEqual(transactions, [str(i) for i in range(TEST_BIG_TRANSACTIONS_NUMBER)])
 
-  def test_no_full_text_index(self):
-    pass
-
 TEST_TRANSACTIONS_NUMBER = 10
 TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 10
-TEST_INDEX = 'test-ethereum-transactions'
+TEST_TRANSACTIONS_INDEX = 'test-ethereum-transactions'
+TEST_INTERNAL_TRANSACTIONS_INDEX = 'test-ethereum-internal-transactions'
 TEST_TRANSACTION_HASH = '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a'
 TEST_TRANSACTION_INPUT = '0xb1631db29e09ec5581a0ec398f1229abaf105d3524c49727621841af947bdc44'
 TEST_INCORRECT_TRANSACTION_HASH = "0x"
@@ -220,6 +248,34 @@ TEST_TRANSACTION_TRACE = [
     "traceAddress": [
       0
     ],
+    "type": "call"
+  }
+]
+TEST_INTERNAL_TRANSACTIONS = [
+  {
+    "callType": "call",
+    "from": "0xa74d69c0aef9166aca23d563f38cbf85fe3e39a6",
+    "gas": "0x104f8",
+    "input": "0x3cc86b80000000000000000000000000000000000000000000000000016345785d8a0000000000000000000000000000a74d69c0aef9166aca23d563f38cbf85fe3e39a6",
+    "to": "0x1fcb809dbe044fb3875463281d1bb55c4476a28b",
+    "value": "0x0",
+    "gasUsed": "0x1bbd",
+    "output": "0x",
+    "subtraces": 1,
+    "traceAddress": [],
+    "type": "call"
+  }, 
+  {
+    "callType": "call",
+    "from": "0x1fcb809dbe044fb3875463281d1bb55c4476a28b",
+    "gas": "0x8fc",
+    "input": "0x",
+    "to": "0xa74d69c0aef9166aca23d563f38cbf85fe3e39a6",
+    "value": "0x16345785d8a0000",
+    "gasUsed": "0x0",
+    "output": "0x",
+    "subtraces": 0,
+    "traceAddress": [0],
     "type": "call"
   }
 ]

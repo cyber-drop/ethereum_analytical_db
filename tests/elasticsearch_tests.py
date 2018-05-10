@@ -63,7 +63,6 @@ class ElasticSearchTestCase(unittest.TestCase):
         self.client.update(TEST_INDEX, 'item', id=random.randint(1, 100), doc={'some_failing_flag': True})
     items = [i["_id"] for items_list in items for i in items_list]
     items = set(items)
-    print(len(list(items)))
     assert len(list(items)) == 100
 
   def unimplemented_pagination_without_scrolling(self):
