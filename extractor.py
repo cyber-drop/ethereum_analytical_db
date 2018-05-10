@@ -9,7 +9,7 @@ from config import INDICES
 @click.command()
 @click.option('--host', help='Elasticsearch host name', default='http://localhost:9200')
 @click.option('--operation', help='Action to perform (detect-contracts, extract-traces, parse-inputs)', default='detect-contracts')
-def start_process(index, operation, host):
+def start_process(operation, host):
   elasticsearch = CustomElasticSearch(host)
   contract_transactions = ContractTransactions(INDICES, host)
   internal_transactions = InternalTransactions(INDICES, host)
