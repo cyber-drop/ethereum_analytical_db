@@ -4,19 +4,20 @@ from contract_transactions import ContractTransactions
 from internal_transactions import InternalTransactions
 from contracts import Contracts
 from contract_methods import ContractMethods
+from config import INDICES
 
 @click.command()
 @click.option('--host', help='Elasticsearch host name', default='http://localhost:9200')
-@click.option('--index', help='Elasticsearch index name', default='ethereum-transaction')
 @click.option('--operation', help='Action to perform (detect-contracts, extract-traces, parse-inputs)', default='detect-contracts')
 def start_process(index, operation, host):
   elasticsearch = CustomElasticSearch(host)
-  contract_transactions = ContractTransactions(index, host)
-  internal_transactions = InternalTransactions(index, host)
-  contracts = Contracts(index, host)
-  contract_methods = ContractMethods(index, host)
+  contract_transactions = ContractTransactions(INDICES, host)
+  internal_transactions = InternalTransactions(INDICES, host)
+  contracts = Contracts(INDICES, host)
+  contract_methods = ContractMethods(INDICES, host)
   if operation == "prepare-index":
-    elasticsearch.prepare_fast_index(index)
+    elasticsearch.prepare_fast_index(INDICES["transaction"])
+    elasticsearch.prepare_fast_index(INDICES["internal_transaction"])
   elif operation == "detect-contracts":
     contract_transactions.detect_contract_transactions()
   elif operation == "extract-traces":

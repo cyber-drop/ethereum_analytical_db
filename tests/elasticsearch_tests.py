@@ -63,7 +63,6 @@ class ElasticSearchTestCase(unittest.TestCase):
         self.client.update(TEST_INDEX, 'item', id=random.randint(1, 100), doc={'some_failing_flag': True})
     items = [i["_id"] for items_list in items for i in items_list]
     items = set(items)
-    print(len(list(items)))
     assert len(list(items)) == 100
 
   def unimplemented_pagination_without_scrolling(self):
@@ -115,10 +114,10 @@ class ElasticSearchTestCase(unittest.TestCase):
       docs = [{**doc, **{"id": i + 1}} for i in range(0, number)]
       self.client.bulk_index(index=TEST_INDEX, doc_type='tx', docs=docs, refresh=True)
 
-  # def test_max_result_size(self):
-  #   self.client.delete_index(TEST_INDEX)
-  #   self.new_client.prepare_fast_index(TEST_INDEX)
-  #   self._add_records({'test': 1}, number=100000)    
+  def test_max_result_size(self):
+    self.client.delete_index(TEST_INDEX)
+    self.new_client.prepare_fast_index(TEST_INDEX)
+    self._add_records({'test': 1}, number=100000)    
 
   def test_final_index_size(self):
     self._add_records(TEST_TRANSACTION)
@@ -143,23 +142,23 @@ class ElasticSearchTestCase(unittest.TestCase):
       object_search_result = self.client.search(index=TEST_INDEX, doc_type='tx', query="_exists_:{}".format(property))['hits']['hits']
       assert len(object_search_result)
 
-  # def test_index_size_depending_on_records_number(self):
-  #   x = list(range(10))
-  #   no_compression_y = []
-  #   compression_y = []
-  #   for i in tqdm(x):
-  #     self.client.recreate_index(TEST_INDEX)
-  #     self._add_records(TEST_TRANSACTION, 1000, i)
-  #     no_compression_y.append(self._get_elasticsearch_size())
-  #   for i in tqdm(x):
-  #     self.client.delete_index(TEST_INDEX)
-  #     self.new_client.prepare_fast_index(TEST_INDEX)
-  #     self._add_records(TEST_TRANSACTION, 1000, i)
-  #     compression_y.append(self._get_elasticsearch_size())
+  def test_index_size_depending_on_records_number(self):
+    x = list(range(10))
+    no_compression_y = []
+    compression_y = []
+    for i in tqdm(x):
+      self.client.recreate_index(TEST_INDEX)
+      self._add_records(TEST_TRANSACTION, 1000, i)
+      no_compression_y.append(self._get_elasticsearch_size())
+    for i in tqdm(x):
+      self.client.delete_index(TEST_INDEX)
+      self.new_client.prepare_fast_index(TEST_INDEX)
+      self._add_records(TEST_TRANSACTION, 1000, i)
+      compression_y.append(self._get_elasticsearch_size())
 
-  #   plt.plot(x, no_compression_y)
-  #   plt.plot(x, compression_y)
-  #   plt.show()
+    plt.plot(x, no_compression_y)
+    plt.plot(x, compression_y)
+    plt.show()
 
   def test_non_empty_index(self):
     self._add_records(TEST_TRANSACTION, number=100)

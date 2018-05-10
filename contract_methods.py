@@ -2,12 +2,11 @@ from tqdm import *
 import re
 from web3 import Web3, HTTPProvider
 from custom_elastic_search import CustomElasticSearch
-
-NUMBER_OF_JOBS = 1000
+from config import INDICES
 
 class ContractMethods:
-  def __init__(self, elasticsearch_index, elasticsearch_host="http://localhost:9200", ethereum_api_host="http://localhost:8545"):
-    self.index = elasticsearch_index
+  def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200", ethereum_api_host="http://localhost:8545"):
+    self.indices = elasticsearch_indices
     self.client = CustomElasticSearch(elasticsearch_host)
     self.w3 = Web3(HTTPProvider(ethereum_api_host))
 
@@ -15,7 +14,7 @@ class ContractMethods:
     return str(self.w3.toHex(self.w3.sha3(text=func)[0:4]))[2:]
 
   def _iterate_contracts(self):
-    return self.client.iterate(self.index, 'contract', 'address:*', paginate=True)
+    return self.client.iterate(self.indices["contract"], 'contract', 'address:*', paginate=True)
 
   def _extract_methods_signatures(self):
     return {
@@ -47,4 +46,4 @@ class ContractMethods:
             methods.append(res)
           if False not in methods:
             avail_standards.append(standard)
-        self.client.update(self.index, 'contract', contract['_id'], doc={'standards': avail_standards, 'bytecode': code}, refresh=True)
+        self.client.update(self.indices["contract"], 'contract', contract['_id'], doc={'standards': avail_standards, 'bytecode': code}, refresh=True)
