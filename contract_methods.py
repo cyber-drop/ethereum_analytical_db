@@ -5,17 +5,25 @@ from custom_elastic_search import CustomElasticSearch
 from config import INDICES
 import json
 
+with open('standard-token-abi.json') as json_file:
+  standard_token_abi = json.load(json_file)
+
 class ContractMethods:
   def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200", ethereum_api_host="http://localhost:8545"):
     self.indices = elasticsearch_indices
     self.client = CustomElasticSearch(elasticsearch_host)
     self.w3 = Web3(HTTPProvider(ethereum_api_host))
-
-  def _extract_first_bytes(self, func):
-    return str(self.w3.toHex(self.w3.sha3(text=func)[0:4]))[2:]
+    self.standard_token_abi = standard_token_abi
+    self.standards = self._extract_methods_signatures()
 
   def _iterate_contracts(self):
     return self.client.iterate(self.indices["contract"], 'contract', 'address:*', paginate=True)
+
+  def _iterate_non_standard(self):
+    return self.client.iterate(self.indices["contract"], 'contract', 'standards: None', paginate=True)
+
+  def _extract_first_bytes(self, func):
+    return str(self.w3.toHex(self.w3.sha3(text=func)[0:4]))[2:]
 
   def _extract_methods_signatures(self):
     return {
@@ -31,67 +39,56 @@ class ContractMethods:
         'tokenFallback': self._extract_first_bytes('tokenFallback(address,uint256,bytes)')
       }
     }
+  def _get_contract_bytecode(self, address):
+    contract_checksum_addr = self.w3.toChecksumAddress(address)
+    contract_code_bytearr = self.w3.eth.getCode(contract_checksum_addr)
+    return self.w3.toHex(contract_code_bytearr)
 
-  def _get_standard_token_abi(self):
-    with open('standard-token-abi.json') as json_file:
-      standard_token_abi = json.load(json_file)
-    return standard_token_abi
-
-  def _check_standards(self, bytecode, standards):
+  def _check_standards(self, bytecode):
     avail_standards = []
-    for standard in standards:
+    for standard in self.standards:
       methods = []
-      for method in standards[standard]:
-        res = re.search(r'' + standards[standard][method], bytecode) != None
+      for method in self.standards[standard]:
+        res = re.search(r'' + self.standards[standard][method], bytecode) != None
         methods.append(res)
       if False not in methods:
         avail_standards.append(standard)
     return avail_standards
 
-  def _search_constants(self, address, abi):
-    contract_instance = self.w3.eth.contract(address=address, abi=abi)
+  def _get_constants(self, address):
+    contract_checksum_addr = self.w3.toChecksumAddress(address)
+    contract_instance = self.w3.eth.contract(address=contract_checksum_addr, abi=self.standard_token_abi)
     try:
       name = contract_instance.functions.name().call()
     except:
-      name = None
+      name = 'None'
     try:
       symbol = contract_instance.functions.symbol().call()
     except:
-      symbol = None
+      symbol = 'None'
     return (name, symbol)
-    
+
+  def _classify_contract(self, contract):
+    code = self._get_contract_bytecode(contract['_source']['address'])
+    is_token = re.search(r'' + self.standards['erc20']['transfer'], code) != None
+    if is_token == True:
+      token_standards = self._check_standards(code)
+      if len(token_standards) > 0:
+        name, symbol = self._get_constants(contract['_source']['address'])
+        update_body = {'standards': token_standards, 'bytecode': code, 'token_name': name, 'token_symbol': symbol, 'is_token': True}
+        self.client.update(self.indices["contract"], 'contract', contract['_id'], doc=update_body, refresh=True)
+      else:
+        update_body = {'standards': ['None'], 'bytecode': code, 'is_token': True}
+        self.client.update(self.indices["contract"], 'contract', contract['_id'], doc=update_body, refresh=True)
+    else:
+      self.client.update(self.indices["contract"], 'contract', contract['_id'], doc={'is_token': False, 'bytecode': code}, refresh=True)
+  
   def search_methods(self):
-    standards = self._extract_methods_signatures()
-    token_abi = self._get_standard_token_abi()
-    non_standard_tokens = []
-    # Iterate trough all contracts
     for contracts_chunk in self._iterate_contracts():
       for contract in contracts_chunk:
-        # Download contract bytecode
-        contract_checksum_addr = self.w3.toChecksumAddress(contract['_source']['address'])
-        contract_code_bytearr = self.w3.eth.getCode(contract_checksum_addr)
-        code = self.w3.toHex(contract_code_bytearr)
-        # If contract is token - checks for standards
-        is_token = re.search(r'' + standards['erc20']['transfer'], code) != None
-        if is_token == True:
-          # Check if contract bytecode complies with defined standards
-          token_standards = self._check_standards(code, standards)
-          if len(token_standards) > 0:
-            name, symbol = self._search_constants(contract_checksum_addr, token_abi)
-            update_body = {
-              'standards': token_standards, 
-              'bytecode': code, 
-              'token_name': name, 
-              'token_symbol': symbol, 
-              'is_token': True
-            }
-            self.client.update(self.indices["contract"], 'contract', contract['_id'], doc=update_body)
-          else:
-            non_standard_tokens.append({'address': contract_checksum_addr, 'bytecode': code, 'id': contract['_id']})
-        else:
-          self.client.update(self.indices["contract"], 'contract', contract['_id'], doc={'is_token': False, 'bytecode': code}, refresh=True)
-
-    for token in non_standard_tokens:
-      name, symbol = self._search_constants(token['address'], token_abi)
-      update_body = {'standards': None, 'bytecode': token['bytecode'], 'token_name': name, 'token_symbol': symbol, 'is_token': True}
-      self.client.update(self.indices["contract"], 'contract', token['id'], doc=update_body, refresh=True)
+        self._classify_contract(contract)
+    for tokens_chunk in self._iterate_non_standard():
+      for token in tokens_chunk:
+        name, symbol = self._get_constants(token['_source']['address'])
+        update_body = {'token_name': name, 'token_symbol': symbol}
+        self.client.update(self.indices["contract"], 'contract', token['_id'], doc=update_body, refresh=True)
