@@ -11,12 +11,10 @@ import httpretty
 from test_constants import TEST_BLOCK_TRACES
 
 class InternalTransactionsTestCase(unittest.TestCase):
-  maxDiff = None
-
   def setUp(self):
     self.client = TestElasticSearch()
     self.client.recreate_fast_index(TEST_TRANSACTIONS_INDEX)
-    self.client.recreate_fast_index(TEST_INTERNAL_TRANSACTIONS_INDEX)
+    self.client.recreate_fast_index(TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type='itx')
     self.client.recreate_index(TEST_BLOCKS_INDEX)
     self.parity_hosts = [(None, None, "http://localhost:8545")]
     self.internal_transactions = InternalTransactions({"block": TEST_BLOCKS_INDEX, "transaction": TEST_TRANSACTIONS_INDEX, "internal_transaction": TEST_INTERNAL_TRANSACTIONS_INDEX}, parity_hosts=self.parity_hosts)

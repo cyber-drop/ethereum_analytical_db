@@ -189,13 +189,7 @@ class TransactionsElasticSearchOptimizationTestCase(ElasticSearchOptimizationTes
   def test_search_by_input_field(self):
     self.client.delete_index(TEST_INDEX)
     self.new_client.prepare_fast_index(TEST_INDEX, self.doc_type)
-    self.client.index(
-      index=TEST_INDEX, 
-      doc_type=self.doc_type, 
-      doc={'input': '0x0'}, 
-      id=1,
-      refresh=True
-    )
+    self._add_records({'input': '0x0'}, 1)
     transactions = self.client.search(
       index=TEST_INDEX, 
       doc_type=self.doc_type, 
@@ -206,14 +200,7 @@ class TransactionsElasticSearchOptimizationTestCase(ElasticSearchOptimizationTes
   def test_search_by_to_contract_field(self):
     self.client.delete_index(TEST_INDEX)
     self.new_client.prepare_fast_index(TEST_INDEX, self.doc_type)
-    self.client.index(
-      index=TEST_INDEX, 
-      doc_type=self.doc_type, 
-      doc={'to': "0x0"}, 
-      id=1,
-      refresh=True
-    )
-
+    self._add_records({'to': '0x0'}, 1)
     transactions = self.client.search(
       index=TEST_INDEX, 
       doc_type=self.doc_type, 
