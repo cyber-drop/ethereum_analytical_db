@@ -10,7 +10,7 @@ from ethereum.abi import (
     method_id as get_abi_method_id)
 from ethereum.utils import encode_int, zpad, decode_hex
 
-GRAB_ABI_PATH = "./quickBlocks/bin/grabABI {}"
+GRAB_ABI_PATH = "/usr/local/qblocks/bin/grabABI {}"
 GRAB_ABI_CACHE_PATH = "/home/{}/.quickBlocks/cache/abis/{}.json"
 
 class Contracts():
@@ -58,7 +58,7 @@ class Contracts():
     return [self._decode_input(call_data) for call_data in encoded_params]
       
   def _iterate_contracts_without_abi(self):
-    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(_exists_:abi)', paginate=True)
+    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(_exists_:abi)')
 
   def _save_contracts_abi(self):
     for contracts in self._iterate_contracts_without_abi():
@@ -67,7 +67,7 @@ class Contracts():
       self.client.bulk(operations, doc_type='contract', index=self.indices["contract"], refresh=True)
 
   def _iterate_contracts_with_abi(self):
-    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND _exists_:abi', paginate=True)
+    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND _exists_:abi')
 
   def _iterate_transactions_by_targets(self, targets):
     query = {
@@ -75,7 +75,7 @@ class Contracts():
         "to": targets
       }
     }
-    return self.client.iterate(self.indices["transaction"], 'tx', query, paginate=True)
+    return self.client.iterate(self.indices["transaction"], 'tx', query)
 
   def _decode_inputs_for_contracts(self, contracts):
     contracts = [contract['_source']['address'] for contract in contracts]
@@ -89,5 +89,4 @@ class Contracts():
     self._save_contracts_abi()
     for contracts in self._iterate_contracts_with_abi():
       self._set_contracts_abi([contract["_source"]["abi"] for contract in contracts]) 
-      self._decode_inputs_for_contracts(contracts)   
-
+      self._decode_inputs_for_contracts(contracts)

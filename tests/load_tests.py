@@ -43,7 +43,7 @@ class LoadTestCase(unittest.TestCase):
     del PARITY_HOSTS[:]
     PARITY_HOSTS.append((None, None, "http://localhost:8545"))
 
-  def test_get_traces_faster_than_serge(self):
+  def xtest_get_traces_faster_than_serge(self):
     real_client = ElasticSearch('http://localhost:9200')
     attemps = []
     real_hashes = real_client.search(index=INDEX_WITH_REAL_DATA, doc_type="tx", query='to_contract:true', size=TEST_BIG_TRANSACTIONS_NUMBER*TEST_ATTEMPS*3)['hits']['hits']

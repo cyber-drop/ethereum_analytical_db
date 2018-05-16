@@ -8,7 +8,7 @@ class ContractTransactions:
     self.ethereum_api_host = ethereum_api_host
 
   def _iterate_contract_transactions(self):
-    return self.client.iterate(self.indices["transaction"], 'tx', 'input:0x?* AND !(_exists_:to_contract)', paginate=True, scrolling=False)
+    return self.client.iterate(self.indices["transaction"], 'tx', 'input:0x?* AND !(_exists_:to_contract)')
 
   def _extract_contract_addresses(self):
     for contract_transactions in self._iterate_contract_transactions():
@@ -17,7 +17,7 @@ class ContractTransactions:
       self.client.bulk_index(docs=docs, doc_type='contract', index=self.indices["contract"], refresh=True)
 
   def _iterate_contracts(self):
-    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(_exists_:transactions_detected)', paginate=True)
+    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(_exists_:transactions_detected)')
 
   def _detect_transactions_by_contracts(self, contracts):
     transactions_query = {

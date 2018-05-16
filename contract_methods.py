@@ -15,7 +15,7 @@ class ContractMethods:
     return str(self.w3.toHex(self.w3.sha3(text=func)[0:4]))[2:]
 
   def _iterate_contracts(self):
-    return self.client.iterate(self.indices["contract"], 'contract', 'address:*', paginate=True)
+    return self.client.iterate(self.indices["contract"], 'contract', 'address:*')
 
   def _extract_methods_signatures(self):
     return {
