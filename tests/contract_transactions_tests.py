@@ -46,7 +46,7 @@ class ContractTransactionsTestCase(unittest.TestCase):
     contracts = self.client.search("address:*", index=TEST_CONTRACTS_INDEX, doc_type="contract", size=100)['hits']['hits']
     assert len(contracts) == 100
 
-  def test_set_flag_for_processed_transactions(self):
+  def xtest_set_flag_for_processed_transactions(self):
     pass
 
   def test_iterate_contracts(self):
