@@ -24,21 +24,10 @@ class ElasticSearchTestCase(unittest.TestCase):
   def test_make_complex_range_query(self):
     assert self.new_client.make_range_query("block", (0, 3), (10, 100)) == "(block:[0 TO 2] OR block:[10 TO 99])"
 
-  def test_iterate_elasticsearch_data(self):
-    for i in range(11):
-      self.client.index(TEST_INDEX, 'item', {'paginate': True}, id=i + 1, refresh=True)
-    iterator = self.new_client.iterate(index=TEST_INDEX, doc_type='item', query='paginate:true', per=10)
-    items = next(iterator)
-    operations = [self.client.update_op(doc={'paginate': False}, id=i + 1) for i, item in enumerate(items)]
-    self.client.bulk(operations, doc_type='item', index=TEST_INDEX, refresh=True)
-    item = next(iterator)
-    assert len(items) == 10
-    assert len(item) == 1
-
   def test_iterate_elasticsearch_data_with_pagination(self):
     for i in range(11):
       self.client.index(TEST_INDEX, 'item', {'paginate': True}, id=i + 1, refresh=True)
-    iterator = self.new_client.iterate(index=TEST_INDEX, doc_type='item', query='paginate:true', per=10, paginate=True)
+    iterator = self.new_client.iterate(index=TEST_INDEX, doc_type='item', query='paginate:true', per=10)
     items = next(iterator)
     item = next(iterator)
     assert len(items) == 10
@@ -47,7 +36,7 @@ class ElasticSearchTestCase(unittest.TestCase):
   def test_iterate_elasticsearch_data_with_object_query(self):
     for i in range(11):
       self.client.index(TEST_INDEX, 'item', {'paginate': True}, id=i + 1, refresh=True)
-    iterator = self.new_client.iterate(index=TEST_INDEX, doc_type='item', query={"term": {"paginate": True}}, per=10, paginate=True)
+    iterator = self.new_client.iterate(index=TEST_INDEX, doc_type='item', query={"term": {"paginate": True}}, per=10)
     items = next(iterator)
     item = next(iterator)
     assert len(items) == 10
@@ -56,7 +45,7 @@ class ElasticSearchTestCase(unittest.TestCase):
   def test_deep_pagination(self):
     for i in range(100):
       self.client.index(TEST_INDEX, 'item', {'paginate': True}, id=i + 1, refresh=True)
-    iterator = self.new_client.iterate(index=TEST_INDEX, doc_type='item', query='paginate:true', per=10, paginate=True)
+    iterator = self.new_client.iterate(index=TEST_INDEX, doc_type='item', query='paginate:true', per=10)
     items = []
     for items_list in iterator:
       items.append(items_list)
@@ -65,26 +54,6 @@ class ElasticSearchTestCase(unittest.TestCase):
     items = [i["_id"] for items_list in items for i in items_list]
     items = set(items)
     assert len(list(items)) == 100
-
-  def xtest_pagination_without_scrolling(self):
-    docs = [{'paginate': True, 'id': i + 1} for i in range(1000)]
-    self.client.bulk_index(docs=docs, doc_type='item', index=TEST_INDEX, refresh=True)
-    attemps = []
-    for attemp in range(10):
-      time_start_scrolling = time()    
-      iterator = self.new_client.iterate(index=TEST_INDEX, doc_type='item', query='paginate:true', per=10, paginate=True, scrolling=True)
-      for transactions in iterator:
-        pass
-      time_start_pagination = time()
-      iterator = self.new_client.iterate(index=TEST_INDEX, doc_type='item', query='paginate:true', per=10, paginate=True, scrolling=False)
-      for transactions in iterator:
-        pass
-      time_end = time()
-      print("Pagination time: ", time_end - time_start_pagination)
-      print("Scrolling time: ", time_start_pagination - time_start_scrolling)
-      attemps.append((time_end - time_start_pagination) < (time_start_pagination - time_start_scrolling))
-    print(attemps)
-    assert all(attemps)
 
   def test_elasticsearch_update_by_query(self):
     self.add_transactions_for_update()

@@ -52,26 +52,23 @@ class CustomElasticSearch(ElasticSearch):
       }
     return client.send_request('GET', [index, doc_type, '_count'], count_body, count_parameters)
 
-  def iterate(client, index, doc_type, query, per=NUMBER_OF_JOBS, paginate=False, scrolling=True):
+  def iterate(client, index, doc_type, query, per=NUMBER_OF_JOBS):
     items_count = client._count_by_object_or_string_query(query, index=index, doc_type=doc_type)['count']
     pages = round(items_count / per + 0.4999)
     scroll_id = None
     for page in tqdm(range(pages)):
-      if paginate:
-        if not scroll_id:
-          pagination_parameters = {'scroll': '60m', 'size': per}
-          pagination_body = {}
-          if type(query) is str:
-            pagination_parameters['q'] = query
-          else:
-            pagination_body['query'] = query
-          response = client.send_request('GET', [index, doc_type, '_search'], pagination_body, pagination_parameters)
-          scroll_id = response['_scroll_id']
-          page_items = response['hits']['hits']
+      if not scroll_id:
+        pagination_parameters = {'scroll': '60m', 'size': per}
+        pagination_body = {}
+        if type(query) is str:
+          pagination_parameters['q'] = query
         else:
-          page_items = client.send_request('POST', ['_search', 'scroll'], {'scroll': '60m', 'scroll_id': scroll_id}, {})['hits']['hits']
+          pagination_body['query'] = query
+        response = client.send_request('GET', [index, doc_type, '_search'], pagination_body, pagination_parameters)
+        scroll_id = response['_scroll_id']
+        page_items = response['hits']['hits']
       else:
-        page_items = client.search(query, index=index, doc_type=doc_type, size=per)['hits']['hits']
+        page_items = client.send_request('POST', ['_search', 'scroll'], {'scroll': '60m', 'scroll_id': scroll_id}, {})['hits']['hits']
       yield page_items
 
   def _set_string_properties_mapping(self, index, doc_type):

@@ -71,8 +71,26 @@ class InternalTransactions:
     return self.client.iterate(self.indices["block"], 'b', '!(_exists_:proceed) AND ' + range_query)
 
   def _iterate_transactions(self, blocks):
-    block_number_query = "({})".format(" OR ".join(["blockNumber:{}".format(block) for block in blocks]))
-    return self.client.iterate(self.indices["transaction"], 'tx', 'to_contract:true AND !(_exists_:trace) AND ' + block_number_query)
+    # 'tx', 'to_contract:true AND !(_exists_:trace) AND ' + 
+    transactions_query = {
+      "bool": {
+        "must": [
+          {"term": {"to_contract": True}},
+          {
+            "bool": {
+              "must_not": {
+                "exists": {
+                  "field": "trace"
+                }
+              }
+            }
+          },
+          {"terms": {"blockNumber": blocks}}
+        ]
+      }
+    }
+
+    return self.client.iterate(self.indices["transaction"], 'tx', transactions_query)
 
   def _get_traces(self, blocks):    
     chunks = self._split_on_chunks(blocks, NUMBER_OF_PROCESSES)

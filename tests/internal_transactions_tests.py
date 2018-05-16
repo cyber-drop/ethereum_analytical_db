@@ -48,6 +48,11 @@ class InternalTransactionsTestCase(unittest.TestCase):
     transactions = [transaction["_id"] for transaction in transactions]
     self.assertCountEqual(transactions, ['3'])
 
+  def test_iterate_transactions_with_big_number_of_blocks(self):
+    iterator = self.internal_transactions._iterate_transactions(list(range(1000)))
+    [transactions for transactions in iterator]
+    assert True
+
   def test_get_parity_url_by_block(self):
     parity_hosts = [
       (0, 100, "url1"),
