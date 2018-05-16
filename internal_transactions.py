@@ -71,7 +71,6 @@ class InternalTransactions:
     return self.client.iterate(self.indices["block"], 'b', '!(_exists_:proceed) AND ' + range_query)
 
   def _iterate_transactions(self, blocks):
-    # 'tx', 'to_contract:true AND !(_exists_:trace) AND ' + 
     transactions_query = {
       "bool": {
         "must": [
@@ -128,10 +127,13 @@ class InternalTransactions:
       result[transaction["_id"]] = blocks[str(block_number)][transaction_index]['trace']
     return result
 
-  def _save_traces(self, traces):
-    if traces:
-      operations = [self.client.update_op(doc={'trace': trace}, id=id) for id, trace in traces.items()]
-      self.client.bulk(operations, doc_type='tx', index=self.indices["transaction"], refresh=True)
+  def _save_traces(self, transactions):
+    transactions_query = {
+      "ids": {
+        "values": transactions
+      }
+    }
+    self.client.update_by_query(self.indices["transaction"], 'tx', transactions_query, 'ctx._source.trace = true')
 
   def _preprocess_internal_transaction(self, transaction):
     transaction = transaction.copy()
@@ -156,7 +158,7 @@ class InternalTransactions:
           trace = traces[transaction["_id"]]
           self._set_trace_hashes(transaction_body, trace)
           self._classify_trace(transaction_body, trace)
-      self._save_traces(traces)
+      self._save_traces(list(traces.keys()))
       self._save_internal_transactions(traces)
 
   def extract_traces(self):

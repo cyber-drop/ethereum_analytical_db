@@ -160,13 +160,12 @@ class InternalTransactionsTestCase(unittest.TestCase):
 
   def test_save_traces(self):
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {"hash": TEST_TRANSACTION_HASH}, id=1, refresh=True)
-    self.internal_transactions._save_traces({1: TEST_TRANSACTION_TRACE})
+    self.internal_transactions._save_traces([1])
     transaction = self.client.get(TEST_TRANSACTIONS_INDEX, 'tx', 1)['_source']
-    trace = transaction['trace']
-    self.assertSequenceEqual(trace, TEST_TRANSACTION_TRACE)
+    assert transaction['trace']
 
   def test_save_empty_traces(self):
-    self.internal_transactions._save_traces({})
+    self.internal_transactions._save_traces([])
     assert True
 
   def test_save_internal_transactions(self):
@@ -199,22 +198,14 @@ class InternalTransactionsTestCase(unittest.TestCase):
     transactions = [transaction["_id"] for transaction in transactions]
     self.assertCountEqual(transactions, [t["_id"] for t in transactions_chunk])
 
-  def test_extract_traces_chunk_with_preprocessing(self):
+  def test_extract_traces_chunk_with_internal_transactions(self):
     transactions_chunk, blocks_chunk = self._add_transactions_and_return_chunk()
     self.internal_transactions._extract_traces_chunk(blocks_chunk)
-    transactions = self.client.search("_exists_:trace", index=TEST_TRANSACTIONS_INDEX, doc_type='tx', size=TEST_TRANSACTIONS_NUMBER)['hits']['hits']
-    transaction = transactions[0]["_source"]
-    for internal_transaction in transaction["trace"]:
-      assert 'hash' in internal_transaction.keys()
-      assert 'class' in internal_transaction.keys()
-
-  def test_extract_traces_chunk_with_internal_transactions(self):
-    real_internal_transactions_length = sum([len(trace['trace']) for trace in TEST_BLOCK_TRACES])
-    docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH + str(i), 'to': TEST_TRANSACTION_HASH, 'from': TEST_TRANSACTION_HASH, 'id': i, 'blockNumber': TEST_BLOCK_NUMBER, "transactionIndex": i} for i in range(len(TEST_BLOCK_TRACES))]
-    self.client.bulk_index(TEST_TRANSACTIONS_INDEX, 'tx', docs, refresh=True)
-    self.internal_transactions._extract_traces_chunk([TEST_BLOCK_NUMBER])
-    internal_transactions = self.client.search("*", index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type='itx', size=real_internal_transactions_length)['hits']['hits']
-    assert len(internal_transactions) == real_internal_transactions_length
+    internal_transactions = self.client.search("*", index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type='itx', size=TEST_TRANSACTIONS_NUMBER)['hits']['hits']
+    assert internal_transactions
+    for internal_transaction in internal_transactions:
+      self.assertRegex(internal_transaction["_id"], "0x\\w{64}.\\d+")
+      assert 'class' in internal_transaction["_source"].keys()
 
   def test_extract_traces(self):
     docs = [{'number': TEST_BLOCK_NUMBER + i, 'id': TEST_BLOCK_NUMBER + i} for i in range(5)]
