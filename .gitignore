@@ -27,3 +27,5 @@ fabric.properties
 get-pip.py
 __pycache__/
 error_blocks.log
+pyethereum
+quickBlocks

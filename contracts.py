@@ -10,7 +10,7 @@ from ethereum.abi import (
     method_id as get_abi_method_id)
 from ethereum.utils import encode_int, zpad, decode_hex
 
-GRAB_ABI_PATH = "./quickBlocks/bin/grabABI {}"
+GRAB_ABI_PATH = "/usr/local/qblocks/bin/grabABI {}"
 GRAB_ABI_CACHE_PATH = "/home/{}/.quickBlocks/cache/abis/{}.json"
 
 class Contracts():
@@ -89,5 +89,4 @@ class Contracts():
     self._save_contracts_abi()
     for contracts in self._iterate_contracts_with_abi():
       self._set_contracts_abi([contract["_source"]["abi"] for contract in contracts]) 
-      self._decode_inputs_for_contracts(contracts)   
-
+      self._decode_inputs_for_contracts(contracts)

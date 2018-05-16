@@ -11,6 +11,7 @@ git clone https://github.com/Great-Hill-Corporation/quickBlocks
 cd ./quickBlocks/src
 cmake .
 make
+sudo -H make install
 cd ../../
 
 echo "ssh -L 9200:localhost:9200 cyberdrop@195.201.105.114"

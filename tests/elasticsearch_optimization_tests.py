@@ -102,7 +102,7 @@ class ElasticSearchOptimizationTestCase():
     with self.assertRaises(Exception):
       self._add_records({'test': 1}, number=1)
 
-  def xtest_fast_index_size(self):
+  def test_fast_index_size(self):
     self._add_records(self.doc)
     size_before = self._get_elasticsearch_size()
 
@@ -117,7 +117,7 @@ class ElasticSearchOptimizationTestCase():
     print("Compressed size: {:.1f}".format(compression * CURRENT_ELASTICSEARCH_SIZE / (1024 ** 3)))
     assert size_after < size_before
 
-  def xtest_fast_index_speed(self):
+  def test_fast_index_speed(self):
     start_time = time()
     self._add_records(self.doc)
     end_time = time()
