@@ -44,6 +44,10 @@ class ContractMethods:
     contract_code_bytearr = self.w3.eth.getCode(contract_checksum_addr)
     return self.w3.toHex(contract_code_bytearr)
 
+  def _check_is_token(self, bytecode):
+    check_res = re.search(r'' + self.standards['erc20']['transfer'], bytecode) != None
+    return check_res
+
   def _check_standards(self, bytecode):
     avail_standards = []
     for standard in self.standards:
@@ -66,16 +70,20 @@ class ContractMethods:
       symbol = contract_instance.functions.symbol().call()
     except:
       symbol = 'None'
-    return (name, symbol)
+    try:
+      decimals = contract_instance.functions.decimals().call()
+    except:
+      decimals = 1
+    return (name, symbol, decimals)
 
   def _classify_contract(self, contract):
     code = self._get_contract_bytecode(contract['_source']['address'])
-    is_token = re.search(r'' + self.standards['erc20']['transfer'], code) != None
+    is_token = self._check_is_token(code)
     if is_token == True:
       token_standards = self._check_standards(code)
       if len(token_standards) > 0:
-        name, symbol = self._get_constants(contract['_source']['address'])
-        update_body = {'standards': token_standards, 'bytecode': code, 'token_name': name, 'token_symbol': symbol, 'is_token': True}
+        name, symbol, decimals = self._get_constants(contract['_source']['address'])
+        update_body = {'standards': token_standards, 'bytecode': code, 'token_name': name, 'token_symbol': symbol, 'decimals': decimals, 'is_token': True}
         self.client.update(self.indices["contract"], 'contract', contract['_id'], doc=update_body, refresh=True)
       else:
         update_body = {'standards': ['None'], 'bytecode': code, 'is_token': True}
@@ -89,6 +97,6 @@ class ContractMethods:
         self._classify_contract(contract)
     for tokens_chunk in self._iterate_non_standard():
       for token in tokens_chunk:
-        name, symbol = self._get_constants(token['_source']['address'])
-        update_body = {'token_name': name, 'token_symbol': symbol}
+        name, symbol, decimals = self._get_constants(token['_source']['address'])
+        update_body = {'token_name': name, 'token_symbol': symbol, 'decimals': decimals}
         self.client.update(self.indices["contract"], 'contract', token['_id'], doc=update_body, refresh=True)

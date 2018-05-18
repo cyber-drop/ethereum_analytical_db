@@ -6,7 +6,7 @@ class ContractMethodsTestCase(unittest.TestCase):
   def setUp(self):
     self.client = TestElasticSearch()
     self.client.recreate_index(TEST_INDEX)
-    self.contract_methods = ContractMethods({"contract": TEST_INDEX})
+    self.contract_methods = ContractMethods({"contract": TEST_INDEX}, ethereum_api_host='https://mainnet.infura.io/SuP0gwmZ0hYfutY70s6V')
 
   def test_iterate_contracts(self):
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[0]}, id=1, refresh=True)
@@ -24,7 +24,6 @@ class ContractMethodsTestCase(unittest.TestCase):
     self.contract_methods.search_methods()
     iterator = self.contract_methods._iterate_non_standard()
     contracts = [c for contracts_list in iterator for c in contracts_list]
-    print(contracts)
     contracts = [contract['_id'] for contract in contracts]
     self.assertCountEqual(['3'], contracts)
 
@@ -43,17 +42,8 @@ class ContractMethodsTestCase(unittest.TestCase):
     assert TEST_BYTECODE in bytecodes
   
   def test_check_if_token(self):
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[0]}, id=1, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[1]}, id=2, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[2]}, id=3, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[3]}, id=4, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[4]}, id=5, refresh=True)
-
-    self.contract_methods.search_methods()
-    iterator = self.contract_methods._iterate_contracts()
-    contracts = [c for contracts_list in iterator for c in contracts_list]
-    is_token = [contract['_source']['is_token'] for contract in contracts]
-    self.assertCountEqual([True, True, True, False, True], is_token)
+    is_token = self.contract_methods._check_is_token(TEST_BYTECODE)
+    assert is_token == True
 
   def test_search_standards(self):
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[0]}, id=1, refresh=True)
@@ -80,9 +70,10 @@ class ContractMethodsTestCase(unittest.TestCase):
     
     tokens_names = [contract['_source']['token_name'] for contract in contracts if contract['_source']['is_token'] == True]
     tokens_symbols = [contract['_source']['token_symbol'] for contract in contracts if contract['_source']['is_token'] == True]
-    
+    token_decimals = [contract['_source']['decimals'] for contract in contracts if contract['_source']['is_token'] == True]
     self.assertCountEqual(['RUN COIN', 'bangbeipay', 'YNOTCoin', 'Josh Bucks'], tokens_names)
     self.assertCountEqual(['RUN', 'BBP', 'YNOT', '%'], tokens_symbols)
+    self.assertCountEqual([0, 18, 16, 18], token_decimals)
 
 TEST_INDEX = 'test-ethereum-contracts'
 TEST_CONTRACT_ADDRESSES = ['0xa0e89120768bf166d228988627e4ac8af350220a', '0x6d6fb0951b769a6246f0246472856b2f70049c53', '0xaff9f95b455662c893bf3bb752557faa962d8355', '0x6Dabe61eD0212141951292e47d866cf0b3F2bfBD', '0x7681ac00c991852ad683d235377e8557256d769f']
