@@ -12,8 +12,8 @@ class TokenHoldersTestCase(unittest.TestCase):
     self.client.recreate_index(TEST_LISTED_INDEX)
     self.client.recreate_index(TEST_TOKEN_TX_INDEX)
     self.token_holders = TokenHolders({'contract': TEST_INDEX, 'transaction': TEST_TX_INDEX, 'listed_token': TEST_LISTED_INDEX, 'token_tx': TEST_TOKEN_TX_INDEX})
-    self.contract_methods = ContractMethods({"contract": TEST_INDEX}, ethereum_api_host='https://mainnet.infura.io/SuP0gwmZ0hYfutY70s6V')
-  '''
+    self.contract_methods = ContractMethods({"contract": TEST_INDEX})
+  
   def test_get_listed_tokens(self):
     for address in TEST_TOKEN_ADDRESSES:
       self.client.index(TEST_INDEX, 'contract', {'address': address}, refresh=True)
@@ -50,7 +50,7 @@ class TokenHoldersTestCase(unittest.TestCase):
     loaded_tokens = [c for contracts_list in loaded_tokens for c in contracts_list]
     loaded_tokens = [token['_source']['token_name'] for token in loaded_tokens]
     self.assertCountEqual(['Aeternity', 'Populous Platform', 'Golem Network Token'], loaded_tokens)
-  '''
+  
   def test_search_token_holders(self):
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
@@ -58,8 +58,6 @@ class TokenHoldersTestCase(unittest.TestCase):
     self.token_holders._extract_token_txs('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', 'Aeternity')
     token_txs = self.token_holders._iterate_tx_descriptions()
     token_txs = [tx for txs_list in token_txs for tx in txs_list]
-    print(token_txs)
-    assert True == False
     methods = [tx['_source']['method'] for tx in token_txs]
     amounts = [tx['_source']['value'] for tx in token_txs] 
     self.assertCountEqual(['transfer', 'approve', 'transferFrom'], methods)

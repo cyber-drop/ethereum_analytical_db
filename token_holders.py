@@ -99,11 +99,11 @@ class TokenHolders:
   def _construct_tx_descr_from_input(self, tx):
     tx_input = tx['decoded_input']
     if tx_input['name'] == 'transfer':
-      return {'method': tx_input['name'], 'from': tx['from'], 'to': tx_input['params'][0]['value'], 'value': tx_input['params'][1]['value'],'block_id': tx['blockNumber']}
+      return {'method': tx_input['name'], 'from': tx['from'], 'to': tx_input['params'][0]['value'], 'value': tx_input['params'][1]['value'],'block_id': tx['blockNumber'], 'tx_index': self.indices['transaction']}
     elif tx_input['name'] == 'transferFrom':
-      return {'method': tx_input['name'], 'from': tx_input['params'][0]['value'], 'to': tx_input['params'][1]['value'], 'value': tx_input['params'][2]['value'], 'sender': tx['from'], 'block_id': tx['blockNumber']}
+      return {'method': tx_input['name'], 'from': tx_input['params'][0]['value'], 'to': tx_input['params'][1]['value'], 'value': tx_input['params'][2]['value'], 'sender': tx['from'], 'block_id': tx['blockNumber'], 'tx_index': self.indices['transaction']}
     elif tx_input['name'] == 'approve':
-      return {'method': tx_input['name'], 'from': tx['from'], 'spender': tx_input['params'][0]['value'], 'value': tx_input['params'][1]['value'],'block_id': tx['blockNumber']}
+      return {'method': tx_input['name'], 'from': tx['from'], 'spender': tx_input['params'][0]['value'], 'value': tx_input['params'][1]['value'],'block_id': tx['blockNumber'], 'tx_index': self.indices['transaction']}
     else:
       return {'method': 'unknown', 'txHash': tx['hash']}
 
@@ -114,9 +114,12 @@ class TokenHolders:
       txs_info.append(tx_descr)
     self._insert_multiple_docs(txs_info, 'tx', self.indices['token_tx'])
 
+  def _iterate_tx_descriptions(self):
+    return self.client.iterate(self.indices['token_tx'], 'tx', 'method:*')
+
   def _extract_token_txs(self, token_address, token_name):
     for txs_chunk in self._iterate_token_txs(token_address):
       self._extract_descriptions_from_txs(txs_chunk, token_name)
 
-  def _iterate_tx_descriptions(self):
-    return self.client.iterate(self.indices['token_tx'], 'tx', 'method:*')
+
+  
