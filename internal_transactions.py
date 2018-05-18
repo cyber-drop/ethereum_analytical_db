@@ -15,6 +15,20 @@ INTERNAL_TRANSACTION = 1
 OUTPUT_TRANSACTION = 2
 OTHER_TRANSACTION = 3
 
+def _restore_block_traces(block):
+  restored_traces = {}
+  for transaction in block['result']:
+    if transaction["transactionPosition"] not in restored_traces.keys():
+      restored_traces[transaction["transactionPosition"]] = {'trace': []}
+    restored_traces[transaction["transactionPosition"]]['trace'].append(transaction)
+    del transaction["transactionHash"]
+    del transaction["transactionPosition"]
+    del transaction["blockHash"]
+    del transaction["blockNumber"]
+  if None in restored_traces.keys():
+    del restored_traces[None]
+  return {"result": list(restored_traces.values()), "id": block["id"]}
+
 def _get_parity_url_by_block(parity_hosts, block):
   for bottom_line, upper_bound, url in parity_hosts:
     if ((not bottom_line) or (block >= bottom_line)) and ((not upper_bound) or (block < upper_bound)):
@@ -29,8 +43,8 @@ def _make_trace_requests(parity_hosts, blocks):
     requests[parity_url].append({
       "jsonrpc": "2.0",
       "id": block_number,
-      "method": "trace_replayBlockTransactions", 
-      "params": [hex(block_number), ["trace"]]
+      "method": "trace_block",
+      "params": [hex(block_number)]
     }) 
   return requests
 
@@ -44,6 +58,7 @@ def _get_traces_sync(parity_hosts, blocks):
       data=request_string, 
       headers={"content-type": "application/json"}
     ).json()
+    responses = [_restore_block_traces(response) for response in responses]
     traces.update({str(response["id"]): response["result"] for response in responses if "result" in response.keys()})
   return traces
 
