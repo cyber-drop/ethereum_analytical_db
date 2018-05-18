@@ -120,4 +120,5 @@ class TokenHolders:
   def _extract_token_txs(self, token_address, token_name):
     for txs_chunk in self._iterate_token_txs(token_address):
       self._extract_descriptions_from_txs(txs_chunk, token_name)
+
   
