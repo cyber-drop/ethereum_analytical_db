@@ -78,23 +78,45 @@ class TokenHolders:
     result = self._remove_identical_descriptions(result)
     return result
 
-  def _construct_bulk_insert_ops(self, tokens):
-    for token in tokens:
-      yield self.client.index_op(token)
+  def _construct_bulk_insert_ops(self, docs):
+    for doc in docs:
+      yield self.client.index_op(doc)
 
-  def _insert_multiple_tokens(self, tokens):
-    for chunk in bulk_chunks(self._construct_bulk_insert_ops(tokens), docs_per_chunk=500, bytes_per_chunk=10000):
-      self.client.bulk(chunk, doc_type='token', index=self.indices['listed_token'], refresh=True)
+  def _insert_multiple_docs(self, docs, doc_type, index_name):
+    for chunk in bulk_chunks(self._construct_bulk_insert_ops(docs), docs_per_chunk=1000):
+      self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
 
   def _iterate_tokens(self):
-    return self.client.iterate(self.indices['listed_token'], 'token', 'token_name:*', paginate=True)
+    return self.client.iterate(self.indices['listed_token'], 'token', 'token_name:*')
 
   def _load_listed_tokens(self):
     listed_tokens = self._search_duplicates()
-    self._insert_multiple_tokens(listed_tokens)
+    self._insert_multiple_docs(listed_tokens, 'token', self.indices['listed_token'])
 
+  def _iterate_token_txs(self, token_addr):
+    return self.client.iterate(self.indices['transaction'], 'tx', 'to:' + token_addr)
 
+  def _construct_tx_descr_from_input(self, tx):
+    tx_input = tx['decoded_input']
+    if tx_input['name'] == 'transfer':
+      return {'method': tx_input['name'], 'from': tx['from'], 'to': tx_input['params'][0]['value'], 'value': tx_input['params'][1]['value'],'block_id': tx['blockNumber']}
+    elif tx_input['name'] == 'transferFrom':
+      return {'method': tx_input['name'], 'from': tx_input['params'][0]['value'], 'to': tx_input['params'][1]['value'], 'value': tx_input['params'][2]['value'], 'sender': tx['from'], 'block_id': tx['blockNumber']}
+    elif tx_input['name'] == 'approve':
+      return {'method': tx_input['name'], 'from': tx['from'], 'spender': tx_input['params'][0]['value'], 'value': tx_input['params'][1]['value'],'block_id': tx['blockNumber']}
+    else:
+      return {'method': 'unknown', 'txHash': tx['hash']}
 
+  def _extract_descriptions_from_txs(self, txs, token):
+    txs_info = []
+    for tx in txs:
+      tx_descr = self._construct_tx_descr_from_input(tx['_source'])
+      txs_info.append(tx_descr)
+    self._insert_multiple_docs(txs_info, 'tx', self.indices['token_tx'])
 
+  def _extract_token_txs(self, token_address, token_name):
+    for txs_chunk in self._iterate_token_txs(token_address):
+      self._extract_descriptions_from_txs(txs_chunk, token_name)
 
-
+  def _iterate_tx_descriptions(self):
+    return self.client.iterate(self.indices['token_tx'], 'tx', 'method:*')
