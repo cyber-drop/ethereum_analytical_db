@@ -9,8 +9,8 @@ from config import INDICES
 
 def prepare_indices(host):
   elasticsearch = CustomElasticSearch(host)
-  elasticsearch.prepare_fast_index(INDICES["transaction"])
-  elasticsearch.prepare_fast_index(INDICES["internal_transaction"])
+  elasticsearch.prepare_fast_index(INDICES["transaction"], 'tx')
+  elasticsearch.prepare_fast_index(INDICES["internal_transaction"], 'itx')
 
 def detect_contracts(host):
   contract_transactions = ContractTransactions(INDICES, host)

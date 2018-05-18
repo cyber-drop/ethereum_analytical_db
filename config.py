@@ -1,5 +1,5 @@
 PARITY_HOSTS = [
-  (0, 2000000, "http://localhost:8545")
+  (None, None, "http://localhost:8550")
 ]
 
 INDICES = {

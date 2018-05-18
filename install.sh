@@ -14,5 +14,11 @@ make
 sudo -H make install
 cd ../../
 
+git clone https://github.com/cyberFund/ethdrain
+cd ./ethdrain
+sudo -H pip3 install -r ./requirements.txt
+cd ../
+
 echo "ssh -L 9200:localhost:9200 cyberdrop@195.201.105.114"
 echo "nano ./config.py"
+echo "telegram-send --configure"

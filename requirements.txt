@@ -5,3 +5,4 @@ requests
 web3
 nose
 httpretty
+telegram-send
