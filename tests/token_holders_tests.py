@@ -10,16 +10,13 @@ class TokenHoldersTestCase(unittest.TestCase):
     self.client.recreate_index(TEST_INDEX)
     self.client.recreate_index(TEST_TX_INDEX)
     self.client.recreate_index(TEST_LISTED_INDEX)
-    self.token_holders = TokenHolders({"contract": TEST_INDEX, 'transaction': TEST_TX_INDEX, 'listed_token': TEST_LISTED_INDEX})
-    self.contract_methods = ContractMethods({"contract": TEST_INDEX})
- 
+    self.client.recreate_index(TEST_TOKEN_TX_INDEX)
+    self.token_holders = TokenHolders({'contract': TEST_INDEX, 'transaction': TEST_TX_INDEX, 'listed_token': TEST_LISTED_INDEX, 'token_tx': TEST_TOKEN_TX_INDEX})
+    self.contract_methods = ContractMethods({"contract": TEST_INDEX}, ethereum_api_host='https://mainnet.infura.io/SuP0gwmZ0hYfutY70s6V')
+  '''
   def test_get_listed_tokens(self):
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0]}, id=1, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[1]}, id=2, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[2]}, id=3, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[3]}, id=4, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[4]}, id=5, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[5]}, id=6, refresh=True)
+    for address in TEST_TOKEN_ADDRESSES:
+      self.client.index(TEST_INDEX, 'contract', {'address': address}, refresh=True)
     self.contract_methods.search_methods()
 
     listed_tokens = self.token_holders._get_listed_tokens()
@@ -28,12 +25,8 @@ class TokenHoldersTestCase(unittest.TestCase):
     self.assertCountEqual(['Aeternity', 'Populous Platform', 'Golem Network Token'], listed_tokens)
   
   def test_search_duplicates(self):
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0]}, id=1, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[1]}, id=2, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[2]}, id=3, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[3]}, id=4, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[4]}, id=5, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[5]}, id=6, refresh=True)
+    for address in TEST_TOKEN_ADDRESSES:
+      self.client.index(TEST_INDEX, 'contract', {'address': address}, refresh=True)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
     self.contract_methods.search_methods()
@@ -46,12 +39,8 @@ class TokenHoldersTestCase(unittest.TestCase):
     assert real_aeternity['address'] == '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'
 
   def test_load_tokens(self):
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0]}, id=1, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[1]}, id=2, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[2]}, id=3, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[3]}, id=4, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[4]}, id=5, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[5]}, id=6, refresh=True)
+    for address in TEST_TOKEN_ADDRESSES:
+      self.client.index(TEST_INDEX, 'contract', {'address': address}, refresh=True)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
     self.contract_methods.search_methods()
@@ -61,22 +50,25 @@ class TokenHoldersTestCase(unittest.TestCase):
     loaded_tokens = [c for contracts_list in loaded_tokens for c in contracts_list]
     loaded_tokens = [token['_source']['token_name'] for token in loaded_tokens]
     self.assertCountEqual(['Aeternity', 'Populous Platform', 'Golem Network Token'], loaded_tokens)
-
+  '''
   def test_search_token_holders(self):
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0]}, id=1, refresh=True)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
-    self.contract_methods.search_methods()
-    self.token_holders._load_listed_tokens()
 
-    self.token_holders._iterate_token_txs('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d')
-    token_holders = self.token_holders._iterate_token_holders()
-    balances = [holder['_source']['balances']['Aeternity'] for holder in token_holders]
-    self.assertCountEqual(['2266000000000000000000', '712491360000000000000', '2294245680000000000000'])
+    self.token_holders._extract_token_txs('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', 'Aeternity')
+    token_txs = self.token_holders._iterate_tx_descriptions()
+    token_txs = [tx for txs_list in token_txs for tx in txs_list]
+    print(token_txs)
+    assert True == False
+    methods = [tx['_source']['method'] for tx in token_txs]
+    amounts = [tx['_source']['value'] for tx in token_txs] 
+    self.assertCountEqual(['transfer', 'approve', 'transferFrom'], methods)
+    self.assertCountEqual(['356245680000000000000', '356245680000000000000', '2266000000000000000000'], amounts)
 
 TEST_INDEX = 'test-ethereum-contracts'
 TEST_TX_INDEX = 'test-ethereum-txs'
 TEST_LISTED_INDEX = 'test-listed-tokens'
+TEST_TOKEN_TX_INDEX = 'test-token-txs'
 
 TEST_TOKEN_ADDRESSES = ['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d',
   '0xd4fa1460f537bb9085d22c7bccb5dd450ef28e3a',
@@ -86,10 +78,10 @@ TEST_TOKEN_ADDRESSES = ['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d',
   '0x83199a2bd905dd5f2f61828e5a705790b782cf43'
   ]
 TEST_TOKEN_TXS = [
-  {'to': '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', 'input': {'name': 'transfer', 'params': [{'type': 'address', 'value': '0xa60c4c379246a7f1438bd76a92034b6c82a183a5'}, {'type': 'uint256', 'value': '2266000000000000000000'}]}},
-  {'to': '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', 'input': {'name': 'transfer', 'params': [{'type': 'address', 'value': '0x4e6b129bbb683952ed1ec935c778d74a77b352ce'}, {'type': 'uint256', 'value': '356245680000000000000'}]}},
-  {'to': '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', 'input': {'name': 'transfer', 'params': [{'type': 'address', 'value': '0x4e6b129bbb683952ed1ec935c778d74a77b352ce'}, {'type': 'uint256', 'value': '356245680000000000000'}]}}},
-  {'to': '0x51ada638582e51c931147c9abd2a6d63bc02e337', 'input': {'name': 'transfer', 'params': [{'type': 'address', 'value': '0x3f5ce5fbfe3e9af3971dd833d26ba9b5c936f0be'}, {'type': 'uint256', 'value': '2294245680000000000000'}]}}},
+  {'from': '0x6b25d0670a34c1c7b867cd9c6ad405aa1759bda0', 'to': '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', 'decoded_input': {'name': 'transfer', 'params': [{'type': 'address', 'value': '0xa60c4c379246a7f1438bd76a92034b6c82a183a5'}, {'type': 'uint256', 'value': '2266000000000000000000'}]}, 'blockNumber': 5635149},
+  {'from': '0x58d46475da68984bacf1f2843b85e0fdbcbc6cef', 'to': '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', 'decoded_input': {'name': 'approve', 'params': [{'type': 'address', 'value': '0x4e6b129bbb683952ed1ec935c778d74a77b352ce'}, {'type': 'uint256', 'value': '356245680000000000000'}]}, 'blockNumber': 5635141},
+  {'from': '0x892Ce7dbC4a0eFbbd5933820e53d2c945ef9f722', 'to': '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', 'decoded_input': {'name': 'transferFrom', 'params': [{'type': 'address', 'value': '0xc917e19946d64aa31d1aeacb516bae2579995aa9'}, {'type': 'address', 'value': '0x4e6b129bbb683952ed1ec935c778d74a77b352ce'}, {'type': 'uint256', 'value': '356245680000000000000'}]}, 'blockNumber': 5635142},
+  {'from': '0x892ce7dbc4a0efbbd5933820e53d2c945ef9f722', 'to': '0x51ada638582e51c931147c9abd2a6d63bc02e337', 'decoded_input': {'name': 'transfer', 'params': [{'type': 'address', 'value': '0x3f5ce5fbfe3e9af3971dd833d26ba9b5c936f0be'}, {'type': 'uint256', 'value': '2294245680000000000000'}]}},
   {'to': '0xa74476443119a942de498590fe1f2454d7d4ac0d'},
   {'to': '0xa74476443119a942de498590fe1f2454d7d4ac0d'},
   {'to': '0xbe78d802c2aeebdc34c810b805c2691885a61257'}
