@@ -62,6 +62,18 @@ class TokenHoldersTestCase(unittest.TestCase):
     loaded_tokens = [token['_source']['token_name'] for token in loaded_tokens]
     self.assertCountEqual(['Aeternity', 'Populous Platform', 'Golem Network Token'], loaded_tokens)
 
+  def test_search_token_holders(self):
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0]}, id=1, refresh=True)
+    for tx in TEST_TOKEN_TXS:
+      self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
+    self.contract_methods.search_methods()
+    self.token_holders._load_listed_tokens()
+
+    self.token_holders._iterate_token_txs('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d')
+    token_holders = self.token_holders._iterate_token_holders()
+    balances = [holder['_source']['balances']['Aeternity'] for holder in token_holders]
+    self.assertCountEqual(['2266000000000000000000', '712491360000000000000', '2294245680000000000000'])
+
 TEST_INDEX = 'test-ethereum-contracts'
 TEST_TX_INDEX = 'test-ethereum-txs'
 TEST_LISTED_INDEX = 'test-listed-tokens'
@@ -74,10 +86,10 @@ TEST_TOKEN_ADDRESSES = ['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d',
   '0x83199a2bd905dd5f2f61828e5a705790b782cf43'
   ]
 TEST_TOKEN_TXS = [
-  {'to': '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'},
-  {'to': '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'},
-  {'to': '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'},
-  {'to': '0x51ada638582e51c931147c9abd2a6d63bc02e337'},
+  {'to': '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', 'input': {'name': 'transfer', 'params': [{'type': 'address', 'value': '0xa60c4c379246a7f1438bd76a92034b6c82a183a5'}, {'type': 'uint256', 'value': '2266000000000000000000'}]}},
+  {'to': '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', 'input': {'name': 'transfer', 'params': [{'type': 'address', 'value': '0x4e6b129bbb683952ed1ec935c778d74a77b352ce'}, {'type': 'uint256', 'value': '356245680000000000000'}]}},
+  {'to': '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', 'input': {'name': 'transfer', 'params': [{'type': 'address', 'value': '0x4e6b129bbb683952ed1ec935c778d74a77b352ce'}, {'type': 'uint256', 'value': '356245680000000000000'}]}}},
+  {'to': '0x51ada638582e51c931147c9abd2a6d63bc02e337', 'input': {'name': 'transfer', 'params': [{'type': 'address', 'value': '0x3f5ce5fbfe3e9af3971dd833d26ba9b5c936f0be'}, {'type': 'uint256', 'value': '2294245680000000000000'}]}}},
   {'to': '0xa74476443119a942de498590fe1f2454d7d4ac0d'},
   {'to': '0xa74476443119a942de498590fe1f2454d7d4ac0d'},
   {'to': '0xbe78d802c2aeebdc34c810b805c2691885a61257'}

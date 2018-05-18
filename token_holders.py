@@ -41,11 +41,12 @@ class TokenHolders:
   def _get_token_txs_count(self, token_address):
     count_body = {
       'query': {
-        "term": {
-          "to": token_address
+        'term': {
+          'to': token_address
         }
       }
     }
+    # TODO: replace by pyelasticsearch send_request
     txs_count = requests.get('http://localhost:9200/' + self.indices['transaction'] + '/tx/_count', json=count_body)
     txs_count = txs_count.json()['count']
     return txs_count
@@ -58,7 +59,7 @@ class TokenHolders:
     real_token['_source']['duplicated'] = True
     return real_token
 
-  def _extend_non_dupl_descr(self, token):
+  def _extend_token_descr(self, token):
     token['_source']['txs_count'] = self._get_token_txs_count(token['_source']['address'])
     token['_source']['duplicated'] = False
     return token
@@ -71,7 +72,7 @@ class TokenHolders:
 
   def _search_duplicates(self):
     token_contracts = self._get_listed_tokens()
-    non_duplicated_tokens = [self._extend_non_dupl_descr(contracts[0]) for contracts in token_contracts if len(contracts) == 1]
+    non_duplicated_tokens = [self._extend_token_descr(contracts[0]) for contracts in token_contracts if len(contracts) == 1]
     duplicated_tokens = [self._find_real_token(contracts) for contracts in token_contracts if len(contracts) > 1]
     result = non_duplicated_tokens + duplicated_tokens
     result = self._remove_identical_descriptions(result)
