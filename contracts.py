@@ -21,7 +21,7 @@ class Contracts():
     self.client = CustomElasticSearch()
 
   def _set_contracts_abi(self, abis):
-    self._contracts_abi = [method for abi in abis for method in abi]
+    self._contracts_abi = abis
 
   def _get_contract_abi(self, address):
     file_path = GRAB_ABI_CACHE_PATH.format(os.environ["USER"], address)
@@ -37,10 +37,10 @@ class Contracts():
       return []
 
   # Solution from https://ethereum.stackexchange.com/questions/20897/how-to-decode-input-data-from-tx-using-python3?rq=1
-  def _decode_input(self, call_data):
+  def _decode_input(self, contract, call_data):
     call_data_bin = decode_hex(call_data)
     method_signature = call_data_bin[:4]
-    for description in self._contracts_abi:
+    for description in self._contracts_abi[contract]:
       if description.get('type') != 'function':
         continue
       method_name = normalize_abi_method_name(description['name'])
@@ -55,7 +55,7 @@ class Contracts():
         return {'name': method_name, 'params': args}
 
   def _decode_inputs_batch(self, encoded_params):
-    return [self._decode_input(call_data) for call_data in encoded_params]
+    return [self._decode_input(contract, call_data) for contract, call_data in encoded_params]
       
   def _iterate_contracts_without_abi(self):
     return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(_exists_:abi)')
@@ -80,7 +80,7 @@ class Contracts():
   def _decode_inputs_for_contracts(self, contracts):
     contracts = [contract['_source']['address'] for contract in contracts]
     for transactions in self._iterate_transactions_by_targets(contracts):
-      inputs = [transaction["_source"]["input"] for transaction in transactions]
+      inputs = [(transaction["_source"]["to"], transaction["_source"]["input"]) for transaction in transactions]
       decoded_inputs = self._decode_inputs_batch(inputs)
       operations = [self.client.update_op(doc={'decoded_input': decoded_inputs[index]}, id=transaction["_id"]) for index, transaction in enumerate(transactions)]
       self.client.bulk(operations, doc_type='tx', index=self.indices["transaction"], refresh=True)
@@ -88,5 +88,5 @@ class Contracts():
   def decode_inputs(self):
     self._save_contracts_abi()
     for contracts in self._iterate_contracts_with_abi():
-      self._set_contracts_abi([contract["_source"]["abi"] for contract in contracts]) 
+      self._set_contracts_abi({contract["_source"]["address"]: contract["_source"]["abi"] for contract in contracts})
       self._decode_inputs_for_contracts(contracts)

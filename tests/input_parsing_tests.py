@@ -15,8 +15,9 @@ class InputParsingTestCase(unittest.TestCase):
     self.client.recreate_fast_index(TEST_TRANSACTIONS_INDEX)
 
   def test_set_contracts_abi(self):
-    self.contracts._set_contracts_abi([TEST_CONTRACT_ABI, TEST_CONTRACT_ABI])
-    self.assertCountEqual(self.contracts._contracts_abi, TEST_CONTRACT_ABI + TEST_CONTRACT_ABI)
+    contracts_abi = {"0x0": TEST_CONTRACT_ABI, "0x1": TEST_CONTRACT_ABI}
+    self.contracts._set_contracts_abi(contracts_abi)
+    self.assertSequenceEqual(self.contracts._contracts_abi, contracts_abi)
 
   def test_get_contract_abi(self):
     response = self.contracts._get_contract_abi(TEST_CONTRACT_ADDRESS)
@@ -35,8 +36,11 @@ class InputParsingTestCase(unittest.TestCase):
     self.assertSequenceEqual(response, TEST_CONTRACT_ABI)
 
   def test_decode_inputs_batch(self):
-    self.contracts._set_contracts_abi([TEST_CONTRACT_ABI])
-    response = self.contracts._decode_inputs_batch([TEST_CONTRACT_PARAMETERS, TEST_CONTRACT_PARAMETERS])
+    self.contracts._set_contracts_abi({"0x0": TEST_CONTRACT_ABI})
+    response = self.contracts._decode_inputs_batch([
+      ("0x0", TEST_CONTRACT_PARAMETERS),
+      ("0x0", TEST_CONTRACT_PARAMETERS)
+    ])
     self.assertSequenceEqual(response, [TEST_CONTRACT_DECODED_PARAMETERS, TEST_CONTRACT_DECODED_PARAMETERS])
 
   def add_contracts_with_and_without_abi(self):
@@ -76,7 +80,7 @@ class InputParsingTestCase(unittest.TestCase):
     self.assertCountEqual(transactions, [str(i) for i in range(1, 21)])    
 
   def test_decode_inputs_for_contracts(self):
-    self.contracts._set_contracts_abi([TEST_CONTRACT_ABI])
+    self.contracts._set_contracts_abi({TEST_CONTRACT_ADDRESS: TEST_CONTRACT_ABI})
     self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS, 'abi': TEST_CONTRACT_ABI}, id=1, refresh=True)
     for i in tqdm(range(10)):
       self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to': TEST_CONTRACT_ADDRESS, 'input': TEST_CONTRACT_PARAMETERS}, id=i + 1, refresh=True)
