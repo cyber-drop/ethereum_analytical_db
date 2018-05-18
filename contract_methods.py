@@ -20,7 +20,7 @@ class ContractMethods:
     return self.client.iterate(self.indices["contract"], 'contract', 'address:*')
 
   def _iterate_non_standard(self):
-    return self.client.iterate(self.indices["contract"], 'contract', 'standards: None', paginate=True)
+    return self.client.iterate(self.indices["contract"], 'contract', 'standards: None')
 
   def _extract_first_bytes(self, func):
     return str(self.w3.toHex(self.w3.sha3(text=func)[0:4]))[2:]
