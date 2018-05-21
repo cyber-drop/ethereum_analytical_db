@@ -34,6 +34,13 @@ class InternalTransactionsTestCase(unittest.TestCase):
     blocks = self.internal_transactions._iterate_blocks()
     self.assertCountEqual(blocks, [1, 2, 5])
 
+  def test_iterate_big_amount_of_blocks(self):
+    blocks_number = 1000000
+    blocks = [{'blockNumber': i, 'id': i + 1} for i in range(blocks_number)]
+    self.client.bulk_index(docs=blocks, index=TEST_TRANSACTIONS_INDEX, doc_type='tx', refresh=True)
+    blocks = self.internal_transactions._iterate_blocks()
+    assert len(blocks) == blocks_number
+
   def test_iterate_transactions(self):
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': False, 'blockNumber': 1}, id=1, refresh=True)
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': True, 'trace': {'test': 1}, 'blockNumber': 2}, id=2, refresh=True)

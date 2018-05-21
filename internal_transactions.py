@@ -15,6 +15,8 @@ INTERNAL_TRANSACTION = 1
 OUTPUT_TRANSACTION = 2
 OTHER_TRANSACTION = 3
 
+MAX_BLOCKS_NUMBER = 10000000
+
 def _restore_block_traces(block):
   restored_traces = {}
   for transaction in block['result']:
@@ -92,7 +94,7 @@ class InternalTransactions:
       },
       "aggs": {
         "blocks": {
-          "terms": {"field": "blockNumber"}
+          "terms": {"field": "blockNumber", "size": MAX_BLOCKS_NUMBER}
         }
       }
     }
