@@ -20,9 +20,10 @@ class ContractTransactions:
     return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(_exists_:transactions_detected)')
 
   def _detect_transactions_by_contracts(self, contracts):
+    # Here is an error
     transactions_query = {
       "terms": {
-        "creates": contracts
+        "to": contracts
       }
     }
     contracts_query = {

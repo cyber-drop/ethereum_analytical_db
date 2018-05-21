@@ -66,21 +66,26 @@ class ContractTransactionsTestCase(unittest.TestCase):
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'creates': TEST_TRANSACTION_TO, 'to': None}, id=1, refresh=True)
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'creates': TEST_TRANSACTION_TO_CONTRACT, 'to': None}, id=2, refresh=True)
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to': TEST_TRANSACTION_TO}, id=3, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to': TEST_TRANSACTION_TO_CONTRACT}, id=4, refresh=True)
     self.contract_transactions.detect_contract_transactions()
     transactions = self.client.search("to_contract:true", index=TEST_TRANSACTIONS_INDEX, doc_type="tx")['hits']['hits']
     transactions = [transaction['_id'] for transaction in transactions]
-    self.assertCountEqual(["1", "2"], transactions)
+    self.assertCountEqual(["3", "4"], transactions)
 
   def test_detect_big_amount_of_contract_transactions(self):
-    docs = [{'creates': str((i % 10) + 1), 'to': None, 'id': i + 1} for i in range(100)]
-    self.client.bulk_index(docs=docs, doc_type='tx', index=TEST_TRANSACTIONS_INDEX, refresh=True)
+    contract_transactions = [{'creates': str(i + 1), 'to': None, 'id': i + 1} for i in range(10)]
+    self.client.bulk_index(docs=contract_transactions, doc_type='tx', index=TEST_TRANSACTIONS_INDEX, refresh=True)
+    transactions = [{'to': str((i % 10) + 1), 'id': i + 1 + 10} for i in range(100)]
+    self.client.bulk_index(docs=transactions, doc_type='tx', index=TEST_TRANSACTIONS_INDEX, refresh=True)
     self.contract_transactions.detect_contract_transactions()
-    transactions = self.client.search("to_contract:true", index=TEST_TRANSACTIONS_INDEX, doc_type="tx", size=100)['hits']['hits']
+    transactions = self.client.search("to_contract:true", index=TEST_TRANSACTIONS_INDEX, doc_type="tx", size=1000)['hits']['hits']
     assert len(transactions) == 100    
 
   def test_detect_transactions_by_big_portion_of_contracts(self):
-    docs = [{'creates': TEST_TRANSACTION_TO + str(i), 'to': None, 'id': i + 1} for i in range(1000)]
-    self.client.bulk_index(docs=docs, doc_type='tx', index=TEST_TRANSACTIONS_INDEX, refresh=True)
+    contract_transactions = [{'creates': TEST_TRANSACTION_TO + str(i), 'to': None, 'id': i + 1} for i in range(1000)]
+    self.client.bulk_index(docs=contract_transactions, doc_type='tx', index=TEST_TRANSACTIONS_INDEX, refresh=True)
+    transactions = [{'to': TEST_TRANSACTION_TO + str(i), 'id': i + 1} for i in range(1000)]
+    self.client.bulk_index(docs=transactions, doc_type='tx', index=TEST_TRANSACTIONS_INDEX, refresh=True)
     self.contract_transactions._detect_transactions_by_contracts([TEST_TRANSACTION_TO + str(i) for i in range(1000)])
     transactions = self.client.search("to_contract:true", index=TEST_TRANSACTIONS_INDEX, doc_type="tx", size=1000)['hits']['hits']
     assert len(transactions) == 1000
