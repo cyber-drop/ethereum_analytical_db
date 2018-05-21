@@ -5,6 +5,5 @@ PARITY_HOSTS = [
 INDICES = {
   "contract": "ethereum-contract",
   "transaction": "ethereum-transaction",
-  "internal_transaction": "ethereum-internal-transaction",
-  "block": "ethereum-block"
+  "internal_transaction": "ethereum-internal-transaction"
 }

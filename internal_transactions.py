@@ -1,4 +1,4 @@
-from custom_elastic_search import CustomElasticSearch
+from custom_elastic_search import CustomElasticSearch, NUMBER_OF_JOBS
 import requests
 import json
 from time import sleep
@@ -82,8 +82,23 @@ class InternalTransactions:
 
   def _iterate_blocks(self):
     ranges = [host_tuple[0:2] for host_tuple in self.parity_hosts]
-    range_query = self.client.make_range_query("number", *ranges)
-    return self.client.iterate(self.indices["block"], 'b', '!(_exists_:proceed) AND ' + range_query)
+    range_query = self.client.make_range_query("blockNumber", *ranges)
+    query = {
+      "size": 0,
+      "query": {
+        "query_string": {
+          "query": '!(_exists_:trace) AND ' + range_query
+        }
+      },
+      "aggs": {
+        "blocks": {
+          "terms": {"field": "blockNumber"}
+        }
+      }
+    }
+    result = self.client.search(index=self.indices["transaction"], doc_type='tx', query=query)
+    blocks = [bucket["key"] for bucket in result["aggregations"]["blocks"]["buckets"]]
+    return blocks
 
   def _iterate_transactions(self, blocks):
     transactions_query = {
@@ -177,6 +192,5 @@ class InternalTransactions:
       self._save_internal_transactions(traces)
 
   def extract_traces(self):
-    for blocks in self._iterate_blocks():
-      blocks = [block["_source"]["number"] for block in blocks]
+    for blocks in self._split_on_chunks(self._iterate_blocks(), NUMBER_OF_JOBS):
       self._extract_traces_chunk(blocks)
