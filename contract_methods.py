@@ -48,13 +48,8 @@ class ContractMethods:
     return self.w3.toHex(contract_code_bytearr)
 
   def _check_is_token(self, bytecode):
-<<<<<<< HEAD
     has_trasfer_method = re.search(r'' + self.standards['erc20']['transfer'], bytecode) != None
     return has_trasfer_method
-=======
-    check_res = re.search(r'' + self.standards['erc20']['transfer'], bytecode) != None
-    return check_res
->>>>>>> 5bcdbd076ab6cb6783f762ff895f5824c93820a2
 
   def _check_standards(self, bytecode):
     avail_standards = []
@@ -82,7 +77,6 @@ class ContractMethods:
       decimals = contract_instance.functions.decimals().call()
     except:
       decimals = 1
-<<<<<<< HEAD
     try:
       total_supply = contract_instance.functions.totalSupply().call()
       total_supply = total_supply / math.pow(10, decimals)
@@ -95,9 +89,6 @@ class ContractMethods:
     except:
       owner = 'None'
     return (name, symbol, decimals, total_supply, owner)
-=======
-    return (name, symbol, decimals)
->>>>>>> 5bcdbd076ab6cb6783f762ff895f5824c93820a2
     
   def _update_contract_descr(self, doc_id, body):
     self.client.update(self.indices['contract'], 'contract', doc_id, doc=body, refresh=True)
@@ -108,13 +99,8 @@ class ContractMethods:
     if is_token == True:
       token_standards = self._check_standards(code)
       if len(token_standards) > 0:
-<<<<<<< HEAD
         name, symbol, decimals, total_supply, owner = self._get_constants(contract['_source']['address'])
         update_body = {'standards': token_standards, 'bytecode': code, 'token_name': name, 'token_symbol': symbol, 'decimals': decimals, 'total_supply': total_supply, 'owner': owner, 'is_token': True}
-=======
-        name, symbol, decimals = self._get_constants(contract['_source']['address'])
-        update_body = {'standards': token_standards, 'bytecode': code, 'token_name': name, 'token_symbol': symbol, 'decimals': decimals, 'is_token': True}
->>>>>>> 5bcdbd076ab6cb6783f762ff895f5824c93820a2
         self._update_contract_descr(contract['_id'], update_body)
       else:
         update_body = {'standards': ['None'], 'bytecode': code, 'is_token': True}
@@ -129,11 +115,6 @@ class ContractMethods:
         self._classify_contract(contract)
     for tokens_chunk in self._iterate_non_standard():
       for token in tokens_chunk:
-<<<<<<< HEAD
         name, symbol, decimals, total_supply, owner = self._get_constants(token['_source']['address'])
         update_body = {'token_name': name, 'token_symbol': symbol, 'decimals': decimals, 'total_supply': total_supply, 'owner': owner}
-=======
-        name, symbol, decimals = self._get_constants(token['_source']['address'])
-        update_body = {'token_name': name, 'token_symbol': symbol, 'decimals': decimals}
->>>>>>> 5bcdbd076ab6cb6783f762ff895f5824c93820a2
         self._update_contract_descr(token['_id'], update_body)
