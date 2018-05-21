@@ -10,17 +10,25 @@ class ContractTransactions:
   def _iterate_contract_transactions(self):
     return self.client.iterate(self.indices["transaction"], 'tx', '(_exists_:creates) AND !(_exists_:to_contract)')
 
+  def _extract_contract_from_transactions(self, transaction):
+    return {
+      "id": transaction["creates"],
+      "address": transaction["creates"],
+      "owner": transaction["from"],
+      "parent_transaction": transaction["hash"],
+      "block_number": transaction["blockNumber"],
+      "bytecode": transaction["input"]
+    }
+
   def _extract_contract_addresses(self):
     for contract_transactions in self._iterate_contract_transactions():
-      contracts = [transaction["_source"]["creates"] for transaction in contract_transactions]
-      docs = [{'address': contract, 'id': contract} for contract in contracts]
+      docs = [self._extract_contract_from_transactions(transaction["_source"]) for transaction in contract_transactions]
       self.client.bulk_index(docs=docs, doc_type='contract', index=self.indices["contract"], refresh=True)
 
   def _iterate_contracts(self):
     return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(_exists_:transactions_detected)')
 
   def _detect_transactions_by_contracts(self, contracts):
-    # Here is an error
     transactions_query = {
       "terms": {
         "to": contracts
