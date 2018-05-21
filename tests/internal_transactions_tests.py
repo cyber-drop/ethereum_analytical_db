@@ -16,9 +16,8 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.client = TestElasticSearch()
     self.client.recreate_fast_index(TEST_TRANSACTIONS_INDEX)
     self.client.recreate_fast_index(TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type='itx')
-    self.client.recreate_index(TEST_BLOCKS_INDEX)
     self.parity_hosts = [(None, None, "http://localhost:8545")]
-    self.internal_transactions = InternalTransactions({"block": TEST_BLOCKS_INDEX, "transaction": TEST_TRANSACTIONS_INDEX, "internal_transaction": TEST_INTERNAL_TRANSACTIONS_INDEX}, parity_hosts=self.parity_hosts)
+    self.internal_transactions = InternalTransactions({"transaction": TEST_TRANSACTIONS_INDEX, "internal_transaction": TEST_INTERNAL_TRANSACTIONS_INDEX}, parity_hosts=self.parity_hosts)
 
   def test_split_on_chunks(self):
     test_list = list(range(10))
@@ -26,17 +25,14 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.assertSequenceEqual(test_chunks, [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]])
 
   def test_iterate_blocks(self):
-    parity_hosts = [(0, 4, "http://localhost:8545"), (5, None, "http://localhost:8545")]
-    self.internal_transactions = InternalTransactions({"block": TEST_BLOCKS_INDEX, "transaction": TEST_TRANSACTIONS_INDEX, "internal_transaction": TEST_INTERNAL_TRANSACTIONS_INDEX}, parity_hosts=parity_hosts)
-    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 1}, id=1, refresh=True)
-    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 2}, id=2, refresh=True)
-    self.client.index(TEST_BLOCKS_INDEX, 'b', {'proceed': True, 'number': 3}, id=3, refresh=True)
-    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 4}, id=4, refresh=True)
-    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 5}, id=5, refresh=True)
-    iterator = self.internal_transactions._iterate_blocks()
-    blocks = next(iterator)
-    blocks = [block["_id"] for block in blocks]
-    self.assertCountEqual(blocks, ['1', '2', '5'])
+    self.internal_transactions.parity_hosts = [(0, 4, "http://localhost:8545"), (5, None, "http://localhost:8545")]
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 1}, id=1, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 2}, id=2, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 3, 'trace': True}, id=3, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 4}, id=4, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 5}, id=5, refresh=True)
+    blocks = self.internal_transactions._iterate_blocks()
+    self.assertCountEqual(blocks, [1, 2, 5])
 
   def test_iterate_transactions(self):
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': False, 'blockNumber': 1}, id=1, refresh=True)
@@ -267,8 +263,6 @@ class InternalTransactionsTestCase(unittest.TestCase):
       assert 'class' in internal_transaction["_source"].keys()
 
   def test_extract_traces(self):
-    docs = [{'number': TEST_BLOCK_NUMBER + i, 'id': TEST_BLOCK_NUMBER + i} for i in range(5)]
-    self.client.bulk_index(TEST_BLOCKS_INDEX, 'b', docs, refresh=True)
     docs = [{'to_contract': True, 'hash': TEST_TRANSACTION_HASH, 'id': i, 'blockNumber': TEST_BLOCK_NUMBER + (i % 5), 'transactionIndex': 0} for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
     self.client.bulk_index(TEST_TRANSACTIONS_INDEX, 'tx', docs, refresh=True)
     self.internal_transactions.extract_traces()
@@ -280,7 +274,6 @@ TEST_TRANSACTIONS_NUMBER = 10
 TEST_BLOCK_NUMBER = 3068185
 TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 10
 TEST_TRANSACTIONS_INDEX = 'test-ethereum-transactions'
-TEST_BLOCKS_INDEX = 'test-ethereum-blocks'
 TEST_INTERNAL_TRANSACTIONS_INDEX = 'test-ethereum-internal-transactions'
 TEST_TRANSACTION_HASH = '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a'
 TEST_TRANSACTION_INPUT = '0xb1631db29e09ec5581a0ec398f1229abaf105d3524c49727621841af947bdc44'
