@@ -214,6 +214,10 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.internal_transactions._save_traces([])
     assert True
 
+  def test_preprocess_internal_transaction_with_empty_field(self):
+    self.internal_transactions._preprocess_internal_transaction({"action": None})
+    assert True
+
   def test_save_internal_transactions(self):
     traces = {1: TEST_TRANSACTION_TRACE}
     self.internal_transactions._save_internal_transactions(traces)

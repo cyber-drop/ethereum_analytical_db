@@ -168,7 +168,7 @@ class InternalTransactions:
   def _preprocess_internal_transaction(self, transaction):
     transaction = transaction.copy()
     for field in ["action", "result"]:
-      if field in transaction.keys():
+      if (field in transaction.keys()) and (transaction[field]):
         transaction.update(transaction[field])
         del transaction[field]
     return transaction
@@ -192,5 +192,6 @@ class InternalTransactions:
       self._save_internal_transactions(traces)
 
   def extract_traces(self):
-    for blocks in self._split_on_chunks(self._iterate_blocks(), NUMBER_OF_JOBS):
+    blocks_chunks = list(self._split_on_chunks(self._iterate_blocks(), NUMBER_OF_JOBS))
+    for blocks in tqdm(blocks_chunks):
       self._extract_traces_chunk(blocks)
