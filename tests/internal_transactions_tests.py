@@ -26,13 +26,13 @@ class InternalTransactionsTestCase(unittest.TestCase):
 
   def test_iterate_blocks(self):
     self.internal_transactions.parity_hosts = [(0, 4, "http://localhost:8545"), (5, None, "http://localhost:8545")]
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 1}, id=1, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 1, 'to_contract': True}, id=1, refresh=True)
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 2}, id=2, refresh=True)
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 3, 'trace': True}, id=3, refresh=True)
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 4}, id=4, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 5}, id=5, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 5, 'to_contract': True}, id=5, refresh=True)
     blocks = self.internal_transactions._iterate_blocks()
-    self.assertCountEqual(blocks, [1, 2, 5])
+    self.assertCountEqual(blocks, [1, 5])
 
   def test_iterate_big_amount_of_blocks(self):
     blocks_number = 1000000
