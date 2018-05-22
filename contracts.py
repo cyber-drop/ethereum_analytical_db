@@ -18,7 +18,7 @@ class Contracts():
 
   def __init__(self, indices, host="http://localhost:9200"):
     self.indices = indices
-    self.client = CustomElasticSearch()
+    self.client = CustomElasticSearch(host)
 
   def _set_contracts_abi(self, abis):
     self._contracts_abi = abis
@@ -75,7 +75,7 @@ class Contracts():
         "to": targets
       }
     }
-    return self.client.iterate(self.indices["transaction"], 'tx', query)
+    return self.client.iterate(self.indices[self.index], self.doc_type, query)
 
   def _decode_inputs_for_contracts(self, contracts):
     contracts = [contract['_source']['address'] for contract in contracts]
@@ -83,10 +83,19 @@ class Contracts():
       inputs = [(transaction["_source"]["to"], transaction["_source"]["input"]) for transaction in transactions]
       decoded_inputs = self._decode_inputs_batch(inputs)
       operations = [self.client.update_op(doc={'decoded_input': decoded_inputs[index]}, id=transaction["_id"]) for index, transaction in enumerate(transactions)]
-      self.client.bulk(operations, doc_type='tx', index=self.indices["transaction"], refresh=True)
+      self.client.bulk(operations, doc_type=self.doc_type, index=self.indices[self.index], refresh=True)
 
   def decode_inputs(self):
     self._save_contracts_abi()
     for contracts in self._iterate_contracts_with_abi():
       self._set_contracts_abi({contract["_source"]["address"]: contract["_source"]["abi"] for contract in contracts})
       self._decode_inputs_for_contracts(contracts)
+
+
+class ExternalContracts(Contracts):
+  doc_type = "tx"
+  index = "transaction"
+
+class InternalContracts(Contracts):
+  doc_type = "itx"
+  index = "internal_transaction"
