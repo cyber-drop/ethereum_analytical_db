@@ -57,6 +57,7 @@ class TokenHolders:
     duplicates_list = sorted(duplicates_list, key=lambda x: x['_source']['txs_count'], reverse=True)
     real_token = duplicates_list[0]
     real_token['_source']['duplicated'] = True
+    real_token['_source']['duplicates'] = [duplicate['_source']['address'] for duplicate in duplicates_list[0:]]
     return real_token
 
   def _extend_token_descr(self, token):
@@ -138,9 +139,23 @@ class TokenHolders:
           holders_list[descr['_source']['to']] = int(delta)
     return holders_list
 
-  def _count_token_holders_balances(self, token_address):
+  def _count_token_holders_balances(self, token_address, token_name):
     token_holders = {}
     for tx_descr_chunk in self._iterate_tx_descriptions(token_address):
       token_holders = self._extract_token_balances(tx_descr_chunk, token_holders)
-    token_holders = [{'address': key, 'balance': str(token_holders[key])} for key in token_holders.keys()]
+    token_holders = [{'address': key, token_name: str(token_holders[key])} for key in token_holders.keys()]
     return token_holders
+
+  def _iterate_holders(self):
+    return self.client.iterate(self.indices['listed_token'], 'holder', 'address:*')
+
+  def get_balances_for_listed_tokens(self):
+    self._load_listed_tokens()
+    tokens = self._iterate_tokens()
+    tokens = [t for tokens_list in tokens for t in tokens_list]
+    for token in tokens:
+      #del token['_source']['bytecode']
+      self._extract_token_txs(token['_source']['address'])
+      token_holders = self._count_token_holders_balances(token['_source']['address'], token['_source']['token_name'])
+      
+      self._insert_multiple_docs(token_holders, 'holder', self.indices['listed_token'])
