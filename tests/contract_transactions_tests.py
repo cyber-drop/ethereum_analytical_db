@@ -1,44 +1,17 @@
 import unittest 
-from contract_transactions import ContractTransactions
+from contract_transactions import ExternalContractTransactions, InternalContractTransactions
 from pyelasticsearch import ElasticSearch
 from time import sleep
 from tqdm import *
 from test_utils import TestElasticSearch
 from unittest.mock import MagicMock, Mock, call
 
-class ContractTransactionsTestCase(unittest.TestCase):
+class ContractTransactionsTestCase():
   def setUp(self):
     self.client = TestElasticSearch()
     self.client.recreate_fast_index(TEST_TRANSACTIONS_INDEX)
     self.client.recreate_index(TEST_CONTRACTS_INDEX)
-    self.contract_transactions = ContractTransactions({"contract": TEST_CONTRACTS_INDEX, "transaction": TEST_TRANSACTIONS_INDEX})
-
-  def test_iterate_contract_transactions(self):
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'creates': TEST_TRANSACTION_TO, 'to': None}, id=1, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to': None}, id=2, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to': TEST_TRANSACTION_TO}, id=3, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'creates': TEST_TRANSACTION_TO, 'to': None}, id=4, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'creates': TEST_TRANSACTION_TO, 'to': None, 'to_contract': True}, id=5, refresh=True)
-    iterator = self.contract_transactions._iterate_contract_transactions()
-    transactions = next(iterator)
-    transactions = [transaction['_id'] for transaction in transactions]
-    self.assertCountEqual(['1'], transactions)
-
-  def test_extract_contract_from_transaction(self):
-    transaction = {
-      "hash": "0x0",
-      "creates": "0x1",
-      "from": "0x2",
-      "input": "0x3",
-      "blockNumber": 100
-    }
-    contract = self.contract_transactions._extract_contract_from_transactions(transaction)
-    assert contract["owner"] == transaction["from"]
-    assert contract["address"] == transaction["creates"]
-    assert contract["id"] == transaction["creates"]
-    assert contract["parent_transaction"] == transaction["hash"]
-    assert contract["block_number"] == transaction["blockNumber"]
-    assert contract["bytecode"] == transaction["input"]
+    self.contract_transactions = self.contract_transactions_class({"contract": TEST_CONTRACTS_INDEX, self.index: TEST_TRANSACTIONS_INDEX})
 
   def test_extract_contract_addresses(self):
     transactions_list = [
@@ -79,24 +52,30 @@ class ContractTransactionsTestCase(unittest.TestCase):
     contracts = [contract['_id'] for contract in contracts]
     self.assertCountEqual(["1", "2"], contracts)
 
-  def test_detect_transactions_by_big_portion_of_contracts(self):
-    contract_transactions = [{'creates': TEST_TRANSACTION_TO + str(i), 'to': None, 'id': i + 1} for i in range(1000)]
-    self.client.bulk_index(docs=contract_transactions, doc_type='tx', index=TEST_TRANSACTIONS_INDEX, refresh=True)
-    transactions = [{'to': TEST_TRANSACTION_TO + str(i), 'id': i + 1} for i in range(1000)]
-    self.client.bulk_index(docs=transactions, doc_type='tx', index=TEST_TRANSACTIONS_INDEX, refresh=True)
-    self.contract_transactions._detect_transactions_by_contracts([TEST_TRANSACTION_TO + str(i) for i in range(1000)])
-    transactions = self.client.search("to_contract:true", index=TEST_TRANSACTIONS_INDEX, doc_type="tx", size=1000)['hits']['hits']
-    assert len(transactions) == 1000
-
-  def test_set_flag_for_processed_contracts(self):
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_TRANSACTION_TO}, id=1, refresh=True)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_TRANSACTION_TO_CONTRACT}, id=2, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'creates': TEST_TRANSACTION_TO, 'to': None}, id=1, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'creates': TEST_TRANSACTION_TO, 'to': None}, id=2, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'creates': TEST_TRANSACTION_TO, 'to': None}, id=3, refresh=True)
-    self.contract_transactions._detect_transactions_by_contracts([TEST_TRANSACTION_TO])
-    contract = self.client.get(index=TEST_CONTRACTS_INDEX, doc_type="contract", id=1)["_source"]
-    assert contract["transactions_detected"]
+  def test_detect_transactions_by_contracts(self):
+    self.contract_transactions.client.update_by_query = MagicMock()
+    contracts = [TEST_TRANSACTION_TO, TEST_TRANSACTION_TO_CONTRACT]
+    self.contract_transactions._detect_transactions_by_contracts(contracts)
+    self.contract_transactions.client.update_by_query.assert_any_call(
+      TEST_CONTRACTS_INDEX,
+      'contract',
+      {
+        "terms": {
+          "address": contracts
+        }
+      },
+      "ctx._source.transactions_detected = true"
+    )
+    self.contract_transactions.client.update_by_query.assert_any_call(
+      TEST_TRANSACTIONS_INDEX,
+      self.doc_type,
+      {
+        "terms": {
+          "to": contracts
+        }
+      },
+      "ctx._source.to_contract = true"
+    )
 
   def test_detect_contract_transactions(self):
     contracts_list = [[TEST_TRANSACTION_TO + str(j*10 + i) for i in range(10)] for j in range(5)]
@@ -117,6 +96,65 @@ class ContractTransactionsTestCase(unittest.TestCase):
       call.extract(),
       call.iterate()
     ] + [call.detect(contracts) for contracts in contracts_list])
+
+
+class InternalContractTransactionsTestCase(ContractTransactionsTestCase, unittest.TestCase):
+  contract_transactions_class = InternalContractTransactions
+  index = "internal_transaction"
+  doc_type = "itx"
+
+  def test_iterate_internal_contract_transactions(self):
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "call"}, id=1, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create"}, id=2, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'type': "create"}, id=3, refresh=True)
+    iterator = self.contract_transactions._iterate_contract_transactions()
+    transactions = next(iterator)
+    transactions = [transaction['_id'] for transaction in transactions]
+    self.assertCountEqual(['2'], transactions)
+
+  def test_extract_contract_from_internal_transaction(self):
+    transaction = {
+      "from": "0x0",
+      "input": "0x1",
+      "address": "0x2",
+      "code": "0x3",
+    }
+    contract = self.contract_transactions._extract_contract_from_transactions(transaction)
+    assert contract["creator"] == transaction["from"]
+    assert contract["address"] == transaction["address"]
+    assert contract["id"] == transaction["address"]
+    assert contract["bytecode"] == transaction["code"]
+
+class ExternalContractTransactionsTestCase(ContractTransactionsTestCase, unittest.TestCase):
+  contract_transactions_class = ExternalContractTransactions
+  index = "transaction"
+  doc_type = "tx"
+
+  def test_extract_contract_from_transaction(self):
+    transaction = {
+      "hash": "0x0",
+      "creates": "0x1",
+      "from": "0x2",
+      "input": "0x3",
+      "blockNumber": 100
+    }
+    contract = self.contract_transactions._extract_contract_from_transactions(transaction)
+    assert contract["owner"] == transaction["from"]
+    assert contract["address"] == transaction["creates"]
+    assert contract["id"] == transaction["creates"]
+    assert contract["parent_transaction"] == transaction["hash"]
+    assert contract["blockNumber"] == transaction["blockNumber"]
+    assert contract["bytecode"] == transaction["input"]
+
+  def test_iterate_contract_transactions(self):
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'creates': TEST_TRANSACTION_TO, 'to': None}, id=1, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to': None}, id=2, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to': TEST_TRANSACTION_TO}, id=3, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'creates': TEST_TRANSACTION_TO, 'to': None}, id=4, refresh=True)
+    iterator = self.contract_transactions._iterate_contract_transactions()
+    transactions = next(iterator)
+    transactions = [transaction['_id'] for transaction in transactions]
+    self.assertCountEqual(['1'], transactions)
 
 TEST_TRANSACTIONS_INDEX = 'test-ethereum-transactions'
 TEST_CONTRACTS_INDEX = 'test-ethereum-contracts'
