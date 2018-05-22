@@ -55,13 +55,23 @@ class TokenHoldersTestCase(unittest.TestCase):
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
 
-    self.token_holders._extract_token_txs('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', 'Aeternity')
+    self.token_holders._extract_token_txs('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d')
     token_txs = self.token_holders._iterate_tx_descriptions()
     token_txs = [tx for txs_list in token_txs for tx in txs_list]
     methods = [tx['_source']['method'] for tx in token_txs]
     amounts = [tx['_source']['value'] for tx in token_txs] 
     self.assertCountEqual(['transfer', 'approve', 'transferFrom'], methods)
     self.assertCountEqual(['356245680000000000000', '356245680000000000000', '2266000000000000000000'], amounts)
+  
+  def test_count_token_balances_from_txs(self):
+    for tx in TEST_TOKEN_TXS:
+      self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
+
+    self.token_holders._extract_token_txs('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d')
+    
+    balances = self.token_holders._count_token_holders_balances('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d')
+    balances = [balance['balance'] for balance in balances]
+    self.assertCountEqual(['2266000000000000000000', '-2266000000000000000000', '356245680000000000000', '-356245680000000000000'], balances)
 
 TEST_INDEX = 'test-ethereum-contracts'
 TEST_TX_INDEX = 'test-ethereum-txs'

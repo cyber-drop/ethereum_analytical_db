@@ -96,6 +96,9 @@ class TokenHolders:
   def _iterate_token_txs(self, token_addr):
     return self.client.iterate(self.indices['transaction'], 'tx', 'to:' + token_addr)
 
+  def _iterate_token_tx_descriptions(self, token_address):
+    return self.client.iterate(self.indices['token_tx'], 'tx', 'token:' + token_addr)
+
   def _construct_tx_descr_from_input(self, tx):
     tx_input = tx['decoded_input']
     if tx_input['name'] == 'transfer':
@@ -107,18 +110,37 @@ class TokenHolders:
     else:
       return {'method': 'unknown', 'txHash': tx['hash']}
 
-  def _extract_descriptions_from_txs(self, txs, token):
+  def _extract_descriptions_from_txs(self, txs):
     txs_info = []
     for tx in txs:
       tx_descr = self._construct_tx_descr_from_input(tx['_source'])
       txs_info.append(tx_descr)
     self._insert_multiple_docs(txs_info, 'tx', self.indices['token_tx'])
 
-  def _iterate_tx_descriptions(self):
-    return self.client.iterate(self.indices['token_tx'], 'tx', 'method:*')
+  def _iterate_tx_descriptions(self, token_address):
+    return self.client.iterate(self.indices['token_tx'], 'tx', 'token:' + token_address)
 
-  def _extract_token_txs(self, token_address, token_name):
+  def _extract_token_txs(self, token_address):
     for txs_chunk in self._iterate_token_txs(token_address):
-      self._extract_descriptions_from_txs(txs_chunk, token_name)
+      self._extract_descriptions_from_txs(txs_chunk)
 
-  
+  def _extract_token_balances(self, tx_descriptions, holders_list):
+    for descr in tx_descriptions:
+      if descr['_source']['method'] == 'transfer' or descr['_source']['method'] == 'transferFrom':
+        delta = descr['_source']['value']
+        if descr['_source']['from'] in holders_list.keys():
+          holders_list[descr['_source']['from']] -= int(delta)
+        else:
+          holders_list[descr['_source']['from']] = -(int(delta))
+        if descr['_source']['to'] in holders_list.keys():
+          holders_list[descr['_source']['to']] += int(delta)
+        else:
+          holders_list[descr['_source']['to']] = int(delta)
+    return holders_list
+
+  def _count_token_holders_balances(self, token_address):
+    token_holders = {}
+    for tx_descr_chunk in self._iterate_tx_descriptions(token_address):
+      token_holders = self._extract_token_balances(tx_descr_chunk, token_holders)
+    token_holders = [{'address': key, 'balance': str(token_holders[key])} for key in token_holders.keys()]
+    return token_holders
