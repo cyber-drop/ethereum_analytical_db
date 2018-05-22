@@ -89,7 +89,7 @@ class InternalTransactions:
       "size": 0,
       "query": {
         "query_string": {
-          "query": '!(_exists_:trace) AND ' + range_query
+          "query": '!(_exists_:trace) AND to_contract:true AND ' + range_query
         }
       },
       "aggs": {
