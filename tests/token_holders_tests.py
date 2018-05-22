@@ -38,19 +38,6 @@ class TokenHoldersTestCase(unittest.TestCase):
     assert real_golem['address'] == '0xa74476443119a942de498590fe1f2454d7d4ac0d'
     assert real_aeternity['address'] == '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'
 
-  def test_load_tokens(self):
-    for address in TEST_TOKEN_ADDRESSES:
-      self.client.index(TEST_INDEX, 'contract', {'address': address}, refresh=True)
-    for tx in TEST_TOKEN_TXS:
-      self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
-    self.contract_methods.search_methods()
-
-    self.token_holders._load_listed_tokens()
-    loaded_tokens = self.token_holders._iterate_tokens()
-    loaded_tokens = [c for contracts_list in loaded_tokens for c in contracts_list]
-    loaded_tokens = [token['_source']['token_name'] for token in loaded_tokens]
-    self.assertCountEqual(['Aeternity', 'Populous Platform', 'Golem Network Token'], loaded_tokens)
-  
   def test_search_token_holders(self):
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
@@ -62,17 +49,7 @@ class TokenHoldersTestCase(unittest.TestCase):
     amounts = [tx['_source']['value'] for tx in token_txs] 
     self.assertCountEqual(['transfer', 'approve', 'transferFrom'], methods)
     self.assertCountEqual(['356245680000000000000', '356245680000000000000', '2266000000000000000000'], amounts)
-  
-  def test_count_token_balances_from_txs(self):
-    for tx in TEST_TOKEN_TXS:
-      self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
-
-    self.token_holders._extract_token_txs('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d')
-    
-    balances = self.token_holders._count_token_holders_balances('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d')
-    balances = [balance['Aeternity'] for balance in balances]
-    self.assertCountEqual(['2266000000000000000000', '-2266000000000000000000', '356245680000000000000', '-356245680000000000000'], balances)
-    '''
+  '''
   def test_get_balances_for_listed_tokens(self):
     for address in TEST_TOKEN_ADDRESSES:
       self.client.index(TEST_INDEX, 'contract', {'address': address}, refresh=True)
@@ -83,7 +60,6 @@ class TokenHoldersTestCase(unittest.TestCase):
     self.token_holders.get_balances_for_listed_tokens()
     holders = self.token_holders._iterate_holders()
     holders = [c for contracts_list in holders for c in contracts_list]
-    print(holders)
     holders_addressses = [holder['_source']['address'] for holder in holders]
     holders_balances = [holder['_source']['Aeternity'] for holder in holders]
     self.assertCountEqual(['0xa60c4c379246a7f1438bd76a92034b6c82a183a5', '0x6b25d0670a34c1c7b867cd9c6ad405aa1759bda0', '0xc917e19946d64aa31d1aeacb516bae2579995aa9', '0x4e6b129bbb683952ed1ec935c778d74a77b352ce'], holders_addressses)

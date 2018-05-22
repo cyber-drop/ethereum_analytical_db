@@ -125,26 +125,55 @@ class TokenHolders:
     for txs_chunk in self._iterate_token_txs(token_address):
       self._extract_descriptions_from_txs(txs_chunk)
 
-  def _extract_token_balances(self, tx_descriptions, holders_list):
+  def _extract_token_balances(self, tx_descriptions, holders_dict, token_name):
     for descr in tx_descriptions:
       if descr['_source']['method'] == 'transfer' or descr['_source']['method'] == 'transferFrom':
         delta = descr['_source']['value']
-        if descr['_source']['from'] in holders_list.keys():
-          holders_list[descr['_source']['from']] -= int(delta)
+        if descr['_source']['from'] in holders_dict.keys():
+          holders_dict[descr['_source']['from']][token_name] = int(holders_dict[descr['_source']['from']][token_name])
+          holders_dict[descr['_source']['from']][token_name] -= int(delta)
         else:
-          holders_list[descr['_source']['from']] = -(int(delta))
-        if descr['_source']['to'] in holders_list.keys():
-          holders_list[descr['_source']['to']] += int(delta)
+          holders_dict[descr['_source']['from']] = {}
+          holders_dict[descr['_source']['from']][token_name] = -(int(delta))
+        if descr['_source']['to'] in holders_dict.keys():
+          holders_dict[descr['_source']['to']][token_name] = int(holders_dict[descr['_source']['to']][token_name])
+          holders_dict[descr['_source']['to']][token_name] += int(delta)
         else:
-          holders_list[descr['_source']['to']] = int(delta)
+          holders_dict[descr['_source']['to']] = {}
+          holders_dict[descr['_source']['to']][token_name] = int(delta)
+        holders_dict[descr['_source']['from']][token_name] = str(holders_dict[descr['_source']['from']][token_name])
+        holders_dict[descr['_source']['to']][token_name] = str(holders_dict[descr['_source']['to']][token_name])
+    holders_list = []
+    for item in holders_dict.items():
+      tmp_dict = item[1]
+      tmp_dict['address'] = item[0]
+      holders_list.append(tmp_dict)
     return holders_list
+
+  def _get_saved_holders(self, descriptions):
+    current_holders = [[tx_descr['_source']['from'], tx_descr['_source']['to']] for tx_descr in descriptions if tx_descr['_source']['method'] != 'approve']
+    current_holders = set([t for tokens_list in current_holders for t in tokens_list])
+    saved_holders = self._search_multiple_holders(current_holders)
+    holders_dict = {}
+    for holder in saved_holders:
+      address = holder['address']
+      holders_dict[address] = holder['_source']
+    return holders_dict
 
   def _count_token_holders_balances(self, token_address, token_name):
     token_holders = {}
     for tx_descr_chunk in self._iterate_tx_descriptions(token_address):
-      token_holders = self._extract_token_balances(tx_descr_chunk, token_holders)
-    token_holders = [{'address': key, token_name: str(token_holders[key])} for key in token_holders.keys()]
+      saved_holders = self._get_saved_holders(tx_descr_chunk)
+      token_holders = self._extract_token_balances(tx_descr_chunk, saved_holders, token_name)
+    #token_holders = [{'address': key, token_name: str(token_holders[key])} for key in token_holders.keys()]
     return token_holders
+
+  def _search_multiple_holders(self, holders_addresses):
+    body = self._construct_msearch_body(holders_addresses)
+    response = self.client.send_request('GET', [self.indices['contract'], 'contract', '_msearch'], body, {})
+    results = response['responses']
+    holders = [result['hits']['hits'] for result in results if len(result['hits']['hits']) > 0]
+    return holders
 
   def _iterate_holders(self):
     return self.client.iterate(self.indices['listed_token'], 'holder', 'address:*')
@@ -154,8 +183,7 @@ class TokenHolders:
     tokens = self._iterate_tokens()
     tokens = [t for tokens_list in tokens for t in tokens_list]
     for token in tokens:
-      #del token['_source']['bytecode']
       self._extract_token_txs(token['_source']['address'])
       token_holders = self._count_token_holders_balances(token['_source']['address'], token['_source']['token_name'])
-      
+      print(token_holders)
       self._insert_multiple_docs(token_holders, 'holder', self.indices['listed_token'])
