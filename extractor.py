@@ -3,7 +3,7 @@ import click
 from custom_elastic_search import CustomElasticSearch
 from contract_transactions import InternalContractTransactions, ExternalContractTransactions
 from internal_transactions import InternalTransactions
-from contracts import Contracts
+from contracts import InternalContracts, ExternalContracts
 from contract_methods import ContractMethods
 from config import INDICES
 
@@ -25,7 +25,7 @@ def extract_traces(host):
   internal_transactions.extract_traces()
 
 def parse_inputs(host):
-  contracts = Contracts(INDICES, host)
+  contracts = ExternalContracts(INDICES, host)
   contracts.decode_inputs()
 
 def search_methods(host):
@@ -33,9 +33,8 @@ def search_methods(host):
   contract_methods.search_methods()
 
 def parse_internal_inputs(host):
-  replaced_indices = {"contract": INDICES["contract"], "transaction": INDICES["internal_transaction"]}
-  internal_transactions = InternalTransactions(replaced_indices, host)
-  internal_transactions.extract_traces()
+  internal_transactions = InternalContracts(INDICES, host)
+  internal_transactions.decode_inputs()
 
 operations = {
   "prepare-indices": prepare_indices,
