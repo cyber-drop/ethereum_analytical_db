@@ -12,7 +12,7 @@ class TokenHoldersTestCase(unittest.TestCase):
     self.client.recreate_index(TEST_LISTED_INDEX)
     self.client.recreate_index(TEST_TOKEN_TX_INDEX)
     self.token_holders = TokenHolders({'contract': TEST_INDEX, 'transaction': TEST_TX_INDEX, 'listed_token': TEST_LISTED_INDEX, 'token_tx': TEST_TOKEN_TX_INDEX})
-    self.contract_methods = ContractMethods({"contract": TEST_INDEX}, ethereum_api_host='https://mainnet.infura.io/SuP0gwmZ0hYfutY70s6V')
+    self.contract_methods = ContractMethods({"contract": TEST_INDEX})
   
   def test_get_listed_tokens(self):
     for address in TEST_TOKEN_ADDRESSES:
@@ -81,8 +81,6 @@ TEST_TOKEN_TXS = [
   {'from': '0x58d46475da68984bacf1f2843b85e0fdbcbc6cef', 'to': '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', 'decoded_input': {'name': 'approve', 'params': [{'type': 'address', 'value': '0x4e6b129bbb683952ed1ec935c778d74a77b352ce'}, {'type': 'uint256', 'value': '356245680000000000000'}]}, 'blockNumber': 5635141},
   {'from': '0xc917e19946d64aa31d1aeacb516bae2579995aa9', 'to': '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', 'decoded_input': {'name': 'transferFrom', 'params': [{'type': 'address', 'value': '0xc917e19946d64aa31d1aeacb516bae2579995aa9'}, {'type': 'address', 'value': '0x4e6b129bbb683952ed1ec935c778d74a77b352ce'}, {'type': 'uint256', 'value': '356245680000000000000'}]}, 'blockNumber': 5635142},
   {'from': '0x892ce7dbc4a0efbbd5933820e53d2c945ef9f722', 'to': '0x51ada638582e51c931147c9abd2a6d63bc02e337', 'decoded_input': {'name': 'transfer', 'params': [{'type': 'address', 'value': '0x3f5ce5fbfe3e9af3971dd833d26ba9b5c936f0be'}, {'type': 'uint256', 'value': '2294245680000000000000'}]}, 'blockNumber': 5632141},
-  {'from': '0x930aa9a843266bdb02847168d571e7913907dd84', 'to': '0xa74476443119a942de498590fe1f2454d7d4ac0d', 'decoded_input': {'name': 'transfer', 'params': [{'type': 'address', 'value': '0xc18118a2976a9e362a0f8d15ca10761593242a85'}, {'type': 'uint256', 'value': '2352000000000000000000'}]}, 'blockNumber': 5235141},
-  #{'to': '0xa74476443119a942de498590fe1f2454d7d4ac0d'},
-  #{'to': '0xbe78d802c2aeebdc34c810b805c2691885a61257'}
+  {'from': '0x930aa9a843266bdb02847168d571e7913907dd84', 'to': '0xa74476443119a942de498590fe1f2454d7d4ac0d', 'decoded_input': {'name': 'transfer', 'params': [{'type': 'address', 'value': '0xc18118a2976a9e362a0f8d15ca10761593242a85'}, {'type': 'uint256', 'value': '2352000000000000000000'}]}, 'blockNumber': 5235141}
 ]
     
