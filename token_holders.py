@@ -11,30 +11,34 @@ class TokenHolders:
     self.client = CustomElasticSearch(elasticsearch_host)
     self.w3 = Web3(HTTPProvider(ethereum_api_host))
 
-  def _get_tokens_list(self):
+  def _get_cmc_tokens_list(self):
     response = requests.get('https://api.coinmarketcap.com/v2/listings/')
     return response.json()['data']
 
-  def _construct_msearch_body(self, names_list):
+  def _construct_token_queries(self, names):
+    queries = [{'query': {'match': {'token_name': {'query': name, 'minimum_should_match': '100%'}}}} for name in names]
+    return queries
+
+  def _construct_msearch_body(self, queries_list, index, doc_type):
     search_list = []
-    for name in names_list:
-      search_list.append({'index': self.indices['contract'], 'type': 'contract'})
-      search_list.append({'query': {'match': {'token_name': {'query': name, 'minimum_should_match': '100%'}}}})
+    for query in queries_list:
+      search_list.append({'index': index, 'type': doc_type})
+      search_list.append(query)
     body = ''
     for obj in search_list:
       body += '%s \n' %json.dumps(obj)
     return body
 
   def _search_multiple_tokens(self, token_names):
-    body = self._construct_msearch_body(token_names)
+    queries = self._construct_token_queries(token_names)
+    body = self._construct_msearch_body(queries, self.indices['contract'], 'contract')
     response = self.client.send_request('GET', [self.indices['contract'], 'contract', '_msearch'], body, {})
     results = response['responses']
-    erc_tokens = [result['hits']['hits'] for result in results if len(result['hits']['hits']) > 0]
-    return erc_tokens
+    tokens = [result['hits']['hits'] for result in results if len(result['hits']['hits']) > 0]
+    return tokens
 
   def _get_listed_tokens(self):
-    coinmarketcap_tokens = self._get_tokens_list()
-    coinmarketcap_names = [token['name'] for token in coinmarketcap_tokens]
+    coinmarketcap_names = [token['name'] for token in self._get_cmc_tokens_list()]
     token_contracts = self._search_multiple_tokens(coinmarketcap_names)
     return token_contracts
 
@@ -46,9 +50,8 @@ class TokenHolders:
         }
       }
     }
-    # TODO: replace by pyelasticsearch send_request
-    txs_count = requests.get('http://localhost:9200/' + self.indices['transaction'] + '/tx/_count', json=count_body)
-    txs_count = txs_count.json()['count']
+    res = self.client.send_request('GET', [self.indices['transaction'], 'tx', '_count'], count_body, {})
+    txs_count = res['count']
     return txs_count
 
   def _find_real_token(self, duplicates_list):
@@ -118,72 +121,18 @@ class TokenHolders:
       txs_info.append(tx_descr)
     self._insert_multiple_docs(txs_info, 'tx', self.indices['token_tx'])
 
-  def _iterate_tx_descriptions(self, token_address):
+  def _iterate_token_tx_descriptions(self, token_address):
     return self.client.iterate(self.indices['token_tx'], 'tx', 'token:' + token_address)
+
+  def _iterate_tx_descriptions(self):
+    return self.client.iterate(self.indices['token_tx'], 'tx', 'token:*')
 
   def _extract_token_txs(self, token_address):
     for txs_chunk in self._iterate_token_txs(token_address):
       self._extract_descriptions_from_txs(txs_chunk)
 
-  def _extract_token_balances(self, tx_descriptions, holders_dict, token_name):
-    for descr in tx_descriptions:
-      if descr['_source']['method'] == 'transfer' or descr['_source']['method'] == 'transferFrom':
-        delta = descr['_source']['value']
-        if descr['_source']['from'] in holders_dict.keys():
-          holders_dict[descr['_source']['from']][token_name] = int(holders_dict[descr['_source']['from']][token_name])
-          holders_dict[descr['_source']['from']][token_name] -= int(delta)
-        else:
-          holders_dict[descr['_source']['from']] = {}
-          holders_dict[descr['_source']['from']][token_name] = -(int(delta))
-        if descr['_source']['to'] in holders_dict.keys():
-          holders_dict[descr['_source']['to']][token_name] = int(holders_dict[descr['_source']['to']][token_name])
-          holders_dict[descr['_source']['to']][token_name] += int(delta)
-        else:
-          holders_dict[descr['_source']['to']] = {}
-          holders_dict[descr['_source']['to']][token_name] = int(delta)
-        holders_dict[descr['_source']['from']][token_name] = str(holders_dict[descr['_source']['from']][token_name])
-        holders_dict[descr['_source']['to']][token_name] = str(holders_dict[descr['_source']['to']][token_name])
-    holders_list = []
-    for item in holders_dict.items():
-      tmp_dict = item[1]
-      tmp_dict['address'] = item[0]
-      holders_list.append(tmp_dict)
-    return holders_list
-
-  def _get_saved_holders(self, descriptions):
-    current_holders = [[tx_descr['_source']['from'], tx_descr['_source']['to']] for tx_descr in descriptions if tx_descr['_source']['method'] != 'approve']
-    current_holders = set([t for tokens_list in current_holders for t in tokens_list])
-    saved_holders = self._search_multiple_holders(current_holders)
-    holders_dict = {}
-    for holder in saved_holders:
-      address = holder['address']
-      holders_dict[address] = holder['_source']
-    return holders_dict
-
-  def _count_token_holders_balances(self, token_address, token_name):
-    token_holders = {}
-    for tx_descr_chunk in self._iterate_tx_descriptions(token_address):
-      saved_holders = self._get_saved_holders(tx_descr_chunk)
-      token_holders = self._extract_token_balances(tx_descr_chunk, saved_holders, token_name)
-    #token_holders = [{'address': key, token_name: str(token_holders[key])} for key in token_holders.keys()]
-    return token_holders
-
-  def _search_multiple_holders(self, holders_addresses):
-    body = self._construct_msearch_body(holders_addresses)
-    response = self.client.send_request('GET', [self.indices['contract'], 'contract', '_msearch'], body, {})
-    results = response['responses']
-    holders = [result['hits']['hits'] for result in results if len(result['hits']['hits']) > 0]
-    return holders
-
-  def _iterate_holders(self):
-    return self.client.iterate(self.indices['listed_token'], 'holder', 'address:*')
-
-  def get_balances_for_listed_tokens(self):
+  def get_listed_token_txs(self):
     self._load_listed_tokens()
-    tokens = self._iterate_tokens()
-    tokens = [t for tokens_list in tokens for t in tokens_list]
-    for token in tokens:
-      self._extract_token_txs(token['_source']['address'])
-      token_holders = self._count_token_holders_balances(token['_source']['address'], token['_source']['token_name'])
-      print(token_holders)
-      self._insert_multiple_docs(token_holders, 'holder', self.indices['listed_token'])
+    for tokens in self._iterate_tokens():
+      for token in tokens:
+        self._extract_token_txs(token['_source']['address'])  
