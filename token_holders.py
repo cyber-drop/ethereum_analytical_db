@@ -147,3 +147,4 @@ class TokenHolders:
         tx_descr = self._construct_tx_descr_from_input(tx)
         transfers.append(tx_descr)
     self._insert_multiple_docs(transfers, 'tx', self.indices['token_tx'])
+
