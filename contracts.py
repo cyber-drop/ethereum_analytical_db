@@ -9,9 +9,27 @@ from ethereum.abi import (
     normalize_name as normalize_abi_method_name,
     method_id as get_abi_method_id)
 from ethereum.utils import encode_int, zpad, decode_hex
+from multiprocessing import Pool
 
 GRAB_ABI_PATH = "/usr/local/qblocks/bin/grabABI {}"
 GRAB_ABI_CACHE_PATH = "/home/{}/.quickBlocks/cache/abis/{}.json"
+NUMBER_OF_PROCESSES = 10
+
+def _get_contracts_abi_sync(addresses):
+  abis = {}
+  for key, address in addresses.items():
+    file_path = GRAB_ABI_CACHE_PATH.format(os.environ["USER"], address)
+    if not os.path.exists(file_path):
+      os.system(GRAB_ABI_PATH.format(address))
+      for attemp in range(5):
+        if not os.path.exists(file_path):
+          sleep(1)
+    if os.path.exists(file_path):
+      abi_file = open(file_path)
+      abis[key] = json.load(abi_file)
+    else:
+      abis[key] = []
+  return abis
 
 class Contracts():
   _contracts_abi = []
@@ -19,22 +37,27 @@ class Contracts():
   def __init__(self, indices, host="http://localhost:9200"):
     self.indices = indices
     self.client = CustomElasticSearch(host)
+    self.pool = Pool(processes=NUMBER_OF_PROCESSES)
 
   def _set_contracts_abi(self, abis):
     self._contracts_abi = abis
 
-  def _get_contract_abi(self, address):
-    file_path = GRAB_ABI_CACHE_PATH.format(os.environ["USER"], address)
-    if not os.path.exists(file_path):
-      os.system(GRAB_ABI_PATH.format(address)) 
-      for attemp in range(5):
-        if not os.path.exists(file_path):
-          sleep(1)
-    if os.path.exists(file_path):
-      abi_file = open(file_path)
-      return json.load(abi_file)
-    else:
-      return []
+  def _split_on_chunks(self, iterable, size):
+    iterable = iter(iterable)
+    for element in iterable:
+      elements = [element]
+      try:
+        for i in range(size - 1):
+          elements.append(next(iterable))
+      except StopIteration:
+        pass
+      yield elements
+
+  def _get_contracts_abi(self, all_addresses):
+    chunks = self._split_on_chunks(list(enumerate(all_addresses)), NUMBER_OF_PROCESSES)
+    dict_chunks = [dict(chunk) for chunk in chunks]
+    abis = {key: abi for abis_dict in self.pool.map(_get_contracts_abi_sync, dict_chunks) for key, abi in abis_dict.items()}
+    return list(abis.values())
 
   # Solution from https://ethereum.stackexchange.com/questions/20897/how-to-decode-input-data-from-tx-using-python3?rq=1
   def _decode_input(self, contract, call_data):
@@ -62,7 +85,7 @@ class Contracts():
 
   def _save_contracts_abi(self):
     for contracts in self._iterate_contracts_without_abi():
-      abis = [self._get_contract_abi(contract["_source"]["address"]) for contract in contracts]
+      abis = self._get_contracts_abi([contract["_source"]["address"] for contract in contracts])
       operations = [self.client.update_op(doc={'abi': abis[index]}, id=contract["_id"]) for index, contract in enumerate(contracts)]
       self.client.bulk(operations, doc_type='contract', index=self.indices["contract"], refresh=True)
 
