@@ -1,11 +1,11 @@
-from contracts import ExternalContracts, InternalContracts
+from contracts import ExternalContracts, InternalContracts, _get_contracts_abi_sync
+import contracts
 import os
 import unittest
-import subprocess
-from time import sleep
 from test_utils import TestElasticSearch
 from tqdm import *
 import json
+from unittest.mock import MagicMock
 
 class InputParsingTestCase():
   def setUp(self):
@@ -14,26 +14,52 @@ class InputParsingTestCase():
     self.client.recreate_index(TEST_CONTRACTS_INDEX)
     self.client.recreate_fast_index(TEST_TRANSACTIONS_INDEX)
 
+  def test_pool(self):
+    assert self.contracts.pool._processes == 10
+
   def test_set_contracts_abi(self):
     contracts_abi = {"0x0": TEST_CONTRACT_ABI, "0x1": TEST_CONTRACT_ABI}
     self.contracts._set_contracts_abi(contracts_abi)
     self.assertSequenceEqual(self.contracts._contracts_abi, contracts_abi)
 
   def test_get_contract_abi(self):
-    response = self.contracts._get_contract_abi(TEST_CONTRACT_ADDRESS)
-    self.assertSequenceEqual(response, TEST_CONTRACT_ABI)
+    response = _get_contracts_abi_sync({1: TEST_CONTRACT_ADDRESS})
+    self.assertSequenceEqual(response, {1: TEST_CONTRACT_ABI})
 
   def test_get_wrong_contract_abi(self):
-    response = self.contracts._get_contract_abi("0x0")
-    assert response == []
+    response = _get_contracts_abi_sync({"wrong": "0x0"})
+    self.assertSequenceEqual(response, {"wrong": []})
 
   def test_get_uncached_contract_abi(self):
     try:
       os.remove("/home/anatoli/.quickBlocks/cache/abis/" + TEST_CONTRACT_ADDRESS + ".json")
     except:
       pass
-    response = self.contracts._get_contract_abi(TEST_CONTRACT_ADDRESS)
-    self.assertSequenceEqual(response, TEST_CONTRACT_ABI)
+    response = _get_contracts_abi_sync({"uncached": TEST_CONTRACT_ADDRESS})
+    self.assertSequenceEqual(response, {"uncached": TEST_CONTRACT_ABI})
+
+  def test_get_multiple_contracts_abi(self):
+    response = _get_contracts_abi_sync({1: TEST_CONTRACT_ADDRESS, 2: TEST_CONTRACT_ADDRESS})
+    self.assertSequenceEqual(response, {1: TEST_CONTRACT_ABI, 2: TEST_CONTRACT_ABI})
+
+  def test_split_on_chunks(self):
+    test_list = list(range(10))
+    test_chunks = list(self.contracts._split_on_chunks(test_list, 3))
+    self.assertSequenceEqual(test_chunks, [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]])
+
+  def test_get_contracts_abi(self):
+    addresses = ["address" + str(i) for i in range(100)]
+    chunks = [[(0, "address1")], [(1, "address2")]]
+    abis = [{1: "abi2"}, {0: "abi1"}]
+
+    self.contracts._split_on_chunks = MagicMock(return_value=chunks)
+    self.contracts.pool.map = MagicMock(return_value=abis)
+
+    response = self.contracts._get_contracts_abi(addresses)
+
+    self.contracts._split_on_chunks.assert_called_with([(index, address) for index, address in enumerate(addresses)], 10)
+    self.contracts.pool.map.assert_called_with(contracts._get_contracts_abi_sync, [dict(chunk) for chunk in chunks])
+    self.assertSequenceEqual(["abi1", "abi2"], response)
 
   def test_decode_inputs_batch(self):
     self.contracts._set_contracts_abi({"0x0": TEST_CONTRACT_ABI})
