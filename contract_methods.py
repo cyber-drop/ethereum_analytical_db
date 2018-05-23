@@ -1,9 +1,10 @@
-from tqdm import *
 import re
 from web3 import Web3, HTTPProvider
 from custom_elastic_search import CustomElasticSearch
 from config import INDICES
 import json
+import math
+from decimal import Decimal
 
 with open('standard-token-abi.json') as json_file:
   standard_token_abi = json.load(json_file)
@@ -39,10 +40,10 @@ class ContractMethods:
         'tokenFallback': self._extract_first_bytes('tokenFallback(address,uint256,bytes)')
       }
     }
-  def _get_contract_bytecode(self, address):
-    contract_checksum_addr = self.w3.toChecksumAddress(address)
-    contract_code_bytearr = self.w3.eth.getCode(contract_checksum_addr)
-    return self.w3.toHex(contract_code_bytearr)
+
+  def _check_is_token(self, bytecode):
+    has_trasfer_method = re.search(r'' + self.standards['erc20']['transfer'], bytecode) != None
+    return has_trasfer_method
 
   def _check_standards(self, bytecode):
     avail_standards = []
@@ -55,6 +56,13 @@ class ContractMethods:
         avail_standards.append(standard)
     return avail_standards
 
+  def _round_supply(self, supply, decimals):
+    if decimals > 1:
+      supply = supply / math.pow(10, decimals)
+      supply = Decimal(supply)
+      supply = round(supply)
+    return supply
+
   def _get_constants(self, address):
     contract_checksum_addr = self.w3.toChecksumAddress(address)
     contract_instance = self.w3.eth.contract(address=contract_checksum_addr, abi=self.standard_token_abi)
@@ -66,22 +74,39 @@ class ContractMethods:
       symbol = contract_instance.functions.symbol().call()
     except:
       symbol = 'None'
-    return (name, symbol)
+    try:
+      decimals = contract_instance.functions.decimals().call()
+    except:
+      decimals = 1
+    try:
+      total_supply = contract_instance.functions.totalSupply().call()
+      total_supply = self._round_supply(total_supply, decimals)
+    except:
+      total_supply = 0
+    try:
+      owner = contract_instance.functions.owner().call()
+    except:
+      owner = 'None'
+    return (name, symbol, decimals, total_supply, owner)
+    
+  def _update_contract_descr(self, doc_id, body):
+    self.client.update(self.indices['contract'], 'contract', doc_id, doc=body, refresh=True)
 
   def _classify_contract(self, contract):
-    code = self._get_contract_bytecode(contract['_source']['address'])
-    is_token = re.search(r'' + self.standards['erc20']['transfer'], code) != None
+    code = contract['_source']['bytecode']
+    is_token = self._check_is_token(code)
     if is_token == True:
       token_standards = self._check_standards(code)
       if len(token_standards) > 0:
-        name, symbol = self._get_constants(contract['_source']['address'])
-        update_body = {'standards': token_standards, 'bytecode': code, 'token_name': name, 'token_symbol': symbol, 'is_token': True}
-        self.client.update(self.indices["contract"], 'contract', contract['_id'], doc=update_body, refresh=True)
+        name, symbol, decimals, total_supply, owner = self._get_constants(contract['_source']['address'])
+        update_body = {'standards': token_standards, 'token_name': name, 'token_symbol': symbol, 'decimals': decimals, 'total_supply': total_supply, 'token_owner': owner, 'is_token': True}
+        self._update_contract_descr(contract['_id'], update_body)
       else:
-        update_body = {'standards': ['None'], 'bytecode': code, 'is_token': True}
-        self.client.update(self.indices["contract"], 'contract', contract['_id'], doc=update_body, refresh=True)
+        update_body = {'standards': ['None'], 'is_token': True}
+        self._update_contract_descr(contract['_id'], update_body)
     else:
-      self.client.update(self.indices["contract"], 'contract', contract['_id'], doc={'is_token': False, 'bytecode': code}, refresh=True)
+      update_body = {'is_token': False}
+      self._update_contract_descr(contract['_id'], update_body)
   
   def search_methods(self):
     for contracts_chunk in self._iterate_contracts():
@@ -89,6 +114,6 @@ class ContractMethods:
         self._classify_contract(contract)
     for tokens_chunk in self._iterate_non_standard():
       for token in tokens_chunk:
-        name, symbol = self._get_constants(token['_source']['address'])
-        update_body = {'token_name': name, 'token_symbol': symbol}
-        self.client.update(self.indices["contract"], 'contract', token['_id'], doc=update_body, refresh=True)
+        name, symbol, decimals, total_supply, owner = self._get_constants(token['_source']['address'])
+        update_body = {'token_name': name, 'token_symbol': symbol, 'decimals': decimals, 'total_supply': total_supply, 'token_owner': owner}
+        self._update_contract_descr(token['_id'], update_body)
