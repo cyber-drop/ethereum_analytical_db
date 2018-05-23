@@ -94,19 +94,19 @@ class ContractMethods:
     self.client.update(self.indices['contract'], 'contract', doc_id, doc=body, refresh=True)
 
   def _classify_contract(self, contract):
-    code = self._get_contract_bytecode(contract['_source']['address'])
+    code = contract['_source']['bytecode']
     is_token = self._check_is_token(code)
     if is_token == True:
       token_standards = self._check_standards(code)
       if len(token_standards) > 0:
         name, symbol, decimals, total_supply, owner = self._get_constants(contract['_source']['address'])
-        update_body = {'standards': token_standards, 'bytecode': code, 'token_name': name, 'token_symbol': symbol, 'decimals': decimals, 'total_supply': total_supply, 'token_owner': owner, 'is_token': True}
+        update_body = {'standards': token_standards, 'token_name': name, 'token_symbol': symbol, 'decimals': decimals, 'total_supply': total_supply, 'token_owner': owner, 'is_token': True}
         self._update_contract_descr(contract['_id'], update_body)
       else:
-        update_body = {'standards': ['None'], 'bytecode': code, 'is_token': True}
+        update_body = {'standards': ['None'], 'is_token': True}
         self._update_contract_descr(contract['_id'], update_body)
     else:
-      update_body = {'is_token': False, 'bytecode': code}
+      update_body = {'is_token': False}
       self._update_contract_descr(contract['_id'], update_body)
   
   def search_methods(self):
