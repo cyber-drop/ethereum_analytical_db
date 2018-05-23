@@ -1,4 +1,3 @@
-from tqdm import *
 import re
 from web3 import Web3, HTTPProvider
 from custom_elastic_search import CustomElasticSearch
@@ -42,11 +41,6 @@ class ContractMethods:
       }
     }
 
-  def _get_contract_bytecode(self, address):
-    contract_checksum_addr = self.w3.toChecksumAddress(address)
-    contract_code_bytearr = self.w3.eth.getCode(contract_checksum_addr)
-    return self.w3.toHex(contract_code_bytearr)
-
   def _check_is_token(self, bytecode):
     has_trasfer_method = re.search(r'' + self.standards['erc20']['transfer'], bytecode) != None
     return has_trasfer_method
@@ -61,6 +55,13 @@ class ContractMethods:
       if False not in methods:
         avail_standards.append(standard)
     return avail_standards
+
+  def _round_supply(self, supply, decimals):
+    if decimals > 1:
+      supply = supply / math.pow(10, decimals)
+      supply = Decimal(supply)
+      supply = round(supply)
+    return supply
 
   def _get_constants(self, address):
     contract_checksum_addr = self.w3.toChecksumAddress(address)
@@ -79,9 +80,7 @@ class ContractMethods:
       decimals = 1
     try:
       total_supply = contract_instance.functions.totalSupply().call()
-      total_supply = total_supply / math.pow(10, decimals)
-      total_supply = Decimal(total_supply)
-      total_supply = round(total_supply)
+      total_supply = self._round_supply(total_supply, decimals)
     except:
       total_supply = 0
     try:
