@@ -100,7 +100,7 @@ class ContractMethods:
       token_standards = self._check_standards(code)
       if len(token_standards) > 0:
         name, symbol, decimals, total_supply, owner = self._get_constants(contract['_source']['address'])
-        update_body = {'standards': token_standards, 'bytecode': code, 'token_name': name, 'token_symbol': symbol, 'decimals': decimals, 'total_supply': total_supply, 'owner': owner, 'is_token': True}
+        update_body = {'standards': token_standards, 'bytecode': code, 'token_name': name, 'token_symbol': symbol, 'decimals': decimals, 'total_supply': total_supply, 'token_owner': owner, 'is_token': True}
         self._update_contract_descr(contract['_id'], update_body)
       else:
         update_body = {'standards': ['None'], 'bytecode': code, 'is_token': True}
@@ -116,5 +116,5 @@ class ContractMethods:
     for tokens_chunk in self._iterate_non_standard():
       for token in tokens_chunk:
         name, symbol, decimals, total_supply, owner = self._get_constants(token['_source']['address'])
-        update_body = {'token_name': name, 'token_symbol': symbol, 'decimals': decimals, 'total_supply': total_supply, 'owner': owner}
+        update_body = {'token_name': name, 'token_symbol': symbol, 'decimals': decimals, 'total_supply': total_supply, 'token_owner': owner}
         self._update_contract_descr(token['_id'], update_body)
