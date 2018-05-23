@@ -32,7 +32,7 @@ class InputParsingTestCase():
 
   def test_get_uncached_contract_abi(self):
     try:
-      os.remove("/home/anatoli/.quickBlocks/cache/abis/" + TEST_CONTRACT_ADDRESS + ".json")
+      os.remove("/home/noomkcalb/.quickBlocks/cache/abis/" + TEST_CONTRACT_ADDRESS + ".json")
     except:
       pass
     response = _get_contracts_abi_sync({"uncached": TEST_CONTRACT_ADDRESS})
