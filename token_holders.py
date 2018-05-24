@@ -35,7 +35,6 @@ class TokenHolders:
     response = self.client.send_request('GET', [self.indices['contract'], 'contract', '_msearch'], body, {})
     results = response['responses']
     tokens = [result['hits']['hits'] for result in results if len(result['hits']['hits']) > 0]
-    print(len(tokens))
     return tokens
 
   def _get_listed_tokens(self):
