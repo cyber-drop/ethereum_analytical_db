@@ -9,7 +9,10 @@ from unittest.mock import MagicMock
 
 class InputParsingTestCase():
   def setUp(self):
-    self.contracts = self.contracts_class({"contract": TEST_CONTRACTS_INDEX, self.index: TEST_TRANSACTIONS_INDEX})
+    self.contracts = self.contracts_class(
+      {"contract": TEST_CONTRACTS_INDEX, self.index: TEST_TRANSACTIONS_INDEX},
+      parity_hosts=[(None, None, "http://localhost:8545")]
+    )
     self.client = TestElasticSearch()
     self.client.recreate_index(TEST_CONTRACTS_INDEX)
     self.client.recreate_fast_index(TEST_TRANSACTIONS_INDEX)
@@ -71,29 +74,37 @@ class InputParsingTestCase():
 
   def add_contracts_with_and_without_abi(self):
     for i in tqdm(range(10)):
-      self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS}, id=i + 1, refresh=True)
+      self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS, "blockNumber": i}, id=i + 1, refresh=True)
     for i in tqdm(range(10)):
-      self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS, 'abi': True}, id=i + 11, refresh=True)
+      self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS, "blockNumber": i, 'abi': True}, id=i + 11, refresh=True)
 
   def test_iterate_contracts_without_abi(self):
+    self.contracts = self.contracts_class(
+      {"contract": TEST_CONTRACTS_INDEX, self.index: TEST_TRANSACTIONS_INDEX},
+      parity_hosts=[(0, 8, "http://localhost:8545")]
+    )
     self.add_contracts_with_and_without_abi()
     contracts = [c for c in self.contracts._iterate_contracts_without_abi()]
     contracts = [c["_id"] for contracts_list in contracts for c in contracts_list]
-    self.assertCountEqual(contracts, [str(i) for i in range(1, 11)])
+    self.assertCountEqual(contracts, [str(i) for i in range(1, 9)])
 
   def test_save_contracts_abi(self):
     for i in tqdm(range(10)):
-      self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS}, id=i + 1, refresh=True)
+      self.client.index(TEST_CONTRACTS_INDEX, 'contract', {"blockNumber": i, 'address': TEST_CONTRACT_ADDRESS}, id=i + 1, refresh=True)
     self.contracts._save_contracts_abi()
     contracts = self.client.search(index=TEST_CONTRACTS_INDEX, doc_type='contract', query="abi:*", size=100)['hits']['hits']
     abis = [contract["_source"]["abi"] for contract in contracts]
     self.assertCountEqual(abis, [TEST_CONTRACT_ABI] * 10)
 
   def test_iterate_contracts_with_abi(self):
+    self.contracts = self.contracts_class(
+      {"contract": TEST_CONTRACTS_INDEX, self.index: TEST_TRANSACTIONS_INDEX},
+      parity_hosts=[(0, 8, "http://localhost:8545")]
+    )
     self.add_contracts_with_and_without_abi()
     contracts = [c for c in self.contracts._iterate_contracts_with_abi()]
     contracts = [c["_id"] for contracts_list in contracts for c in contracts_list]
-    self.assertCountEqual(contracts, [str(i) for i in range(11, 21)])
+    self.assertCountEqual(contracts, [str(i) for i in range(11, 19)])
 
   def test_iterate_transactions_by_targets(self):
     for i in tqdm(range(20)):
