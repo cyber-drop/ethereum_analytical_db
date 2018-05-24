@@ -50,6 +50,20 @@ class TokenHoldersTestCase(unittest.TestCase):
     self.assertCountEqual(['transfer', 'approve', 'transferFrom'], methods)
     self.assertCountEqual(['356245680000000000000', '356245680000000000000', '2266000000000000000000'], amounts)
   
+  def test_get_listed_tokens_txs(self):
+    for i, address in enumerate(TEST_TOKEN_ADDRESSES):
+      self.client.index(TEST_INDEX, 'contract', {'address': address, 'bytecode': TEST_BYTECODES[i]}, refresh=True)
+    for tx in TEST_TOKEN_TXS:
+      self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
+    self.contract_methods.search_methods()
+
+    self.token_holders.get_listed_tokens_txs()
+    all_descrptions = self.token_holders._iterate_tx_descriptions()
+    all_descrptions = [tx for txs_list in all_descrptions for tx in txs_list]
+    tokens = set([descr['_source']['token'] for descr in all_descrptions])
+    self.assertCountEqual(['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', '0xa74476443119a942de498590fe1f2454d7d4ac0d'], tokens)
+    assert len(all_descrptions) == 4
+    
   def test_run(self):
     for i, address in enumerate(TEST_TOKEN_ADDRESSES):
       self.client.index(TEST_INDEX, 'contract', {'address': address, 'bytecode': TEST_BYTECODES[i]}, refresh=True)
@@ -63,7 +77,6 @@ class TokenHoldersTestCase(unittest.TestCase):
     token = list(set([descr['_source']['token'] for descr in all_descrptions]))[0]
     assert token == '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'
     assert len(all_descrptions) == 2
-
 
 TEST_INDEX = 'test-ethereum-contracts'
 TEST_TX_INDEX = 'test-ethereum-txs'

@@ -139,6 +139,12 @@ class TokenHolders:
     for txs_chunk in self._iterate_token_txs(token_address):
       self._extract_descriptions_from_txs(txs_chunk) 
 
+  def get_listed_tokens_txs(self):
+    self._load_listed_tokens()
+    for tokens in self._iterate_tokens():
+      for token in tokens:
+        self._extract_token_txs(token['_source']['address'])
+
   def run(self, block):
     listed_tokens_addresses = self._get_listed_tokens_addresses()
     transfer_methods = ['transfer', 'transferFrom', 'approve']
