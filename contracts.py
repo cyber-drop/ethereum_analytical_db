@@ -21,9 +21,6 @@ def _get_contracts_abi_sync(addresses):
     file_path = GRAB_ABI_CACHE_PATH.format(os.environ["USER"], address)
     if not os.path.exists(file_path):
       os.system(GRAB_ABI_PATH.format(address))
-      for attemp in range(50):
-        if not os.path.exists(file_path):
-          sleep(0.1)
     if os.path.exists(file_path):
       abi_file = open(file_path)
       abis[key] = json.load(abi_file)
