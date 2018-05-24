@@ -12,7 +12,7 @@ class TokenHoldersTestCase(unittest.TestCase):
     self.client.recreate_index(TEST_LISTED_INDEX)
     self.client.recreate_index(TEST_TOKEN_TX_INDEX)
     self.token_holders = TokenHolders({'contract': TEST_INDEX, 'transaction': TEST_TX_INDEX, 'listed_token': TEST_LISTED_INDEX, 'token_tx': TEST_TOKEN_TX_INDEX})
-    self.contract_methods = ContractMethods({"contract": TEST_INDEX})
+    self.contract_methods = ContractMethods({"contract": TEST_INDEX}, ethereum_api_host='https://mainnet.infura.io/SuP0gwmZ0hYfutY70s6V')
   
   def test_get_listed_tokens(self):
     for address in TEST_TOKEN_ADDRESSES:
