@@ -1,7 +1,4 @@
 import os
-from subprocess import call
-import pdb
-from time import sleep
 from custom_elastic_search import CustomElasticSearch
 import json
 from ethereum.abi import (
@@ -10,6 +7,7 @@ from ethereum.abi import (
     method_id as get_abi_method_id)
 from ethereum.utils import encode_int, zpad, decode_hex
 from multiprocessing import Pool
+from config import PARITY_HOSTS
 
 GRAB_ABI_PATH = "/usr/local/qblocks/bin/grabABI {}"
 GRAB_ABI_CACHE_PATH = "/home/{}/.quickBlocks/cache/abis/{}.json"
@@ -31,10 +29,11 @@ def _get_contracts_abi_sync(addresses):
 class Contracts():
   _contracts_abi = []
 
-  def __init__(self, indices, host="http://localhost:9200"):
+  def __init__(self, indices, host="http://localhost:9200", parity_hosts=PARITY_HOSTS):
     self.indices = indices
     self.client = CustomElasticSearch(host)
     self.pool = Pool(processes=NUMBER_OF_PROCESSES)
+    self.parity_hosts = parity_hosts
 
   def _set_contracts_abi(self, abis):
     self._contracts_abi = abis
@@ -76,9 +75,15 @@ class Contracts():
 
   def _decode_inputs_batch(self, encoded_params):
     return [self._decode_input(contract, call_data) for contract, call_data in encoded_params]
-      
+
+
+  def _get_range_query(self):
+    ranges = [range_tuple[0:2] for range_tuple in self.parity_hosts]
+    range_query = self.client.make_range_query("blockNumber", *ranges)
+    return range_query
+
   def _iterate_contracts_without_abi(self):
-    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(_exists_:abi)')
+    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(_exists_:abi) AND ' + self._get_range_query())
 
   def _save_contracts_abi(self):
     for contracts in self._iterate_contracts_without_abi():
@@ -87,7 +92,7 @@ class Contracts():
       self.client.bulk(operations, doc_type='contract', index=self.indices["contract"], refresh=True)
 
   def _iterate_contracts_with_abi(self):
-    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND _exists_:abi')
+    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND _exists_:abi AND ' + self._get_range_query())
 
   def _iterate_transactions_by_targets(self, targets):
     query = {
@@ -110,7 +115,6 @@ class Contracts():
     for contracts in self._iterate_contracts_with_abi():
       self._set_contracts_abi({contract["_source"]["address"]: contract["_source"]["abi"] for contract in contracts})
       self._decode_inputs_for_contracts(contracts)
-
 
 class ExternalContracts(Contracts):
   doc_type = "tx"
