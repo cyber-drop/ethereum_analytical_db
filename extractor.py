@@ -5,6 +5,7 @@ from contract_transactions import InternalContractTransactions, ExternalContract
 from internal_transactions import InternalTransactions
 from contracts import InternalContracts, ExternalContracts
 from contract_methods import ContractMethods
+from token_holders import TokenHolders
 from config import INDICES
 
 def prepare_indices(host):
@@ -36,6 +37,10 @@ def parse_internal_inputs(host):
   internal_transactions = InternalContracts(INDICES, host)
   internal_transactions.decode_inputs()
 
+def extract_tokens_txs(host):
+  token_holders = TokenHolders(INDICES, host)
+  token_holders.get_listed_tokens_txs()
+
 operations = {
   "prepare-indices": prepare_indices,
   "detect-contracts": detect_contracts,
@@ -43,7 +48,8 @@ operations = {
   "extract-traces": extract_traces,
   "parse-inputs": parse_inputs,
   "parse-internal-inputs": parse_internal_inputs,
-  "search-methods": search_methods
+  "search-methods": search_methods,
+  "extract-tokens-txs": extract_tokens_txs
 }
 
 @click.command()
