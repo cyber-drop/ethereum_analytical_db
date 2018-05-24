@@ -15,8 +15,8 @@ class TokenHoldersTestCase(unittest.TestCase):
     self.contract_methods = ContractMethods({"contract": TEST_INDEX}, ethereum_api_host='https://mainnet.infura.io/SuP0gwmZ0hYfutY70s6V')
   
   def test_get_listed_tokens(self):
-    for address in TEST_TOKEN_ADDRESSES:
-      self.client.index(TEST_INDEX, 'contract', {'address': address}, refresh=True)
+    for i, address in enumerate(TEST_TOKEN_ADDRESSES):
+      self.client.index(TEST_INDEX, 'contract', {'address': address, 'bytecode': TEST_BYTECODES[i]}, refresh=True)
     self.contract_methods.search_methods()
 
     listed_tokens = self.token_holders._get_listed_tokens()
@@ -25,8 +25,8 @@ class TokenHoldersTestCase(unittest.TestCase):
     self.assertCountEqual(['Aeternity', 'Populous Platform', 'Golem Network Token'], listed_tokens)
   
   def test_search_duplicates(self):
-    for address in TEST_TOKEN_ADDRESSES:
-      self.client.index(TEST_INDEX, 'contract', {'address': address}, refresh=True)
+    for i, address in enumerate(TEST_TOKEN_ADDRESSES):
+      self.client.index(TEST_INDEX, 'contract', {'address': address, 'bytecode': TEST_BYTECODES[i]}, refresh=True)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
     self.contract_methods.search_methods()
