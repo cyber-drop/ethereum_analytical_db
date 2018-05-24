@@ -93,6 +93,13 @@ class TokenHolders:
   def _iterate_tokens(self):
     return self.client.iterate(self.indices['listed_token'], 'token', 'token_name:*')
 
+  def _get_listed_tokens_addresses(self):
+    addresses = []
+    for tokens in self._iterate_tokens():
+      for token in tokens:
+        addresses.append(token['_source']['address'])
+    return addresses
+
   def _load_listed_tokens(self):
     listed_tokens = self._search_duplicates()
     self._insert_multiple_docs(listed_tokens, 'token', self.indices['listed_token'])
@@ -129,10 +136,15 @@ class TokenHolders:
 
   def _extract_token_txs(self, token_address):
     for txs_chunk in self._iterate_token_txs(token_address):
-      self._extract_descriptions_from_txs(txs_chunk)
+      self._extract_descriptions_from_txs(txs_chunk) 
 
-  def get_listed_token_txs(self):
-    self._load_listed_tokens()
-    for tokens in self._iterate_tokens():
-      for token in tokens:
-        self._extract_token_txs(token['_source']['address'])  
+  def run(self, block):
+    listed_tokens_addresses = self._get_listed_tokens_addresses()
+    transfer_methods = ['transfer', 'transferFrom', 'approve']
+    transfers = []
+    for tx in block['transactions']:
+      if tx['to'] in listed_tokens_addresses and tx['decoded_input']['name'] in transfer_methods:
+        tx_descr = self._construct_tx_descr_from_input(tx)
+        transfers.append(tx_descr)
+    self._insert_multiple_docs(transfers, 'tx', self.indices['token_tx'])
+
