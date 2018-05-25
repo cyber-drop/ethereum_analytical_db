@@ -50,7 +50,8 @@ class TokenHolders:
         }
       }
     }
-    res = self.client.send_request('GET', [self.indices['transaction'], 'tx', '_count'], count_body, {})
+    res = requests.get('http://localhost:9200/' + self.indices['transaction'] + '/tx/_count', json=count_body)
+    res = res.json()
     txs_count = res['count']
     return txs_count
 
@@ -139,7 +140,6 @@ class TokenHolders:
       self._extract_descriptions_from_txs(txs_chunk) 
 
   def get_listed_tokens_txs(self):
-    self._load_listed_tokens()
     for tokens in self._iterate_tokens():
       for token in tokens:
         self._extract_token_txs(token['_source']['address'])
