@@ -10,7 +10,7 @@ class TokenHolders:
     self.indices = elasticsearch_indices
     self.client = CustomElasticSearch(elasticsearch_host)
     self.w3 = Web3(HTTPProvider(ethereum_api_host))
-
+    self.transfer_signatures = ['23b872dd', 'a9059cbb', '095ea7b3']
   def _get_cmc_tokens_list(self):
     response = requests.get('https://api.coinmarketcap.com/v2/listings/')
     return response.json()['data']
@@ -94,22 +94,12 @@ class TokenHolders:
   def _iterate_tokens(self):
     return self.client.iterate(self.indices['listed_token'], 'token', 'token_name:*')
 
-  def _get_listed_tokens_addresses(self):
-    addresses = []
-    for tokens in self._iterate_tokens():
-      for token in tokens:
-        addresses.append(token['_source']['address'])
-    return addresses
-
   def _load_listed_tokens(self):
     listed_tokens = self._search_duplicates()
     self._insert_multiple_docs(listed_tokens, 'token', self.indices['listed_token'])
 
-  def _iterate_token_txs(self, token_addr):
-    return self.client.iterate(self.indices['transaction'], 'tx', 'to:' + token_addr)
-
-  def _iterate_token_tx_descriptions(self, token_address):
-    return self.client.iterate(self.indices['token_tx'], 'tx', 'token:' + token_addr)
+  def _iterate_token_txs(self, token_address):
+    return self.client.iterate(self.indices['transaction'], 'tx', 'to:' + token_address)
 
   def _construct_tx_descr_from_input(self, tx):
     tx_input = tx['decoded_input']
@@ -122,11 +112,45 @@ class TokenHolders:
     else:
       return {'method': 'unknown', 'txHash': tx['hash']}
 
+  def _parse_transfer_tx_input(input_string):
+    mathod = input_string[2:10]
+    params = input_string[10:]
+    first_param = params[:64]
+    #first_param = '0x' + first_param[24:]
+    sec_param = params[64:128]
+    if method == '23b872dd':
+      third_param = params[128:]
+    else:
+      third_param = ''
+    #sec_param = int(sec_param, 16) / math.pow(10, 18)
+    return (first_param, sec_param, third_param)
+
+  def _construct_tx_descr_from_raw_input(self, tx):
+    if tx['input'][2:10] == '23b872dd':
+      from_, to, value = self._parse_transfer_tx_input(tx['input'])
+      return {'method': 'transferFrom', 'from': from_, 'to': to, 'value': value, 'block_id': tx['blockNumber'], 'token': tx['to'], 'tx_index': self.indices['transaction']}
+    else if tx['input'][2:10] == 'a9059cbb':
+      to, value = self._parse_transfer_tx_input(tx['input'])
+      return {'method': 'transfer', 'from': tx['from'], 'to': to, 'value': value,'block_id': tx['blockNumber'], 'token': tx['to'], 'tx_index': self.indices['transaction']}
+    else if tx['input'][2:10] == '095ea7b3':
+      spender, value = self._parse_transfer_tx_input(tx['input'])
+      return {'method': 'approve', 'from': tx['from'], 'spender': spender, 'value': value,'block_id': tx['blockNumber'], 'token': tx['to'], 'tx_index': self.indices['transaction']}
+    else:
+      return {'method': 'unknown', 'txHash': tx['hash']}
+
+
+  def _check_tx_input(self, tx):
+    if 'decoded_input' in tx['_source'].keys():
+      return self._construct_tx_descr_from_input(tx['_source'])
+    else if tx['_source']['input'][2:10] in self.transfer_signatures:
+      return self._construct_tx_descr_from_raw_input(tx['_source'])
+
   def _extract_descriptions_from_txs(self, txs):
     txs_info = []
     for tx in txs:
-      tx_descr = self._construct_tx_descr_from_input(tx['_source'])
-      txs_info.append(tx_descr)
+      tx_descr = self._check_tx_input(tx)
+      if tx_descr != None:
+        txs_info.append(tx_descr)
     self._insert_multiple_docs(txs_info, 'tx', self.indices['token_tx'])
 
   def _iterate_token_tx_descriptions(self, token_address):
@@ -140,9 +164,17 @@ class TokenHolders:
       self._extract_descriptions_from_txs(txs_chunk) 
 
   def get_listed_tokens_txs(self):
+    self._load_listed_tokens()
     for tokens in self._iterate_tokens():
       for token in tokens:
         self._extract_token_txs(token['_source']['address'])
+
+  def _get_listed_tokens_addresses(self):
+    addresses = []
+    for tokens in self._iterate_tokens():
+      for token in tokens:
+        addresses.append(token['_source']['address'])
+    return addresses
 
   def run(self, block):
     listed_tokens_addresses = self._get_listed_tokens_addresses()

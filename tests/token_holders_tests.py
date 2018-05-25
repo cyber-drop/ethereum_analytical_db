@@ -28,10 +28,12 @@ class TokenHoldersTestCase(unittest.TestCase):
 
     listed_tokens = self.token_holders._search_duplicates()
     duplicated = [token for token in listed_tokens if token['duplicated'] == True]
+    print(duplicated)
     real_golem = [token for token in duplicated if token['token_name'] == 'Golem Network Token'][0]
     real_aeternity = [token for token in duplicated if token['token_name'] == 'Aeternity'][0]
     assert real_golem['address'] == '0xa74476443119a942de498590fe1f2454d7d4ac0d'
     assert real_aeternity['address'] == '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'
+    assert real_aeternity['txs_count'] == 3
   
   def test_extract_token_txs(self):
     for tx in TEST_TOKEN_TXS:
@@ -50,8 +52,6 @@ class TokenHoldersTestCase(unittest.TestCase):
       self.client.index(TEST_INDEX, 'contract', {'address': address, 'token_name': TEST_TOKEN_NAMES[i]}, refresh=True)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
-    
-    self.token_holders._load_listed_tokens()
 
     self.token_holders.get_listed_tokens_txs()
     all_descrptions = self.token_holders._iterate_tx_descriptions()
