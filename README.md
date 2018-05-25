@@ -20,7 +20,11 @@ Starts input parsing. Each transaction highlighted with 'to_contract' flag will 
 
 - search-methods
 
-Downloads contract bytecode and check does it contain signatures of token standards-specific methods. The list of standards then stored in 'standards' field. It also saves contract bytecode in 'bytecode' field.  
+Downloads contract bytecode and check does it contain signatures of token standards-specific methods. The list of standards then stored in 'standards' field. It also saves contract bytecode in 'bytecode' field. 
+
+- extract-tokens-txs
+
+Downloads list of tokens from Coinmarketcap API and tries to find contracts with corresponding names in ES and then saves matching contracts into separate index. After finishing this process finds all transactions that have 'to' field equal to token contract address and also saves these transaction to separate index.
 
 ## Operations speed
 

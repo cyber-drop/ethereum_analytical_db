@@ -31,6 +31,8 @@ curl -X DELETE localhost:9200/ethereum-contract
     telegram-send "Inputs parsed"
     python3 ./extractor.py --operation parse-internal-inputs
     telegram-send "Internal inputs parsed"
+    python3 ./extractor.py --operation extract-tokens-txs
+    telegram-send "Tokens transactions extracted"
 
     telegram-send "Everything is done"
 ) 2>&1 | telegram-send --stdin
