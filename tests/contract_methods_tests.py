@@ -6,7 +6,7 @@ class ContractMethodsTestCase(unittest.TestCase):
   def setUp(self):
     self.client = TestElasticSearch()
     self.client.recreate_index(TEST_INDEX)
-    self.contract_methods = ContractMethods({"contract": TEST_INDEX}, ethereum_api_host='https://mainnet.infura.io/SuP0gwmZ0hYfutY70s6V')
+    self.contract_methods = ContractMethods({"contract": TEST_INDEX})
 
   def test_iterate_non_standard(self):
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[0], 'bytecode': TEST_BYTECODES[0]}, id=1, refresh=True)
