@@ -43,8 +43,8 @@ class TokenHoldersTestCase(unittest.TestCase):
     token_txs = self.token_holders._iterate_token_tx_descriptions('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d')
     token_txs = [tx for txs_list in token_txs for tx in txs_list]
     methods = [tx['_source']['method'] for tx in token_txs]
-    amounts = [tx['_source']['value'] for tx in token_txs if tx['_source']['method'] != 'unknown'] 
-    self.assertCountEqual(['transfer', 'approve', 'transferFrom', 'unknown'], methods)
+    amounts = [tx['_source']['value'] for tx in token_txs] 
+    self.assertCountEqual(['transfer', 'approve', 'transferFrom'], methods)
     self.assertCountEqual(['356245680000000000000', '356245680000000000000', '2266000000000000000000'], amounts)
   
   def test_get_listed_tokens_txs(self):
@@ -58,7 +58,7 @@ class TokenHoldersTestCase(unittest.TestCase):
     all_descrptions = [tx for txs_list in all_descrptions for tx in txs_list]
     tokens = set([descr['_source']['token'] for descr in all_descrptions])
     self.assertCountEqual(['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', '0xa74476443119a942de498590fe1f2454d7d4ac0d'], tokens)
-    assert len(all_descrptions) == 5
+    assert len(all_descrptions) == 4
   
   def test_run(self):
     for i, address in enumerate(TEST_TOKEN_ADDRESSES):

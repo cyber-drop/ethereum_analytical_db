@@ -110,16 +110,13 @@ class TokenHolders:
     elif tx_input['name'] == 'approve':
       return {'method': tx_input['name'], 'from': tx['from'], 'spender': tx_input['params'][0]['value'], 'value': tx_input['params'][1]['value'],'block_id': tx['blockNumber'], 'token': tx['to'], 'tx_index': self.indices['transaction']}
     else:
-      return {'method': 'unknown', 'txHash': tx['hash'], 'token': tx['to']}
-
-  def _tx_without_decoded_input(self, tx):
-    return {'method': 'unknown', 'txHash': tx['hash'], 'token': tx['to']}
+      return
 
   def _check_tx_input(self, tx):
     if 'decoded_input' in tx['_source'].keys():
       return self._construct_tx_descr_from_input(tx['_source'])
     else:
-      return self._tx_without_decoded_input(tx['_source'])
+      return
 
   def _extract_descriptions_from_txs(self, txs):
     txs_info = []
