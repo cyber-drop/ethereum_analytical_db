@@ -10,7 +10,7 @@ class TokenHolders:
     self.indices = elasticsearch_indices
     self.client = CustomElasticSearch(elasticsearch_host)
     self.w3 = Web3(HTTPProvider(ethereum_api_host))
-    self.transfer_signatures = ['23b872dd', 'a9059cbb', '095ea7b3']
+
   def _get_cmc_tokens_list(self):
     response = requests.get('https://api.coinmarketcap.com/v2/listings/')
     return response.json()['data']
