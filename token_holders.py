@@ -110,40 +110,16 @@ class TokenHolders:
     elif tx_input['name'] == 'approve':
       return {'method': tx_input['name'], 'from': tx['from'], 'spender': tx_input['params'][0]['value'], 'value': tx_input['params'][1]['value'],'block_id': tx['blockNumber'], 'token': tx['to'], 'tx_index': self.indices['transaction']}
     else:
-      return {'method': 'unknown', 'txHash': tx['hash']}
+      return {'method': 'unknown', 'txHash': tx['hash'], 'token': tx['to']}
 
-  def _parse_transfer_tx_input(input_string):
-    mathod = input_string[2:10]
-    params = input_string[10:]
-    first_param = params[:64]
-    #first_param = '0x' + first_param[24:]
-    sec_param = params[64:128]
-    if method == '23b872dd':
-      third_param = params[128:]
-    else:
-      third_param = ''
-    #sec_param = int(sec_param, 16) / math.pow(10, 18)
-    return (first_param, sec_param, third_param)
-
-  def _construct_tx_descr_from_raw_input(self, tx):
-    if tx['input'][2:10] == '23b872dd':
-      from_, to, value = self._parse_transfer_tx_input(tx['input'])
-      return {'method': 'transferFrom', 'from': from_, 'to': to, 'value': value, 'block_id': tx['blockNumber'], 'token': tx['to'], 'tx_index': self.indices['transaction']}
-    else if tx['input'][2:10] == 'a9059cbb':
-      to, value = self._parse_transfer_tx_input(tx['input'])
-      return {'method': 'transfer', 'from': tx['from'], 'to': to, 'value': value,'block_id': tx['blockNumber'], 'token': tx['to'], 'tx_index': self.indices['transaction']}
-    else if tx['input'][2:10] == '095ea7b3':
-      spender, value = self._parse_transfer_tx_input(tx['input'])
-      return {'method': 'approve', 'from': tx['from'], 'spender': spender, 'value': value,'block_id': tx['blockNumber'], 'token': tx['to'], 'tx_index': self.indices['transaction']}
-    else:
-      return {'method': 'unknown', 'txHash': tx['hash']}
-
+  def _tx_without_decoded_input(self, tx):
+    return {'method': 'unknown', 'txHash': tx['hash'], 'token': tx['to']}
 
   def _check_tx_input(self, tx):
     if 'decoded_input' in tx['_source'].keys():
       return self._construct_tx_descr_from_input(tx['_source'])
-    else if tx['_source']['input'][2:10] in self.transfer_signatures:
-      return self._construct_tx_descr_from_raw_input(tx['_source'])
+    else:
+      return self._tx_without_decoded_input(tx['_source'])
 
   def _extract_descriptions_from_txs(self, txs):
     txs_info = []
