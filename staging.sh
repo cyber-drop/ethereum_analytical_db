@@ -1,38 +1,38 @@
-telegram-send "Staging started"
+echo "Staging started"
 cd /home/$USER/core
-pkill -9 extractor.py
-pkill -9 ethdrain.py
 
-curl -X DELETE localhost:9200/ethereum-transaction
-curl -X DELETE localhost:9200/ethereum-internal-transaction
-curl -X DELETE localhost:9200/ethereum-block
-curl -X DELETE localhost:9200/ethereum-contract
+curl -X DELETE localhost:9200/ethereum-transaction?pretty
+curl -X DELETE localhost:9200/ethereum-internal-transaction?pretty
+curl -X DELETE localhost:9200/ethereum-block?pretty
+curl -X DELETE localhost:9200/ethereum-contract?pretty
+curl -X DELETE localhost:9200/ethereum-listed-token?pretty
+curl -X DELETE localhost:9200/ethereum-token-transaction?pretty
 
 (
     python3 ./extractor.py --operation prepare-indices
-    telegram-send "Indices prepared"
+    echo "Indices prepared"
 
     cd ./ethdrain
-    python3 ./ethdrain.py -s 5000000 -e 5005000 -o elasticsearch -r http://localhost:8550
+    python3 ./ethdrain.py -s 5010000 -e 5020000 -o elasticsearch -r http://localhost:8545
     cd ../
-    telegram-send "Transactions extracted"
+    echo "Transactions extracted"
 
     python3 ./extractor.py --operation detect-contracts
-    telegram-send "Contracts detected"
+    echo "Contracts detected"
     python3 ./extractor.py --operation extract-traces
-    telegram-send "Traces extracted"
+    echo "Traces extracted"
     python3 ./extractor.py --operation detect-internal-contracts
-    telegram-send "Internal contracts detected"
+    echo "Internal contracts detected"
     python3 ./extractor.py --operation extract-traces
-    telegram-send "Traces re-extracted"
+    echo "Traces re-extracted"
     python3 ./extractor.py --operation search-methods
-    telegram-send "Contracts info added"
+    echo "Contracts info added"
     python3 ./extractor.py --operation parse-inputs
-    telegram-send "Inputs parsed"
+    echo "Inputs parsed"
     python3 ./extractor.py --operation parse-internal-inputs
-    telegram-send "Internal inputs parsed"
+    echo "Internal inputs parsed"
     python3 ./extractor.py --operation extract-tokens-txs
-    telegram-send "Tokens transactions extracted"
-
-    telegram-send "Everything is done"
-) 2>&1 | telegram-send --stdin
+    echo "Tokens transactions extracted"
+)
+telegram-send "Staging is completed, see tmux a -t staging"
+telegram-send "Spoiler: everything is on fire"
