@@ -6,10 +6,9 @@ import json
 from pyelasticsearch import bulk_chunks
 
 class TokenHolders:
-  def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200", ethereum_api_host="http://localhost:8545"):
+  def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200"):
     self.indices = elasticsearch_indices
     self.client = CustomElasticSearch(elasticsearch_host)
-    self.w3 = Web3(HTTPProvider(ethereum_api_host))
 
   def _get_cmc_tokens_list(self):
     response = requests.get('https://api.coinmarketcap.com/v2/listings/')

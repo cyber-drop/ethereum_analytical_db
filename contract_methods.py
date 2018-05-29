@@ -1,7 +1,7 @@
 import re
 from web3 import Web3, HTTPProvider
 from custom_elastic_search import CustomElasticSearch
-from config import INDICES
+from config import INDICES, PARITY_HOSTS
 import json
 import math
 from decimal import Decimal
@@ -10,10 +10,10 @@ with open('standard-token-abi.json') as json_file:
   standard_token_abi = json.load(json_file)
 
 class ContractMethods:
-  def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200", ethereum_api_host="http://localhost:8545"):
+  def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200", parity_hosts=PARITY_HOSTS):
     self.indices = elasticsearch_indices
     self.client = CustomElasticSearch(elasticsearch_host)
-    self.w3 = Web3(HTTPProvider(ethereum_api_host))
+    self.w3 = Web3(HTTPProvider(parity_hosts[0][2]))
     self.standard_token_abi = standard_token_abi
     self.standards = self._extract_methods_signatures()
 
