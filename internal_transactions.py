@@ -134,6 +134,9 @@ class InternalTransactions:
     for transaction in trace:
       transaction["blockNumber"] = block
 
+  def _remove_transactions_from_trace(self, trace):
+    return [transaction for transaction in trace if not transaction["hash"].endswith(".0")]
+
   def _save_traces(self, blocks):
     transactions_query = {
       "terms": {
@@ -164,10 +167,11 @@ class InternalTransactions:
     blocks_traces = self._get_traces(blocks)
     for block, trace in blocks_traces.items():
       self._set_trace_hashes(trace)
+      filtered_trace = self._remove_transactions_from_trace(trace)
       self._set_block_number(trace, block)
       for transactions in self._iterate_transactions(block):
-        self._classify_trace(transactions, trace)
-      self._save_internal_transactions(trace)
+        self._classify_trace(transactions, filtered_trace)
+      self._save_internal_transactions(filtered_trace)
       self._save_miner_transactions(trace)
     self._save_traces(blocks)
 
