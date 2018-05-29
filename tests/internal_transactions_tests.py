@@ -41,15 +41,13 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.assertCountEqual(blocks, [1, 2, 5])
 
   def test_iterate_transactions(self):
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': False, 'blockNumber': 1}, id=1, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': True, 'trace': {'test': 1}, 'blockNumber': 2}, id=2, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': True, 'blockNumber': 1}, id=3, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': True, 'blockNumber': 3}, id=4, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'to_contract': True, 'blockNumber': 1}, id=5, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 1}, id=1, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 3}, id=2, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'blockNumber': 1}, id=3, refresh=True)
     iterator = self.internal_transactions._iterate_transactions(1)
     transactions = next(iterator)
     transactions = [transaction["_id"] for transaction in transactions]
-    self.assertCountEqual(transactions, ['3'])
+    self.assertCountEqual(transactions, ['1'])
 
   def test_iterate_transactions_with_big_number_of_blocks(self):
     iterator = self.internal_transactions._iterate_transactions(list(range(1000)))
@@ -280,6 +278,12 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert "class" not in trace[0].keys()
     assert "class" in trace[1].keys()
 
+  def test_set_block_number(self):
+    trace = [{}, {}, {}]
+    self.internal_transactions._set_block_number(trace, 123)
+    for transaction in trace:
+      assert transaction["blockNumber"] == 123
+
   def test_save_traces(self):
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {"blockNumber": 123}, id=1, refresh=True)
     self.internal_transactions._save_traces([123])
@@ -377,6 +381,28 @@ class InternalTransactionsTestCase(unittest.TestCase):
       calls += [call.save_transactions(trace), call.save_rewards(trace)]
     calls.append(call.save_traces(test_blocks))
     process.assert_has_calls(calls)
+
+  def test_extract_traces_chunk_set_block_number(self):
+    test_block = 123
+    test_trace = [{}]
+    self.internal_transactions._get_traces = MagicMock(return_value={test_block: test_trace})
+    self.internal_transactions._iterate_transactions = MagicMock(return_value=[])
+    self.internal_transactions._save_internal_transactions = MagicMock()
+    self.internal_transactions._save_miner_transactions = MagicMock()
+    self.internal_transactions._set_block_number = MagicMock()
+    self.internal_transactions._set_trace_hashes = MagicMock()
+    self.internal_transactions._save_traces = MagicMock()
+
+    process = Mock(
+      set_block=self.internal_transactions._set_block_number,
+      save_transactions=self.internal_transactions._save_internal_transactions
+    )
+
+    self.internal_transactions._extract_traces_chunk([test_block])
+
+    calls = [call.set_block(test_trace, test_block), call.save_transactions(test_trace)]
+    process.assert_has_calls(calls)
+    pass
 
   def test_extract_traces(self):
     test_blocks = list(range(10))

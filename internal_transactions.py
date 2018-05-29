@@ -88,7 +88,7 @@ class InternalTransactions:
     return blocks
 
   def _iterate_transactions(self, block):
-    return self.client.iterate(self.indices["transaction"], 'tx', "to_contract:true AND blockNumber:" + str(block))
+    return self.client.iterate(self.indices["transaction"], 'tx', "blockNumber:" + str(block))
 
   def _get_traces(self, blocks):    
     chunks = self._split_on_chunks(blocks, NUMBER_OF_PROCESSES)
@@ -130,6 +130,10 @@ class InternalTransactions:
       else:
         internal_transaction["class"] = OTHER_TRANSACTION
 
+  def _set_block_number(self, trace, block):
+    for transaction in trace:
+      transaction["blockNumber"] = block
+
   def _save_traces(self, blocks):
     transactions_query = {
       "terms": {
@@ -160,6 +164,7 @@ class InternalTransactions:
     blocks_traces = self._get_traces(blocks)
     for block, trace in blocks_traces.items():
       self._set_trace_hashes(trace)
+      self._set_block_number(trace, block)
       for transactions in self._iterate_transactions(block):
         self._classify_trace(transactions, trace)
       self._save_internal_transactions(trace)
