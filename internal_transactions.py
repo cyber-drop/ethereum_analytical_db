@@ -87,26 +87,8 @@ class InternalTransactions:
     blocks = [bucket["key"] for bucket in result["aggregations"]["blocks"]["buckets"]]
     return blocks
 
-  def _iterate_transactions(self, blocks):
-    transactions_query = {
-      "bool": {
-        "must": [
-          {"term": {"to_contract": True}},
-          {
-            "bool": {
-              "must_not": {
-                "exists": {
-                  "field": "trace"
-                }
-              }
-            }
-          },
-          {"terms": {"blockNumber": blocks}}
-        ]
-      }
-    }
-
-    return self.client.iterate(self.indices["transaction"], 'tx', transactions_query)
+  def _iterate_transactions(self, block):
+    return self.client.iterate(self.indices["transaction"], 'tx', "to_contract:true AND blockNumber:" + str(block))
 
   def _get_traces(self, blocks):    
     chunks = self._split_on_chunks(blocks, NUMBER_OF_PROCESSES)
@@ -128,13 +110,13 @@ class InternalTransactions:
 
   def _classify_trace(self, transactions, trace):
     transactions_dict = {
-      transaction["hash"]: transaction for transaction in transactions
+      transaction["_id"]: transaction for transaction in transactions
     }
     for internal_transaction in trace:
       transaction_hash = internal_transaction["transactionHash"]
       if not transaction_hash or (transaction_hash not in transactions_dict.keys()):
         continue
-      transaction = transactions_dict[transaction_hash]
+      transaction = transactions_dict[transaction_hash]["_source"]
       action = internal_transaction["action"]
       if ("from" not in action.keys()) or ("to" not in action.keys()):
         internal_transaction["class"] = OTHER_TRANSACTION
@@ -148,10 +130,10 @@ class InternalTransactions:
       else:
         internal_transaction["class"] = OTHER_TRANSACTION
 
-  def _save_traces(self, transactions):
+  def _save_traces(self, blocks):
     transactions_query = {
-      "ids": {
-        "values": transactions
+      "terms": {
+        "blockNumber": blocks
       }
     }
     self.client.update_by_query(self.indices["transaction"], 'tx', transactions_query, 'ctx._source.trace = true')
@@ -176,13 +158,13 @@ class InternalTransactions:
 
   def _extract_traces_chunk(self, blocks):
     blocks_traces = self._get_traces(blocks)
-    for transactions in self._iterate_transactions(blocks):
-      self._classify_trace(blocks_traces, transactions)
     for block, trace in blocks_traces.items():
       self._set_trace_hashes(trace)
+      for transactions in self._iterate_transactions(block):
+        self._classify_trace(transactions, trace)
       self._save_internal_transactions(trace)
       self._save_miner_transactions(trace)
-    self._save_traces(set([transaction["transactionHash"] for trace in blocks_traces.values() for transaction in trace]))
+    self._save_traces(blocks)
 
   def extract_traces(self):
     blocks_chunks = list(self._split_on_chunks(self._iterate_blocks(), NUMBER_OF_JOBS))
