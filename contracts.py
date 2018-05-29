@@ -9,7 +9,7 @@ from ethereum.utils import encode_int, zpad, decode_hex
 from multiprocessing import Pool
 from config import PARITY_HOSTS
 
-GRAB_ABI_PATH = "/usr/local/qblocks/bin/grabABI {}"
+GRAB_ABI_PATH = "/usr/local/qblocks/bin/grabABI {} > /dev/null 2>&1"
 GRAB_ABI_CACHE_PATH = "/home/{}/.quickBlocks/cache/abis/{}.json"
 NUMBER_OF_PROCESSES = 10
 
