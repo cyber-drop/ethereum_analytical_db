@@ -28,7 +28,6 @@ class ContractMethodsTestCase(unittest.TestCase):
 
   def test_get_constants(self):
     constants = self.contract_methods._get_constants('0xd26114cd6EE289AccF82350c8d8487fedB8A0C07')
-    print(constants)
     self.assertCountEqual(('OMGToken', 'OMG', '140245398', 18, '0x000000000000000000000000000000000000dEaD'), constants)
 
   def test_search_methods(self):
