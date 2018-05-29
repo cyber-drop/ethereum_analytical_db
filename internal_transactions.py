@@ -159,7 +159,8 @@ class InternalTransactions:
         if transaction["transactionHash"] and not (transaction["hash"].endswith(".0"))
       ]
     if docs:
-        self.client.bulk_index(docs=docs, index=self.indices["internal_transaction"], doc_type="itx", id_field="hash", refresh=True)
+      for docs_chunk in tqdm(self._split_on_chunks(docs, NUMBER_OF_JOBS)):
+        self.client.bulk_index(docs=docs_chunk, index=self.indices["internal_transaction"], doc_type="itx", id_field="hash", refresh=True)
 
   def _save_miner_transactions(self, blocks_traces):
     docs = []

@@ -88,7 +88,7 @@ class Contracts():
   def _save_contracts_abi(self):
     for contracts in self._iterate_contracts_without_abi():
       abis = self._get_contracts_abi([contract["_source"]["address"] for contract in contracts])
-      operations = [self.client.update_op(doc={'abi': abis[index]}, id=contract["_id"]) for index, contract in enumerate(contracts)]
+      operations = [self.client.update_op(doc={'abi': abis[index], 'abi_extracted': True}, id=contract["_id"]) for index, contract in enumerate(contracts)]
       self.client.bulk(operations, doc_type='contract', index=self.indices["contract"], refresh=True)
 
   def _iterate_contracts_with_abi(self):
