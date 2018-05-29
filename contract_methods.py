@@ -81,6 +81,7 @@ class ContractMethods:
     try:
       total_supply = contract_instance.functions.totalSupply().call()
       total_supply = self._round_supply(total_supply, decimals)
+      total_supply = str(total_supply)
     except:
       total_supply = 0
     try:

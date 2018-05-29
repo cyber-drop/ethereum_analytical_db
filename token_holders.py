@@ -50,7 +50,8 @@ class TokenHolders:
         }
       }
     }
-    res = self.client.send_request('GET', [self.indices['transaction'], 'tx', '_count'], count_body, {})
+    res = requests.get('http://localhost:9200/' + self.indices['transaction'] + '/tx/_count', json=count_body)
+    res = res.json()
     txs_count = res['count']
     return txs_count
 
@@ -93,22 +94,12 @@ class TokenHolders:
   def _iterate_tokens(self):
     return self.client.iterate(self.indices['listed_token'], 'token', 'token_name:*')
 
-  def _get_listed_tokens_addresses(self):
-    addresses = []
-    for tokens in self._iterate_tokens():
-      for token in tokens:
-        addresses.append(token['_source']['address'])
-    return addresses
-
   def _load_listed_tokens(self):
     listed_tokens = self._search_duplicates()
     self._insert_multiple_docs(listed_tokens, 'token', self.indices['listed_token'])
 
-  def _iterate_token_txs(self, token_addr):
-    return self.client.iterate(self.indices['transaction'], 'tx', 'to:' + token_addr)
-
-  def _iterate_token_tx_descriptions(self, token_address):
-    return self.client.iterate(self.indices['token_tx'], 'tx', 'token:' + token_addr)
+  def _iterate_token_txs(self, token_address):
+    return self.client.iterate(self.indices['transaction'], 'tx', 'to:' + token_address)
 
   def _construct_tx_descr_from_input(self, tx):
     tx_input = tx['decoded_input']
@@ -119,13 +110,23 @@ class TokenHolders:
     elif tx_input['name'] == 'approve':
       return {'method': tx_input['name'], 'from': tx['from'], 'spender': tx_input['params'][0]['value'], 'value': tx_input['params'][1]['value'],'block_id': tx['blockNumber'], 'token': tx['to'], 'tx_index': self.indices['transaction']}
     else:
-      return {'method': 'unknown', 'txHash': tx['hash']}
+      return {'method': 'unknown', 'txHash': tx['hash'], 'token': tx['to']}
+
+  def _tx_without_decoded_input(self, tx):
+    return {'method': 'unknown', 'txHash': tx['hash'], 'token': tx['to']}
+
+  def _check_tx_input(self, tx):
+    if 'decoded_input' in tx['_source'].keys():
+      return self._construct_tx_descr_from_input(tx['_source'])
+    else:
+      return self._tx_without_decoded_input(tx['_source'])
 
   def _extract_descriptions_from_txs(self, txs):
     txs_info = []
     for tx in txs:
-      tx_descr = self._construct_tx_descr_from_input(tx['_source'])
-      txs_info.append(tx_descr)
+      tx_descr = self._check_tx_input(tx)
+      if tx_descr != None:
+        txs_info.append(tx_descr)
     self._insert_multiple_docs(txs_info, 'tx', self.indices['token_tx'])
 
   def _iterate_token_tx_descriptions(self, token_address):
@@ -143,6 +144,13 @@ class TokenHolders:
     for tokens in self._iterate_tokens():
       for token in tokens:
         self._extract_token_txs(token['_source']['address'])
+
+  def _get_listed_tokens_addresses(self):
+    addresses = []
+    for tokens in self._iterate_tokens():
+      for token in tokens:
+        addresses.append(token['_source']['address'])
+    return addresses
 
   def run(self, block):
     listed_tokens_addresses = self._get_listed_tokens_addresses()
