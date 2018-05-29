@@ -18,6 +18,7 @@ OTHER_TRANSACTION = 3
 MAX_BLOCKS_NUMBER = 10000000
 
 def _restore_block_traces(block):
+  restored_response = {"id": block["id"]}
   restored_traces = {}
   for transaction in block['result']:
     if transaction["transactionPosition"] not in restored_traces.keys():
@@ -28,8 +29,10 @@ def _restore_block_traces(block):
     del transaction["blockHash"]
     del transaction["blockNumber"]
   if None in restored_traces.keys():
+    restored_response["reward"] = restored_traces[None]["trace"][0]
     del restored_traces[None]
-  return {"result": list(restored_traces.values()), "id": block["id"]}
+  restored_response["result"] = list(restored_traces.values())
+  return restored_response
 
 def _get_parity_url_by_block(parity_hosts, block):
   for bottom_line, upper_bound, url in parity_hosts:
@@ -56,11 +59,10 @@ def _get_traces_sync(parity_hosts, blocks):
   for parity_url, request in requests_dict.items():
     request_string = json.dumps(request)
     responses = requests.post(
-      parity_url, 
-      data=request_string, 
+      parity_url,
+      data=request_string,
       headers={"content-type": "application/json"}
     ).json()
-    responses = [_restore_block_traces(response) for response in responses]
     traces.update({str(response["id"]): response["result"] for response in responses if "result" in response.keys()})
   return traces
 
@@ -89,7 +91,7 @@ class InternalTransactions:
       "size": 0,
       "query": {
         "query_string": {
-          "query": '!(_exists_:trace) AND to_contract:true AND ' + range_query
+          "query": '!(_exists_:trace) AND ' + range_query
         }
       },
       "aggs": {
@@ -125,18 +127,31 @@ class InternalTransactions:
 
   def _get_traces(self, blocks):    
     chunks = self._split_on_chunks(blocks, NUMBER_OF_PROCESSES)
-    arguments = zip(repeat(self.parity_hosts), chunks)
+    arguments = list(zip(repeat(self.parity_hosts), chunks))
     traces = self.pool.starmap(_get_traces_sync, arguments)
     return {id: trace for traces_dict in traces for id, trace in traces_dict.items()}
 
-  def _set_trace_hashes(self, transaction, trace):
-    for i, internal_transaction in enumerate(trace):
-      internal_transaction["hash"] = transaction["hash"] + "." + str(i)
+  def _set_trace_hashes(self, trace):
+    traces_size = {}
+    for transaction in trace:
+      transaction_hash = transaction["transactionHash"]
+      if transaction_hash:
+        if transaction_hash not in traces_size.keys():
+          traces_size[transaction_hash] = 0
+        transaction["hash"] = "{}.{}".format(transaction["transactionHash"], traces_size[transaction_hash])
+        traces_size[transaction_hash] += 1
+      else:
+        transaction["hash"] = transaction["blockHash"]
 
-  def _classify_trace(self, transaction, trace):
-    if "from" not in transaction.keys():
-      return
+  def _classify_trace(self, transactions, trace):
+    transactions_dict = {
+      transaction["hash"]: transaction for transaction in transactions
+    }
     for internal_transaction in trace:
+      transaction_hash = internal_transaction["transactionHash"]
+      if not transaction_hash or (transaction_hash not in transactions_dict.keys()):
+        continue
+      transaction = transactions_dict[transaction_hash]
       action = internal_transaction["action"]
       if ("from" not in action.keys()) or ("to" not in action.keys()):
         internal_transaction["class"] = OTHER_TRANSACTION
@@ -149,15 +164,6 @@ class InternalTransactions:
         internal_transaction["class"] = OUTPUT_TRANSACTION
       else:
         internal_transaction["class"] = OTHER_TRANSACTION
-
-  def _restore_transactions_dictionary(self, blocks, transactions):
-    result = {}
-    for transaction in transactions:
-      transaction_body = transaction["_source"]
-      block_number = transaction_body["blockNumber"]
-      transaction_index = transaction_body["transactionIndex"]
-      result[transaction["_id"]] = blocks[str(block_number)][transaction_index]['trace']
-    return result
 
   def _save_traces(self, transactions):
     transactions_query = {
@@ -175,23 +181,25 @@ class InternalTransactions:
         del transaction[field]
     return transaction
 
-  def _save_internal_transactions(self, traces):
-    if traces:
-      docs = [self._preprocess_internal_transaction(transaction) for trace in traces.values() for transaction in trace]
+  def _save_internal_transactions(self, transactions):
+    docs = [self._preprocess_internal_transaction(transaction) for transaction in transactions if transaction["transactionHash"]]
+    if docs:
       self.client.bulk_index(docs=docs, index=self.indices["internal_transaction"], doc_type="itx", id_field="hash", refresh=True)
+
+  def _save_miner_transactions(self, transactions):
+    docs = [self._preprocess_internal_transaction(transaction) for transaction in transactions if not transaction["transactionHash"]]
+    self.client.bulk_index(docs=docs, index=self.indices["miner_transaction"], doc_type="tx", id_field="hash",
+                           refresh=True)
 
   def _extract_traces_chunk(self, blocks):
     blocks_traces = self._get_traces(blocks)
+    self._set_trace_hashes(blocks_traces)
     for transactions in self._iterate_transactions(blocks):
-      traces = self._restore_transactions_dictionary(blocks_traces, transactions)
-      for transaction in transactions:
-        if transaction["_id"] in traces.keys():
-          transaction_body = transaction["_source"]
-          trace = traces[transaction["_id"]]
-          self._set_trace_hashes(transaction_body, trace)
-          self._classify_trace(transaction_body, trace)
-      self._save_traces(list(traces.keys()))
-      self._save_internal_transactions(traces)
+      self._classify_trace(blocks_traces, transactions)
+    for block, trace in blocks_traces.items():
+      self._save_internal_transactions(trace)
+      self._save_miner_transactions(trace)
+    self._save_traces(set([transaction["transactionHash"] for trace in blocks_traces.values() for transaction in trace]))
 
   def extract_traces(self):
     blocks_chunks = list(self._split_on_chunks(self._iterate_blocks(), NUMBER_OF_JOBS))
