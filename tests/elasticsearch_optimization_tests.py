@@ -85,7 +85,7 @@ class ElasticSearchOptimizationTestCase():
     self.new_client._index_exists = MagicMock(return_value=True)
     self.new_client.prepare_fast_index(TEST_INDEX, self.doc_type)
     for method in self.index_methods + self.mapping_methods:
-      getattr(self.new_client, method).assert_not_called()    
+      getattr(self.new_client, method).assert_not_called()
 
   def _get_elasticsearch_size(self):
     result = subprocess.run(["du", "-sb", "/var/lib/elasticsearch"], stdout=subprocess.PIPE)
@@ -182,7 +182,6 @@ TEST_INDEX = 'test-ethereum-transactions'
 
 class TransactionsElasticSearchOptimizationTestCase(ElasticSearchOptimizationTestCase, unittest.TestCase):
   string_fields = ["from", "hash", "blockTimestamp"]
-  object_fields = ["decoded_input"]
   doc_type = 'tx'
   doc = TEST_TRANSACTION
 
@@ -212,7 +211,14 @@ class TransactionsElasticSearchOptimizationTestCase(ElasticSearchOptimizationTes
         }
       }
     )['hits']['hits']
-    assert len(transactions)    
+    assert len(transactions)
+
+  def test_search_by_decoded_input_field(self):
+    self.client.delete_index(TEST_INDEX)
+    self.new_client.prepare_fast_index(TEST_INDEX, self.doc_type)
+    self.client.index(index=TEST_INDEX, doc_type=self.doc_type, doc={"decoded_input": {'test': 1}}, refresh=True)
+    result = self.client.count(index=TEST_INDEX, doc_type=self.doc_type, query="_exists_:decoded_input")['count']
+    assert result == 1
 
 class InternalTransactionsElasticSearchOptimizationTestCase(ElasticSearchOptimizationTestCase, unittest.TestCase):
   string_fields = ["callType", "from", "gas", "hash", "blockTimestamp", "gasUsed", "output"]

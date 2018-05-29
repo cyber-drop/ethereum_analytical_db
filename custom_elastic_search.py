@@ -7,7 +7,7 @@ STRING_PROPERTIES = [
   "blockTimestamp", "callType", 
   "gas", "gasUsed", "output"
 ]
-OBJECT_PROPERTIES = ["decoded_input", "traceAddress"]
+OBJECT_PROPERTIES = ["traceAddress"]
 NUMBER_OF_JOBS = 10
 
 class CustomElasticSearch(ElasticSearch):
