@@ -88,7 +88,7 @@ class InternalTransactions:
     return blocks
 
   def _iterate_transactions(self, block):
-    return self.client.iterate(self.indices["transaction"], 'tx', "to_contract:true AND blockNumber:" + str(block))
+    return self.client.iterate(self.indices["transaction"], 'tx', "blockNumber:" + str(block))
 
   def _get_traces(self, blocks):    
     chunks = self._split_on_chunks(blocks, NUMBER_OF_PROCESSES)

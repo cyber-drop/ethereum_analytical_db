@@ -41,15 +41,13 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.assertCountEqual(blocks, [1, 2, 5])
 
   def test_iterate_transactions(self):
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': False, 'blockNumber': 1}, id=1, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': True, 'trace': {'test': 1}, 'blockNumber': 2}, id=2, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': True, 'blockNumber': 1}, id=3, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': True, 'blockNumber': 3}, id=4, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'to_contract': True, 'blockNumber': 1}, id=5, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 1}, id=1, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 3}, id=2, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'blockNumber': 1}, id=3, refresh=True)
     iterator = self.internal_transactions._iterate_transactions(1)
     transactions = next(iterator)
     transactions = [transaction["_id"] for transaction in transactions]
-    self.assertCountEqual(transactions, ['3'])
+    self.assertCountEqual(transactions, ['1'])
 
   def test_iterate_transactions_with_big_number_of_blocks(self):
     iterator = self.internal_transactions._iterate_transactions(list(range(1000)))
