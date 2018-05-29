@@ -43,10 +43,10 @@ class InternalTransactionsTestCase(unittest.TestCase):
   def test_iterate_transactions(self):
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': False, 'blockNumber': 1}, id=1, refresh=True)
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': True, 'trace': {'test': 1}, 'blockNumber': 2}, id=2, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': True, 'blockNumber': 2}, id=3, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': True, 'blockNumber': 1}, id=3, refresh=True)
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': True, 'blockNumber': 3}, id=4, refresh=True)
     self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'to_contract': True, 'blockNumber': 1}, id=5, refresh=True)
-    iterator = self.internal_transactions._iterate_transactions([1, 2])
+    iterator = self.internal_transactions._iterate_transactions(1)
     transactions = next(iterator)
     transactions = [transaction["_id"] for transaction in transactions]
     self.assertCountEqual(transactions, ['3'])
@@ -225,13 +225,18 @@ class InternalTransactionsTestCase(unittest.TestCase):
       }
     }]
     transactions = [{
-      "hash": "0x0",
-      "from": "0x0",
-      "to": "0x1"
-    }, {
-      "hash": "0x1",
-      "from": "0x1",
-      "to": "0x2"
+      "_id": "0x0",
+      "_source": {
+        "from": "0x0",
+        "to": "0x1"
+      }
+    },
+    {
+      "_id": "0x1",
+      "_source": {
+        "from": "0x1",
+        "to": "0x2"
+      }
     }]
     self.internal_transactions._classify_trace(transactions, trace)
     assert trace[0]["class"] == INPUT_TRANSACTION
@@ -251,7 +256,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
         "to": "0x0"
       }
     }]
-    transactions = [{"hash": "0x1", "from": "0x0", "to": "0x0"}]
+    transactions = [{"_id": "0x1", "_source": {"from": "0x0", "to": "0x0"}}]
     self.internal_transactions._classify_trace(transactions, trace)
     assert "class" not in trace[0].keys()
     assert "class" in trace[1].keys()
@@ -270,14 +275,14 @@ class InternalTransactionsTestCase(unittest.TestCase):
         "to": "0x0"
       }
     }]
-    transactions = [{"hash": "0x1", "from": "0x0", "to": "0x0"}]
+    transactions = [{"_id": "0x1", "_source": {"from": "0x0", "to": "0x0"}}]
     self.internal_transactions._classify_trace(transactions, trace)
     assert "class" not in trace[0].keys()
     assert "class" in trace[1].keys()
 
   def test_save_traces(self):
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {"hash": TEST_TRANSACTION_HASH}, id=1, refresh=True)
-    self.internal_transactions._save_traces([1])
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {"blockNumber": 123}, id=1, refresh=True)
+    self.internal_transactions._save_traces([123])
     transaction = self.client.get(TEST_TRANSACTIONS_INDEX, 'tx', 1)['_source']
     assert transaction['trace']
 
@@ -340,9 +345,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
 
   def test_extract_traces_chunk(self):
     test_blocks = ["0x{}".format(i) for i in range(10)]
-    test_active_transactions = {"0x{}".format(i) for i in range(3)}
     test_traces = {"0x{}".format(i): [{"transactionHash": "0x{}".format(i % 3)}] for i in range(10)}
-    test_transactions_chunks = [[j*10 + i for i in range(10)] for j in range(10)]
+    test_traces["0x0"].append({"transactionHash": None})
+    test_transactions_chunks = [[str(j*10 + i) for i in range(10)] for j in range(10)]
 
     self.internal_transactions._get_traces = MagicMock(return_value=test_traces)
     self.internal_transactions._set_trace_hashes = MagicMock()
@@ -363,12 +368,14 @@ class InternalTransactionsTestCase(unittest.TestCase):
 
     self.internal_transactions._extract_traces_chunk(test_blocks)
 
-    calls = [call.get_traces(test_blocks), call.iterate(test_blocks)]
-    for chunk in test_transactions_chunks:
-      calls.append(call.classify(test_traces, chunk))
+    calls = [call.get_traces(test_blocks)]
     for block, trace in test_traces.items():
-      calls += [call.set_hashes(trace), call.save_transactions(trace), call.save_rewards(trace)]
-    calls.append(call.save_traces(test_active_transactions))
+      calls.append(call.set_hashes(trace))
+      calls.append(call.iterate(block))
+      for chunk in test_transactions_chunks:
+        calls.append(call.classify(chunk, trace))
+      calls += [call.save_transactions(trace), call.save_rewards(trace)]
+    calls.append(call.save_traces(test_blocks))
     process.assert_has_calls(calls)
 
   def test_extract_traces(self):
@@ -390,6 +397,26 @@ class InternalTransactionsTestCase(unittest.TestCase):
       calls.append(call.extract(chunk))
     process.assert_has_calls(calls)
 
+  def test_process(self):
+    test_transactions = self.client.search(index=REAL_TRANSACTIONS_INDEX, doc_type="tx", query="*", size=10000)['hits']['hits']
+    test_transactions = [transaction["_source"] for transaction in test_transactions]
+    test_blocks_number = len(list(set(transaction["blockNumber"] for transaction in test_transactions)))
+    self.client.bulk_index(
+      docs=test_transactions,
+      index=TEST_TRANSACTIONS_INDEX,
+      doc_type='tx',
+      id_field="hash",
+      refresh=True
+    )
+
+    self.internal_transactions.extract_traces()
+
+    internal_transactions_count = self.client.count(index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type="itx", query="*")["count"]
+    miner_transactions_count = self.client.count(index=TEST_MINER_TRANSACTIONS_INDEX, doc_type="tx", query="*")["count"]
+    assert internal_transactions_count > 0
+    assert miner_transactions_count == test_blocks_number
+
+REAL_TRANSACTIONS_INDEX = "ethereum-transaction"
 TEST_TRANSACTIONS_NUMBER = 10
 TEST_BLOCK_NUMBER = 3068185
 TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 10
@@ -399,97 +426,3 @@ TEST_MINER_TRANSACTIONS_INDEX = 'test-ethereum-miner-transactions'
 TEST_TRANSACTION_HASH = '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a'
 TEST_TRANSACTION_INPUT = '0xb1631db29e09ec5581a0ec398f1229abaf105d3524c49727621841af947bdc44'
 TEST_INCORRECT_TRANSACTION_HASH = "0x"
-TEST_TRANSACTION_TRACE = [
-  {
-    "action": {
-      "callType": "call",
-      "from": "0xa74d69c0aef9166aca23d563f38cbf85fe3e39a6",
-      "gas": "0x104f8",
-      "input": "0x3cc86b80000000000000000000000000000000000000000000000000016345785d8a0000000000000000000000000000a74d69c0aef9166aca23d563f38cbf85fe3e39a6",
-      "to": "0x1fcb809dbe044fb3875463281d1bb55c4476a28b",
-      "value": "0x0"
-    },
-    "result": {
-      "gasUsed": "0x1bbd",
-      "output": "0x"
-    },
-    "subtraces": 1,
-    "traceAddress": [],
-    "type": "call"
-  },
-  {
-    "action": {
-      "callType": "call",
-      "from": "0x1fcb809dbe044fb3875463281d1bb55c4476a28b",
-      "gas": "0x8fc",
-      "input": "0x",
-      "to": "0xa74d69c0aef9166aca23d563f38cbf85fe3e39a6",
-      "value": "0x16345785d8a0000"
-    },
-    "result": {
-      "gasUsed": "0x0",
-      "output": "0x"
-    },
-    "subtraces": 0,
-    "traceAddress": [
-      0
-    ],
-    "type": "call"
-  },
-  {
-    'subtraces': 0,
-    'action': {
-      'to': '0x86fa049857e0209aa7d9e616f7eb3b3b78ecfdb0',
-      'from': '0xce6cd85aabf4a5a9a3f4c85381f9e47f957940b2',
-      'callType': 'call',
-      'gas': '0x234e8',
-      'value': '0x0',
-      'input': '0xa9059cbb0000000000000000000000006cc5f688a315f3dc28a7781717a9a798a59fda7b0000000000000000000000000000000000000000000000838a8ebe0301a4ffff'
-    },
-    'type': 'call',
-    'error': 'Bad instruction',
-    'hash': '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a.0',
-    'traceAddress': []
-  }
-]
-TEST_INTERNAL_TRANSACTIONS = [
-  {
-    "callType": "call",
-    "from": "0xa74d69c0aef9166aca23d563f38cbf85fe3e39a6",
-    "gas": "0x104f8",
-    "input": "0x3cc86b80000000000000000000000000000000000000000000000000016345785d8a0000000000000000000000000000a74d69c0aef9166aca23d563f38cbf85fe3e39a6",
-    "to": "0x1fcb809dbe044fb3875463281d1bb55c4476a28b",
-    "value": "0x0",
-    "gasUsed": "0x1bbd",
-    "output": "0x",
-    "subtraces": 1,
-    "traceAddress": [],
-    "type": "call"
-  },
-  {
-    "callType": "call",
-    "from": "0x1fcb809dbe044fb3875463281d1bb55c4476a28b",
-    "gas": "0x8fc",
-    "input": "0x",
-    "to": "0xa74d69c0aef9166aca23d563f38cbf85fe3e39a6",
-    "value": "0x16345785d8a0000",
-    "gasUsed": "0x0",
-    "output": "0x",
-    "subtraces": 0,
-    "traceAddress": [0],
-    "type": "call"
-  },
-  {
-    'subtraces': 0,
-    'to': '0x86fa049857e0209aa7d9e616f7eb3b3b78ecfdb0',
-    'from': '0xce6cd85aabf4a5a9a3f4c85381f9e47f957940b2',
-    'callType': 'call',
-    'gas': '0x234e8',
-    'value': '0x0',
-    'input': '0xa9059cbb0000000000000000000000006cc5f688a315f3dc28a7781717a9a798a59fda7b0000000000000000000000000000000000000000000000838a8ebe0301a4ffff',
-    'type': 'call',
-    'error': 'Bad instruction',
-    'traceAddress': []
-  }
-]
-
