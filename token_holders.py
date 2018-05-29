@@ -6,17 +6,30 @@ import json
 from pyelasticsearch import bulk_chunks
 
 class TokenHolders:
-  def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200", ethereum_api_host="http://localhost:8545"):
+  def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200"):
     self.indices = elasticsearch_indices
     self.client = CustomElasticSearch(elasticsearch_host)
-    self.w3 = Web3(HTTPProvider(ethereum_api_host))
 
   def _get_cmc_tokens_list(self):
     response = requests.get('https://api.coinmarketcap.com/v2/listings/')
-    return response.json()['data']
+    names = [(token['name'], token['symbol']) for token in response.json()['data']]
+    return names
 
   def _construct_token_queries(self, names):
-    queries = [{'query': {'match': {'token_name': {'query': name, 'minimum_should_match': '100%'}}}} for name in names]
+    queries = []
+    for name in names:
+      query = {
+        'query': {
+          'bool': {
+            'must': [
+              {'match': {'token_symbol':  name[1]}},
+              {'match': {'token_name': name[0]}},
+              {'exists': {'field': 'abi'}}
+            ]
+          }
+        }
+      }
+      queries.append(query)
     return queries
 
   def _construct_msearch_body(self, queries_list, index, doc_type):
@@ -38,7 +51,7 @@ class TokenHolders:
     return tokens
 
   def _get_listed_tokens(self):
-    coinmarketcap_names = [token['name'] for token in self._get_cmc_tokens_list()]
+    coinmarketcap_names = self._get_cmc_tokens_list()
     token_contracts = self._search_multiple_tokens(coinmarketcap_names)
     return token_contracts
 
@@ -110,16 +123,13 @@ class TokenHolders:
     elif tx_input['name'] == 'approve':
       return {'method': tx_input['name'], 'from': tx['from'], 'spender': tx_input['params'][0]['value'], 'value': tx_input['params'][1]['value'],'block_id': tx['blockNumber'], 'token': tx['to'], 'tx_index': self.indices['transaction']}
     else:
-      return {'method': 'unknown', 'txHash': tx['hash'], 'token': tx['to']}
-
-  def _tx_without_decoded_input(self, tx):
-    return {'method': 'unknown', 'txHash': tx['hash'], 'token': tx['to']}
+      return
 
   def _check_tx_input(self, tx):
     if 'decoded_input' in tx['_source'].keys():
       return self._construct_tx_descr_from_input(tx['_source'])
     else:
-      return self._tx_without_decoded_input(tx['_source'])
+      return
 
   def _extract_descriptions_from_txs(self, txs):
     txs_info = []

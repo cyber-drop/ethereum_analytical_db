@@ -13,7 +13,7 @@ class TokenHoldersTestCase(unittest.TestCase):
   
   def test_get_listed_tokens(self):
     for i, address in enumerate(TEST_TOKEN_ADDRESSES):
-      self.client.index(TEST_INDEX, 'contract', {'address': address, 'token_name': TEST_TOKEN_NAMES[i]}, refresh=True)
+      self.client.index(TEST_INDEX, 'contract', {'address': address, 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi']}, refresh=True)
 
     listed_tokens = self.token_holders._get_listed_tokens()
     listed_tokens = [token[0]['_source']['token_name'] for token in listed_tokens]
@@ -22,7 +22,7 @@ class TokenHoldersTestCase(unittest.TestCase):
   
   def test_search_duplicates(self):
     for i, address in enumerate(TEST_TOKEN_ADDRESSES):
-      self.client.index(TEST_INDEX, 'contract', {'address': address, 'token_name': TEST_TOKEN_NAMES[i]}, refresh=True)
+      self.client.index(TEST_INDEX, 'contract', {'address': address, 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi']}, refresh=True)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
 
@@ -33,7 +33,7 @@ class TokenHoldersTestCase(unittest.TestCase):
     real_aeternity = [token for token in duplicated if token['token_name'] == 'Aeternity'][0]
     assert real_golem['address'] == '0xa74476443119a942de498590fe1f2454d7d4ac0d'
     assert real_aeternity['address'] == '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'
-    assert real_aeternity['txs_count'] == 3
+    assert real_aeternity['txs_count'] == 4
   
   def test_extract_token_txs(self):
     for tx in TEST_TOKEN_TXS:
@@ -43,13 +43,13 @@ class TokenHoldersTestCase(unittest.TestCase):
     token_txs = self.token_holders._iterate_token_tx_descriptions('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d')
     token_txs = [tx for txs_list in token_txs for tx in txs_list]
     methods = [tx['_source']['method'] for tx in token_txs]
-    amounts = [tx['_source']['value'] for tx in token_txs if tx['_source']['method'] != 'unknown'] 
-    self.assertCountEqual(['transfer', 'approve', 'transferFrom', 'unknown'], methods)
+    amounts = [tx['_source']['value'] for tx in token_txs] 
+    self.assertCountEqual(['transfer', 'approve', 'transferFrom'], methods)
     self.assertCountEqual(['356245680000000000000', '356245680000000000000', '2266000000000000000000'], amounts)
   
   def test_get_listed_tokens_txs(self):
     for i, address in enumerate(TEST_TOKEN_ADDRESSES):
-      self.client.index(TEST_INDEX, 'contract', {'address': address, 'token_name': TEST_TOKEN_NAMES[i]}, refresh=True)
+      self.client.index(TEST_INDEX, 'contract', {'address': address, 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi']}, refresh=True)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
 
@@ -58,11 +58,11 @@ class TokenHoldersTestCase(unittest.TestCase):
     all_descrptions = [tx for txs_list in all_descrptions for tx in txs_list]
     tokens = set([descr['_source']['token'] for descr in all_descrptions])
     self.assertCountEqual(['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', '0xa74476443119a942de498590fe1f2454d7d4ac0d'], tokens)
-    assert len(all_descrptions) == 5
+    assert len(all_descrptions) == 4
   
   def test_run(self):
     for i, address in enumerate(TEST_TOKEN_ADDRESSES):
-      self.client.index(TEST_INDEX, 'contract', {'address': address, 'token_name': TEST_TOKEN_NAMES[i]}, refresh=True)
+      self.client.index(TEST_INDEX, 'contract', {'address': address, 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi']}, refresh=True)
 
     self.token_holders._load_listed_tokens()
     self.token_holders.run(TEST_BLOCK)
@@ -86,7 +86,7 @@ TEST_TOKEN_ADDRESSES = ['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d',
   '0x83199a2bd905dd5f2f61828e5a705790b782cf43'
   ]
 TEST_TOKEN_NAMES = ['Aeternity', 'Populous Platform', 'Aeternity', 'Golem Network Token', 'Golem Network Token', 'Samtoken']
-
+TEST_TOKEN_SYMBOLS = ['AE', 'PPT', 'AE', 'GNT', 'GNT', 'SMT']
 TEST_TOKEN_TXS = [
   {'from': '0x6b25d0670a34c1c7b867cd9c6ad405aa1759bda0', 'to': '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', 'decoded_input': {'name': 'transfer', 'params': [{'type': 'address', 'value': '0xa60c4c379246a7f1438bd76a92034b6c82a183a5'}, {'type': 'uint256', 'value': '2266000000000000000000'}]}, 'blockNumber': 5635149},
   {'from': '0x58d46475da68984bacf1f2843b85e0fdbcbc6cef', 'to': '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', 'decoded_input': {'name': 'approve', 'params': [{'type': 'address', 'value': '0x4e6b129bbb683952ed1ec935c778d74a77b352ce'}, {'type': 'uint256', 'value': '356245680000000000000'}]}, 'blockNumber': 5635141},
