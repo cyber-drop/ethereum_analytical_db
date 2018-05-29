@@ -17,23 +17,6 @@ OTHER_TRANSACTION = 3
 
 MAX_BLOCKS_NUMBER = 10000000
 
-def _restore_block_traces(block):
-  restored_response = {"id": block["id"]}
-  restored_traces = {}
-  for transaction in block['result']:
-    if transaction["transactionPosition"] not in restored_traces.keys():
-      restored_traces[transaction["transactionPosition"]] = {'trace': []}
-    restored_traces[transaction["transactionPosition"]]['trace'].append(transaction)
-    del transaction["transactionHash"]
-    del transaction["transactionPosition"]
-    del transaction["blockHash"]
-    del transaction["blockNumber"]
-  if None in restored_traces.keys():
-    restored_response["reward"] = restored_traces[None]["trace"][0]
-    del restored_traces[None]
-  restored_response["result"] = list(restored_traces.values())
-  return restored_response
-
 def _get_parity_url_by_block(parity_hosts, block):
   for bottom_line, upper_bound, url in parity_hosts:
     if ((not bottom_line) or (block >= bottom_line)) and ((not upper_bound) or (block < upper_bound)):
@@ -193,10 +176,10 @@ class InternalTransactions:
 
   def _extract_traces_chunk(self, blocks):
     blocks_traces = self._get_traces(blocks)
-    self._set_trace_hashes(blocks_traces)
     for transactions in self._iterate_transactions(blocks):
       self._classify_trace(blocks_traces, transactions)
     for block, trace in blocks_traces.items():
+      self._set_trace_hashes(trace)
       self._save_internal_transactions(trace)
       self._save_miner_transactions(trace)
     self._save_traces(set([transaction["transactionHash"] for trace in blocks_traces.values() for transaction in trace]))
