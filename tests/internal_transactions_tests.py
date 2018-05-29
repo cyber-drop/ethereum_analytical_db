@@ -1,6 +1,7 @@
 import unittest
 from test_utils import TestElasticSearch
 from internal_transactions import *
+from internal_transactions import _get_parity_url_by_block, _get_traces_sync, _make_trace_requests
 import internal_transactions
 import random
 import requests
@@ -38,13 +39,6 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 5}, id=5, refresh=True)
     blocks = self.internal_transactions._iterate_blocks()
     self.assertCountEqual(blocks, [1, 2, 5])
-
-  def test_iterate_big_amount_of_blocks(self):
-    blocks_number = 1000000
-    blocks = [{'blockNumber': i, 'id': i + 1} for i in range(blocks_number)]
-    self.client.bulk_index(docs=blocks, index=TEST_TRANSACTIONS_INDEX, doc_type='tx', refresh=True)
-    blocks = self.internal_transactions._iterate_blocks()
-    assert len(blocks) == blocks_number
 
   def test_iterate_transactions(self):
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to_contract': False, 'blockNumber': 1}, id=1, refresh=True)
@@ -296,20 +290,25 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert True
 
   def test_save_internal_transactions(self):
-    traces = TEST_TRANSACTION_TRACE
-    self.internal_transactions._save_internal_transactions(traces)
-    internal_transactions = self.client.search(index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type="itx", query="*")["hits"]["hits"]
-    internal_transactions = [transaction["_source"] for transaction in internal_transactions]
-    self.assertCountEqual(internal_transactions, TEST_INTERNAL_TRANSACTIONS)
+    test_trace = [{"transactionHash": "0x0"} for i in range(10)]
+    test_preprocessed_trace = [{
+      "hash": "0x{}".format(i),
+      "transactionHash": '0x0'
+    } for i in range(10)]
+    test_transactions_ids = [transaction["hash"] for transaction in test_preprocessed_trace]
+    test_transactions_bodies = [{key: value for key, value in transaction.items() if key is not "hash"} for transaction in test_preprocessed_trace]
+    self.internal_transactions._preprocess_internal_transaction = MagicMock(side_effect=test_preprocessed_trace)
 
-  def test_save_internal_transactions_with_ids(self):
-    trace = TEST_TRANSACTION_TRACE.copy()
-    for i, transaction in enumerate(trace):
-      transaction["hash"] = "0x1.{}".format(i)
-    self.internal_transactions._save_internal_transactions(trace)
+    self.internal_transactions._save_internal_transactions(test_trace)
+
+    for transaction in test_trace:
+      self.internal_transactions._preprocess_internal_transaction.assert_any_call(transaction)
+
     internal_transactions = self.client.search(index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type="itx", query="*")["hits"]["hits"]
-    internal_transactions = [transaction["_id"] for transaction in internal_transactions]
-    self.assertCountEqual(internal_transactions, ["0x1.{}".format(i) for i, t in enumerate(trace)])
+    internal_transactions_bodies = [transaction["_source"] for transaction in internal_transactions]
+    internal_transactions_ids = [transaction["_id"] for transaction in internal_transactions]
+    self.assertCountEqual(internal_transactions_ids, test_transactions_ids)
+    self.assertCountEqual(internal_transactions_bodies, test_transactions_bodies)
 
   def test_save_internal_transactions_ignore_rewards(self):
     trace = [{"transactionHash": None, "hash": "0x1"}]
