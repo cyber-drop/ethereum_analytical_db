@@ -134,9 +134,6 @@ class InternalTransactions:
     for transaction in trace:
       transaction["blockNumber"] = block
 
-  def _remove_transactions_from_trace(self, trace):
-    return [transaction for transaction in trace if not transaction["hash"].endswith(".0")]
-
   def _save_traces(self, blocks):
     transactions_query = {
       "terms": {
@@ -153,26 +150,31 @@ class InternalTransactions:
         del transaction[field]
     return transaction
 
-  def _save_internal_transactions(self, transactions):
-    docs = [self._preprocess_internal_transaction(transaction) for transaction in transactions if transaction["transactionHash"]]
-    if docs:
-      self.client.bulk_index(docs=docs, index=self.indices["internal_transaction"], doc_type="itx", id_field="hash", refresh=True)
+  def _save_internal_transactions(self, blocks_traces):
+    for block, transactions in blocks_traces.items():
+      docs = [
+        self._preprocess_internal_transaction(transaction)
+        for transaction in transactions
+        if transaction["transactionHash"] and not (transaction["hash"].endswith(".0"))
+      ]
+      if docs:
+        self.client.bulk_index(docs=docs, index=self.indices["internal_transaction"], doc_type="itx", id_field="hash", refresh=True)
 
-  def _save_miner_transactions(self, transactions):
-    docs = [self._preprocess_internal_transaction(transaction) for transaction in transactions if not transaction["transactionHash"]]
-    self.client.bulk_index(docs=docs, index=self.indices["miner_transaction"], doc_type="tx", id_field="hash",
+  def _save_miner_transactions(self, blocks_traces):
+    for block, transactions in blocks_traces.items():
+      docs = [self._preprocess_internal_transaction(transaction) for transaction in transactions if not transaction["transactionHash"]]
+      self.client.bulk_index(docs=docs, index=self.indices["miner_transaction"], doc_type="tx", id_field="hash",
                            refresh=True)
 
   def _extract_traces_chunk(self, blocks):
     blocks_traces = self._get_traces(blocks)
     for block, trace in blocks_traces.items():
       self._set_trace_hashes(trace)
-      filtered_trace = self._remove_transactions_from_trace(trace)
       self._set_block_number(trace, block)
       for transactions in self._iterate_transactions(block):
-        self._classify_trace(transactions, filtered_trace)
-      self._save_internal_transactions(filtered_trace)
-      self._save_miner_transactions(trace)
+        self._classify_trace(transactions, trace)
+    self._save_internal_transactions(blocks_traces)
+    self._save_miner_transactions(blocks_traces)
     self._save_traces(blocks)
 
   def extract_traces(self):
