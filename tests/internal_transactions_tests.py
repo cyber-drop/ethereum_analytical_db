@@ -363,11 +363,11 @@ class InternalTransactionsTestCase(unittest.TestCase):
 
     self.internal_transactions._extract_traces_chunk(test_blocks)
 
-    calls = [call.get_traces(test_blocks), call.set_hashes(test_traces), call.iterate(test_blocks)]
+    calls = [call.get_traces(test_blocks), call.iterate(test_blocks)]
     for chunk in test_transactions_chunks:
       calls.append(call.classify(test_traces, chunk))
     for block, trace in test_traces.items():
-      calls += [call.save_transactions(trace), call.save_rewards(trace)]
+      calls += [call.set_hashes(trace), call.save_transactions(trace), call.save_rewards(trace)]
     calls.append(call.save_traces(test_active_transactions))
     process.assert_has_calls(calls)
 
