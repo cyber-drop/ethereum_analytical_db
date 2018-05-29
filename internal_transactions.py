@@ -151,19 +151,21 @@ class InternalTransactions:
     return transaction
 
   def _save_internal_transactions(self, blocks_traces):
+    docs = []
     for block, transactions in blocks_traces.items():
-      docs = [
+      docs += [
         self._preprocess_internal_transaction(transaction)
         for transaction in transactions
         if transaction["transactionHash"] and not (transaction["hash"].endswith(".0"))
       ]
-      if docs:
+    if docs:
         self.client.bulk_index(docs=docs, index=self.indices["internal_transaction"], doc_type="itx", id_field="hash", refresh=True)
 
   def _save_miner_transactions(self, blocks_traces):
+    docs = []
     for block, transactions in blocks_traces.items():
-      docs = [self._preprocess_internal_transaction(transaction) for transaction in transactions if not transaction["transactionHash"]]
-      self.client.bulk_index(docs=docs, index=self.indices["miner_transaction"], doc_type="tx", id_field="hash",
+      docs += [self._preprocess_internal_transaction(transaction) for transaction in transactions if not transaction["transactionHash"]]
+    self.client.bulk_index(docs=docs, index=self.indices["miner_transaction"], doc_type="tx", id_field="hash",
                            refresh=True)
 
   def _extract_traces_chunk(self, blocks):
