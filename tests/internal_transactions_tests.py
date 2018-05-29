@@ -1,5 +1,5 @@
 import unittest
-from test_utils import TestElasticSearch
+from test_utils import TestElasticSearch, mockify
 from internal_transactions import *
 from internal_transactions import _get_parity_url_by_block, _get_traces_sync, _make_trace_requests
 import internal_transactions
@@ -48,11 +48,6 @@ class InternalTransactionsTestCase(unittest.TestCase):
     transactions = next(iterator)
     transactions = [transaction["_id"] for transaction in transactions]
     self.assertCountEqual(transactions, ['1'])
-
-  def test_iterate_transactions_with_big_number_of_blocks(self):
-    iterator = self.internal_transactions._iterate_transactions(list(range(1000)))
-    [transactions for transactions in iterator]
-    assert True
 
   def test_get_parity_url_by_block(self):
     parity_hosts = [
@@ -184,6 +179,16 @@ class InternalTransactionsTestCase(unittest.TestCase):
     }]
     self.internal_transactions._set_trace_hashes(transactions)
     assert transactions[0]["hash"] == "0x1"
+
+  def test_remove_transactions_from_trace(self):
+    transactions = [{
+      "hash": "0x0.0"
+    }, {
+      "hash": "0x0.10"
+    }]
+    transactions = self.internal_transactions._remove_transactions_from_trace(transactions)
+    assert len(transactions) == 1
+    assert transactions[0]["hash"] == "0x0.10"
 
   def test_classify_trace(self):
     trace = [{
@@ -352,14 +357,10 @@ class InternalTransactionsTestCase(unittest.TestCase):
     test_traces = {"0x{}".format(i): [{"transactionHash": "0x{}".format(i % 3)}] for i in range(10)}
     test_traces["0x0"].append({"transactionHash": None})
     test_transactions_chunks = [[str(j*10 + i) for i in range(10)] for j in range(10)]
-
-    self.internal_transactions._get_traces = MagicMock(return_value=test_traces)
-    self.internal_transactions._set_trace_hashes = MagicMock()
-    self.internal_transactions._iterate_transactions = MagicMock(return_value=test_transactions_chunks)
-    self.internal_transactions._classify_trace = MagicMock()
-    self.internal_transactions._save_traces = MagicMock()
-    self.internal_transactions._save_internal_transactions = MagicMock()
-    self.internal_transactions._save_miner_transactions = MagicMock()
+    mockify(self.internal_transactions, {
+      "_get_traces": MagicMock(return_value=test_traces),
+      "_iterate_transactions": MagicMock(return_value=test_transactions_chunks)
+    }, ["_extract_traces_chunk"])
     process = Mock(
       get_traces=self.internal_transactions._get_traces,
       set_hashes=self.internal_transactions._set_trace_hashes,
@@ -385,14 +386,10 @@ class InternalTransactionsTestCase(unittest.TestCase):
   def test_extract_traces_chunk_set_block_number(self):
     test_block = 123
     test_trace = [{}]
-    self.internal_transactions._get_traces = MagicMock(return_value={test_block: test_trace})
-    self.internal_transactions._iterate_transactions = MagicMock(return_value=[])
-    self.internal_transactions._save_internal_transactions = MagicMock()
-    self.internal_transactions._save_miner_transactions = MagicMock()
-    self.internal_transactions._set_block_number = MagicMock()
-    self.internal_transactions._set_trace_hashes = MagicMock()
-    self.internal_transactions._save_traces = MagicMock()
-
+    mockify(self.internal_transactions, {
+      "_get_traces": MagicMock(return_value={test_block: test_trace}),
+      "_iterate_transactions": MagicMock(return_value=[])
+    }, ["_extract_traces_chunk"])
     process = Mock(
       set_block=self.internal_transactions._set_block_number,
       save_transactions=self.internal_transactions._save_internal_transactions
@@ -402,7 +399,33 @@ class InternalTransactionsTestCase(unittest.TestCase):
 
     calls = [call.set_block(test_trace, test_block), call.save_transactions(test_trace)]
     process.assert_has_calls(calls)
-    pass
+
+  def test_extract_traces_chunk_remove_first_transactions(self):
+    test_block = 123
+    test_trace = [{}, {}]
+    test_filtered_trace = [{}]
+    test_transactions = [[]]
+    mockify(self.internal_transactions, {
+      "_iterate_transactions": MagicMock(return_value=test_transactions),
+      "_get_traces": MagicMock(return_value={test_block: test_trace}),
+      "_remove_transactions_from_trace": MagicMock(return_value=test_filtered_trace)
+    }, ["_extract_traces_chunk"])
+    process = Mock(
+      set_hashes=self.internal_transactions._set_trace_hashes,
+      remove_transactions=self.internal_transactions._remove_transactions_from_trace,
+      classify=self.internal_transactions._classify_trace,
+      save_transactions=self.internal_transactions._save_internal_transactions
+    )
+
+    self.internal_transactions._extract_traces_chunk([test_block])
+
+    calls = [
+      call.set_hashes(test_trace),
+      call.remove_transactions(test_trace),
+      call.classify(test_transactions[0], test_filtered_trace),
+      call.save_transactions(test_filtered_trace)
+    ]
+    process.assert_has_calls(calls)
 
   def test_extract_traces(self):
     test_blocks = list(range(10))

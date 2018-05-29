@@ -1,5 +1,18 @@
 from pyelasticsearch import ElasticSearch
 from custom_elastic_search import CustomElasticSearch
+from unittest.mock import MagicMock
+
+def mockify(object, mocks, not_mocks):
+  def cat(x, *args, **kwargs):
+    return x
+  for attr in  dir(object):
+    if not attr.startswith('__'):
+      if attr in mocks.keys():
+        setattr(object, attr, mocks[attr])
+      elif attr not in not_mocks:
+        value = getattr(object, attr)
+        if callable(value):
+          setattr(object, attr, MagicMock(side_effect=cat))
 
 class TestElasticSearch(ElasticSearch):
   def __init__(self):
