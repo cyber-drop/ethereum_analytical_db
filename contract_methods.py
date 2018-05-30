@@ -83,7 +83,7 @@ class ContractMethods:
       total_supply = self._round_supply(total_supply, decimals)
       total_supply = str(total_supply)
     except:
-      total_supply = 0
+      total_supply = '0'
     try:
       owner = contract_instance.functions.owner().call()
     except:
