@@ -2,12 +2,27 @@ from pyelasticsearch import ElasticSearch
 from tqdm import *
 from pyelasticsearch.exceptions import ElasticHttpError
 
-STRING_PROPERTIES = [
-  "from", "hash", 
-  "blockTimestamp", "callType", 
-  "gas", "gasUsed", "output"
-]
-OBJECT_PROPERTIES = ["traceAddress"]
+STRING_PROPERTIES = {
+  "tx": ["from", "hash", "blockTimestamp", "creates", "to"],
+  "itx": [
+    "from", "hash",
+    "blockTimestamp", "callType",
+    "gas", "gasUsed",
+    "callType", "blockHash", "transactionHash",
+    "refundAddress", "to", "value"
+  ]
+}
+
+OBJECT_PROPERTIES = {
+  "tx": ["decoded_input"],
+  "itx": ["decoded_input", "traceAddress"]
+}
+
+TEXT_PROPERTIES = {
+  "tx": ["input"],
+  "itx": ["code", "input", "init", "error", "output"]
+}
+
 NUMBER_OF_JOBS = 10
 
 class CustomElasticSearch(ElasticSearch):
@@ -71,17 +86,41 @@ class CustomElasticSearch(ElasticSearch):
         page_items = client.send_request('POST', ['_search', 'scroll'], {'scroll': '60m', 'scroll_id': scroll_id}, {})['hits']['hits']
       yield page_items
 
-  def _set_string_properties_mapping(self, index, doc_type):
+  def _set_mapping(self, index, doc_type, properties, type):
     mapping = {}
-    for property in STRING_PROPERTIES:
-      mapping[property] = {"type": "string", "index": "no"}
+    for property in properties:
+      mapping[property] = type
     self.put_mapping(index, doc_type, {'properties': mapping})
 
+  def _set_string_properties_mapping(self, index, doc_type):
+    self._set_mapping(
+      index, doc_type,
+      STRING_PROPERTIES[doc_type],
+      {"type": "keyword"}
+    )
+
   def _set_object_properties_mapping(self, index, doc_type):
-    mapping = {}
-    for property in OBJECT_PROPERTIES:
-      mapping[property] = {"type": "object", "enabled": False}
-    self.put_mapping(index, doc_type, {'properties': mapping})
+    self._set_mapping(
+      index, doc_type,
+      OBJECT_PROPERTIES[doc_type],
+      {"type": "object", "enabled": False}
+    )
+
+  def _set_text_properties_mapping(self, index, doc_type):
+    self._set_mapping(
+      index, doc_type,
+      TEXT_PROPERTIES[doc_type],
+      {
+        "type": "text",
+        "index": False,
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 10
+          }
+        }
+      }
+    )
 
   def _disable_all_field(self, index, doc_type):
     self.put_mapping(index, doc_type, {'_all': {"enabled": False}})
@@ -112,3 +151,4 @@ class CustomElasticSearch(ElasticSearch):
       self._disable_all_field(index, doc_type)
       self._set_object_properties_mapping(index, doc_type)
       self._set_string_properties_mapping(index, doc_type)
+      self._set_text_properties_mapping(index, doc_type)
