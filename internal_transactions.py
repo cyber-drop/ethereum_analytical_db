@@ -38,7 +38,7 @@ def _make_trace_requests(parity_hosts, blocks):
 
 def _get_traces_sync(parity_hosts, blocks):
   requests_dict = _make_trace_requests(parity_hosts, blocks)
-  traces = {}
+  traces = []
   for parity_url, request in requests_dict.items():
     request_string = json.dumps(request)
     responses = requests.post(
@@ -46,7 +46,9 @@ def _get_traces_sync(parity_hosts, blocks):
       data=request_string,
       headers={"content-type": "application/json"}
     ).json()
-    traces.update({str(response["id"]): response["result"] for response in responses if "result" in response.keys()})
+    for response in responses:
+      if "result" in response.keys():
+        traces += response["result"]
   return traces
 
 class InternalTransactions:
@@ -87,14 +89,19 @@ class InternalTransactions:
     blocks = [bucket["key"] for bucket in result["aggregations"]["blocks"]["buckets"]]
     return blocks
 
-  def _iterate_transactions(self, block):
-    return self.client.iterate(self.indices["transaction"], 'tx', "blockNumber:" + str(block))
+  def _iterate_transactions(self, blocks):
+    query = {
+      "terms": {
+        "blockNumber": blocks
+      }
+    }
+    return self.client.iterate(self.indices["transaction"], 'tx', query)
 
   def _get_traces(self, blocks):    
     chunks = self._split_on_chunks(blocks, NUMBER_OF_PROCESSES)
     arguments = list(zip(repeat(self.parity_hosts), chunks))
     traces = self.pool.starmap(_get_traces_sync, arguments)
-    return {id: trace for traces_dict in traces for id, trace in traces_dict.items()}
+    return [transaction for trace in traces for transaction in trace]
 
   def _set_trace_hashes(self, trace):
     traces_size = {}
@@ -130,10 +137,7 @@ class InternalTransactions:
       else:
         internal_transaction["class"] = OTHER_TRANSACTION
 
-  def _set_block_number(self, trace, block):
-    for transaction in trace:
-      transaction["blockNumber"] = block
-
+  # TODO change
   def _save_traces(self, blocks):
     transactions_query = {
       "terms": {
@@ -151,31 +155,24 @@ class InternalTransactions:
     return transaction
 
   def _save_internal_transactions(self, blocks_traces):
-    docs = []
-    for block, transactions in blocks_traces.items():
-      docs += [
-        self._preprocess_internal_transaction(transaction)
-        for transaction in transactions
-        if transaction["transactionHash"] and not (transaction["hash"].endswith(".0"))
-      ]
+    docs = [
+      self._preprocess_internal_transaction(transaction)
+      for transaction in blocks_traces
+      if transaction["transactionHash"] and not (transaction["hash"].endswith(".0"))
+    ]
     if docs:
-      for docs_chunk in tqdm(self._split_on_chunks(docs, NUMBER_OF_JOBS)):
-        self.client.bulk_index(docs=docs_chunk, index=self.indices["internal_transaction"], doc_type="itx", id_field="hash", refresh=True)
+      self.client.bulk_index(docs=docs, index=self.indices["internal_transaction"], doc_type="itx", id_field="hash", refresh=True)
 
   def _save_miner_transactions(self, blocks_traces):
-    docs = []
-    for block, transactions in blocks_traces.items():
-      docs += [self._preprocess_internal_transaction(transaction) for transaction in transactions if not transaction["transactionHash"]]
+    docs = [self._preprocess_internal_transaction(transaction) for transaction in blocks_traces if not transaction["transactionHash"]]
     self.client.bulk_index(docs=docs, index=self.indices["miner_transaction"], doc_type="tx", id_field="hash",
                            refresh=True)
 
   def _extract_traces_chunk(self, blocks):
     blocks_traces = self._get_traces(blocks)
-    for block, trace in blocks_traces.items():
-      self._set_trace_hashes(trace)
-      self._set_block_number(trace, block)
-      for transactions in self._iterate_transactions(block):
-        self._classify_trace(transactions, trace)
+    self._set_trace_hashes(blocks_traces)
+    for transactions in self._iterate_transactions(blocks):
+      self._classify_trace(transactions, blocks_traces)
     self._save_internal_transactions(blocks_traces)
     self._save_miner_transactions(blocks_traces)
     self._save_traces(blocks)

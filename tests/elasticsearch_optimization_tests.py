@@ -207,8 +207,8 @@ class TransactionsElasticSearchOptimizationTestCase(ElasticSearchOptimizationTes
 
 class InternalTransactionsElasticSearchOptimizationTestCase(ElasticSearchOptimizationTestCase, unittest.TestCase):
   string_fields = ["callType", "from", "gas", "hash", "blockTimestamp", "gasUsed",
-                   "blockHash", "transactionHash",
-                   "refundAddress", "to", "value"]
+                   "blockHash", "transactionHash", "refundAddress", "to", "value",
+                   "type", "address", "balance", "blockNumber"]
   text_fields = ["input", "code", "init", "error", "output"]
   object_fields = ["traceAddress", "decoded_input"]
   doc_type = 'itx'

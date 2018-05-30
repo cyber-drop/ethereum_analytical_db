@@ -9,7 +9,8 @@ STRING_PROPERTIES = {
     "blockTimestamp", "callType",
     "gas", "gasUsed",
     "callType", "blockHash", "transactionHash",
-    "refundAddress", "to", "value"
+    "refundAddress", "to", "value",
+    "type", "address", "balance", "blockNumber"
   ]
 }
 
