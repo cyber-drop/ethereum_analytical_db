@@ -16,6 +16,7 @@ class ContractMethods:
     self.w3 = Web3(HTTPProvider(parity_hosts[0][2]))
     self.standard_token_abi = standard_token_abi
     self.standards = self._extract_methods_signatures()
+    self.constants = ['name', 'symbol', 'decimals', 'total_supply', 'owner']
 
   def _iterate_contracts(self):
     return self.client.iterate(self.indices["contract"], 'contract', 'address:*')
@@ -56,39 +57,40 @@ class ContractMethods:
         avail_standards.append(standard)
     return avail_standards
 
+  
   def _round_supply(self, supply, decimals):
     if decimals > 1:
       supply = supply / math.pow(10, decimals)
       supply = Decimal(supply)
       supply = round(supply)
+      supply = str(supply)
+    else: 
+      supply = str(supply)
     return supply
+
+  def _constant_methods(self, contract_instance):
+    return {
+      'name': {'func': contract_instance.functions.name(), 'placeholder': 'None'},
+      'symbol': {'func': contract_instance.functions.symbol(), 'placeholder': 'None'},
+      'decimals': {'func': contract_instance.functions.decimals(),'placeholder': 1},
+      'total_supply': {'func': contract_instance.functions.totalSupply(),'placeholder': '0'},
+      'owner': {'func': contract_instance.functions.owner(), 'placeholder': 'None'}
+    }
 
   def _get_constants(self, address):
     contract_checksum_addr = self.w3.toChecksumAddress(address)
     contract_instance = self.w3.eth.contract(address=contract_checksum_addr, abi=self.standard_token_abi)
-    try:
-      name = contract_instance.functions.name().call()
-    except:
-      name = 'None'
-    try:
-      symbol = contract_instance.functions.symbol().call()
-    except:
-      symbol = 'None'
-    try:
-      decimals = contract_instance.functions.decimals().call()
-    except:
-      decimals = 1
-    try:
-      total_supply = contract_instance.functions.totalSupply().call()
-      total_supply = self._round_supply(total_supply, decimals)
-      total_supply = str(total_supply)
-    except:
-      total_supply = '0'
-    try:
-      owner = contract_instance.functions.owner().call()
-    except:
-      owner = 'None'
-    return (name, symbol, decimals, total_supply, owner)
+    methods = self._constant_methods(contract_instance)
+    contract_constants = []
+    for constant in self.constants:
+      try:
+        response = methods[constant]['func'].call()
+      except:
+        response = methods[constant]['placeholder']
+      if constant == 'total_supply' and response != '0':
+        response = self._round_supply(response, contract_constants[2])
+      contract_constants.append(response)
+    return contract_constants
     
   def _update_contract_descr(self, doc_id, body):
     self.client.update(self.indices['contract'], 'contract', doc_id, doc=body, refresh=True)
