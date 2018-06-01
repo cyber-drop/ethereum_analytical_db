@@ -21,16 +21,12 @@ curl -X DELETE localhost:9200/ethereum-token-transaction?pretty
     echo "Contracts detected"
     python3 ./extractor.py --operation extract-traces
     echo "Traces extracted"
-    python3 ./extractor.py --operation detect-internal-contracts
-    echo "Internal contracts detected"
     python3 ./extractor.py --operation extract-traces
     echo "Traces re-extracted"
     python3 ./extractor.py --operation search-methods
     echo "Contracts info added"
     python3 ./extractor.py --operation parse-inputs
     echo "Inputs parsed"
-    python3 ./extractor.py --operation parse-internal-inputs
-    echo "Internal inputs parsed"
     python3 ./extractor.py --operation extract-tokens-txs
     echo "Tokens transactions extracted"
 )
