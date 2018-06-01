@@ -18,8 +18,10 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.client.recreate_fast_index(TEST_TRANSACTIONS_INDEX)
     self.client.recreate_fast_index(TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type='itx')
     self.client.recreate_index(TEST_MINER_TRANSACTIONS_INDEX)
+    self.client.recreate_index(TEST_BLOCKS_INDEX)
     self.parity_hosts = [(None, None, "http://localhost:8545")]
     self.internal_transactions = InternalTransactions({
+      "block": TEST_BLOCKS_INDEX,
       "transaction": TEST_TRANSACTIONS_INDEX,
       "internal_transaction": TEST_INTERNAL_TRANSACTIONS_INDEX,
       "miner_transaction": TEST_MINER_TRANSACTIONS_INDEX
@@ -32,12 +34,13 @@ class InternalTransactionsTestCase(unittest.TestCase):
 
   def test_iterate_blocks(self):
     self.internal_transactions.parity_hosts = [(0, 4, "http://localhost:8545"), (5, None, "http://localhost:8545")]
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 1}, id=1, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 2}, id=2, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 3, 'trace': True}, id=3, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 4}, id=4, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 5}, id=5, refresh=True)
-    blocks = self.internal_transactions._iterate_blocks()
+    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 1}, id=1, refresh=True)
+    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 2}, id=2, refresh=True)
+    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 3, 'traces_extracted': True}, id=3, refresh=True)
+    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 4}, id=4, refresh=True)
+    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 5}, id=5, refresh=True)
+    blocks = next(self.internal_transactions._iterate_blocks())
+    blocks = [block["_source"]["number"] for block in blocks]
     self.assertCountEqual(blocks, [1, 2, 5])
 
   def test_iterate_transactions(self):
@@ -180,105 +183,74 @@ class InternalTransactionsTestCase(unittest.TestCase):
   def test_classify_trace(self):
     trace = [{
       "transactionHash": "0x0",
+      "hash": "0x0.0",
       "action": {
         "from": "0x0",
         "to": "0x1"
       }
     }, {
       "transactionHash": "0x0",
+      "hash": "0x0.1",
       "action": {
         "from": "0x1",
         "to": "0x0"
       }
     }, {
       "transactionHash": "0x0",
+      "hash": "0x0.2",
       "action": {
         "from": "0x0",
         "to": "0x3"
       }
     }, {
       "transactionHash": "0x0",
+      "hash": "0x0.3",
       "action": {
         "from": "0x0",
         "to": "0x0"
       }
     }, {
       "transactionHash": "0x0",
+      "hash": "0x0.4",
       "action": {
         "from": "0x0"
       }
-    }, {
-      "transactionHash": "0x1",
-      "action": {
-        "from": "0x0",
-        "to": "0x1"
-      }
     }]
-    transactions = [{
-      "_id": "0x0",
-      "_source": {
-        "from": "0x0",
-        "to": "0x1"
-      }
-    },
-    {
-      "_id": "0x1",
-      "_source": {
-        "from": "0x1",
-        "to": "0x2"
-      }
-    }]
-    self.internal_transactions._classify_trace(transactions, trace)
-    assert trace[0]["class"] == INPUT_TRANSACTION
+    self.internal_transactions._classify_trace(trace)
+    # assert trace[0]["class"] == INPUT_TRANSACTION
     assert trace[1]["class"] == INTERNAL_TRANSACTION
     assert trace[2]["class"] == OUTPUT_TRANSACTION
     assert trace[3]["class"] == OTHER_TRANSACTION
     assert trace[4]["class"] == OTHER_TRANSACTION
-    assert trace[5]["class"] == OTHER_TRANSACTION
 
   def test_classify_reward(self):
     trace = [{
+      "hash": "0x0",
       "transactionHash": None
     }, {
       "transactionHash": "0x1",
-      "action": {
-        "from": "0x0",
-        "to": "0x0"
-      }
-    }]
-    transactions = [{"_id": "0x1", "_source": {"from": "0x0", "to": "0x0"}}]
-    self.internal_transactions._classify_trace(transactions, trace)
-    assert "class" not in trace[0].keys()
-    assert "class" in trace[1].keys()
-
-  def test_classify_trace_partially(self):
-    trace = [{
-      "transactionHash": "0x2",
+      "hash": "0x1.0",
       "action": {
         "from": "0x0",
         "to": "0x0"
       }
     }, {
       "transactionHash": "0x1",
+      "hash": "0x1.1",
       "action": {
         "from": "0x0",
         "to": "0x0"
       }
     }]
-    transactions = [{"_id": "0x1", "_source": {"from": "0x0", "to": "0x0"}}]
-    self.internal_transactions._classify_trace(transactions, trace)
+    self.internal_transactions._classify_trace(trace)
     assert "class" not in trace[0].keys()
     assert "class" in trace[1].keys()
 
   def test_save_traces(self):
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {"blockNumber": 123}, id=1, refresh=True)
+    self.client.index(TEST_BLOCKS_INDEX, 'b', {"number": 123}, id=1, refresh=True)
     self.internal_transactions._save_traces([123])
-    transaction = self.client.get(TEST_TRANSACTIONS_INDEX, 'tx', 1)['_source']
-    assert transaction['trace']
-
-  def test_save_empty_traces(self):
-    self.internal_transactions._save_traces([])
-    assert True
+    block = self.client.get(TEST_BLOCKS_INDEX, 'b', 1)['_source']
+    assert block['trace']
 
   def test_preprocess_internal_transaction_with_empty_field(self):
     self.internal_transactions._preprocess_internal_transaction({"action": None})
@@ -326,33 +298,15 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert miner_transactions[0]["_id"] == "0x1"
     self.assertCountEqual(miner_transactions[0]["_source"], {"transactionHash": None})
 
-  def _add_transactions_and_return_chunk(self):
-    docs = [{
-      'hash': TEST_TRANSACTION_HASH,
-      'from': TEST_TRANSACTION_HASH,
-      'to': TEST_TRANSACTION_HASH,
-      'to_contract': True,
-      'id': i,
-      'blockNumber': TEST_BLOCK_NUMBER,
-      "transactionIndex": i % 10
-    } for i in range(TEST_BIG_TRANSACTIONS_NUMBER)]
-    self.client.bulk_index(TEST_TRANSACTIONS_INDEX, 'tx', docs, refresh=True)
-    transactions = self.client.search(index=TEST_TRANSACTIONS_INDEX, doc_type='tx', query="*")['hits']['hits']
-    return transactions, list(set([transaction["_source"]["blockNumber"] for transaction in transactions]))
-
   def test_extract_traces_chunk(self):
     test_blocks = ["0x{}".format(i) for i in range(10)]
     test_traces = [{"transactionHash": "0x{}".format(i % 3)} for i in range(10)]
-    test_transactions_chunks = [[str(j*10 + i) for i in range(10)] for j in range(10)]
     mockify(self.internal_transactions, {
-      "_get_traces": MagicMock(return_value=test_traces),
-      "_iterate_transactions": MagicMock(return_value=test_transactions_chunks)
+      "_get_traces": MagicMock(return_value=test_traces)
     }, ["_extract_traces_chunk"])
     process = Mock(
       get_traces=self.internal_transactions._get_traces,
       set_hashes=self.internal_transactions._set_trace_hashes,
-      iterate=self.internal_transactions._iterate_transactions,
-      classify=self.internal_transactions._classify_trace,
       save_traces=self.internal_transactions._save_traces,
       save_transactions=self.internal_transactions._save_internal_transactions,
       save_rewards=self.internal_transactions._save_miner_transactions
@@ -360,30 +314,28 @@ class InternalTransactionsTestCase(unittest.TestCase):
 
     self.internal_transactions._extract_traces_chunk(test_blocks)
 
-    calls = [call.get_traces(test_blocks)]
-    calls.append(call.set_hashes(test_traces))
-    calls.append(call.iterate(test_blocks))
-    for chunk in test_transactions_chunks:
-      calls.append(call.classify(chunk, test_traces))
-    calls += [call.save_transactions(test_traces), call.save_rewards(test_traces)]
-    calls.append(call.save_traces(test_blocks))
+    calls = [
+      call.get_traces(test_blocks),
+      call.set_hashes(test_traces),
+      call.save_transactions(test_traces),
+      call.save_rewards(test_traces),
+      call.save_traces(test_blocks)
+    ]
     process.assert_has_calls(calls)
 
   def test_extract_traces(self):
-    test_blocks = list(range(10))
     test_chunks = [list(range(5)), list(range(5, 10))]
-    self.internal_transactions._iterate_blocks = MagicMock(return_value=test_blocks)
-    self.internal_transactions._split_on_chunks = MagicMock(return_value=test_chunks)
+    test_chunks_from_elasticsearch = [[{"_source": {"number": block}} for block in chunk] for chunk in test_chunks]
+    self.internal_transactions._iterate_blocks = MagicMock(return_value=test_chunks_from_elasticsearch)
     self.internal_transactions._extract_traces_chunk = MagicMock()
     process = Mock(
       iterate=self.internal_transactions._iterate_blocks,
-      split=self.internal_transactions._split_on_chunks,
       extract=self.internal_transactions._extract_traces_chunk
     )
 
     self.internal_transactions.extract_traces()
 
-    calls = [call.iterate(), call.split(test_blocks, 10)]
+    calls = [call.iterate()]
     for chunk in test_chunks:
       calls.append(call.extract(chunk))
     process.assert_has_calls(calls)
@@ -391,6 +343,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
   def test_process(self):
     test_transactions = self.client.search(index=REAL_TRANSACTIONS_INDEX, doc_type="tx", query="*", size=10000)['hits']['hits']
     test_transactions = [transaction["_source"] for transaction in test_transactions]
+    test_blocks = [{"number": block} for block in set(transaction["blockNumber"] for transaction in test_transactions)]
     test_blocks_number = len(list(set(transaction["blockNumber"] for transaction in test_transactions)))
     self.client.bulk_index(
       docs=test_transactions,
@@ -399,12 +352,19 @@ class InternalTransactionsTestCase(unittest.TestCase):
       id_field="hash",
       refresh=True
     )
+    self.client.bulk_index(
+      docs=test_blocks,
+      index=TEST_BLOCKS_INDEX,
+      doc_type='b',
+      refresh=True
+    )
 
     self.internal_transactions.extract_traces()
 
     internal_transactions_count = self.client.count(index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type="itx", query="*")["count"]
     miner_transactions_count = self.client.count(index=TEST_MINER_TRANSACTIONS_INDEX, doc_type="tx", query="*")["count"]
-    assert internal_transactions_count == 1044
+    print(miner_transactions_count)
+    assert internal_transactions_count == 422
     print(internal_transactions_count)
     assert miner_transactions_count == test_blocks_number
 
@@ -414,6 +374,7 @@ TEST_BLOCK_NUMBER = 3068185
 TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 10
 TEST_TRANSACTIONS_INDEX = 'test-ethereum-transactions'
 TEST_INTERNAL_TRANSACTIONS_INDEX = 'test-ethereum-internal-transactions'
+TEST_BLOCKS_INDEX = "test-ethereum-blocks"
 TEST_MINER_TRANSACTIONS_INDEX = 'test-ethereum-miner-transactions'
 TEST_TRANSACTION_HASH = '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a'
 TEST_TRANSACTION_INPUT = '0xb1631db29e09ec5581a0ec398f1229abaf105d3524c49727621841af947bdc44'
