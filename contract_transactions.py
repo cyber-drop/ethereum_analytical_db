@@ -59,7 +59,7 @@ class ExternalContractTransactions(ContractTransactions):
 class InternalContractTransactions(ContractTransactions):
   index = "internal_transaction"
   doc_type = "itx"
-  contract_transactions_query = "type:create"
+  contract_transactions_query = "type:create AND !(_exists_:error)"
 
   def _extract_contract_from_transactions(self, transaction):
     return {

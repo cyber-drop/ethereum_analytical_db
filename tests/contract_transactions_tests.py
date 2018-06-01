@@ -106,7 +106,8 @@ class InternalContractTransactionsTestCase(ContractTransactionsTestCase, unittes
   def test_iterate_internal_contract_transactions(self):
     self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "call"}, id=1, refresh=True)
     self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create"}, id=2, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'type': "create"}, id=3, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create", "error": "Out of gas"}, id=3, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'type': "create"}, id=4, refresh=True)
     iterator = self.contract_transactions._iterate_contract_transactions()
     transactions = next(iterator)
     transactions = [transaction['_id'] for transaction in transactions]
