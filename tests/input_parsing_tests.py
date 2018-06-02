@@ -91,7 +91,7 @@ class InputParsingTestCase():
   def test_save_contracts_abi(self):
     for i in tqdm(range(10)):
       self.client.index(TEST_CONTRACTS_INDEX, 'contract', {"blockNumber": i, 'address': TEST_CONTRACT_ADDRESS}, id=i + 1, refresh=True)
-    self.contracts._save_contracts_abi()
+    self.contracts.save_contracts_abi()
     contracts = self.client.search(index=TEST_CONTRACTS_INDEX, doc_type='contract', query="abi:*", size=100)['hits']['hits']
     abis = [contract["_source"]["abi"] for contract in contracts]
     self.assertCountEqual(abis, [TEST_CONTRACT_ABI] * 10)
@@ -99,7 +99,7 @@ class InputParsingTestCase():
   def test_save_contracts_abi_status(self):
     for i in tqdm(range(10)):
       self.client.index(TEST_CONTRACTS_INDEX, 'contract', {"blockNumber": i, 'address': TEST_CONTRACT_ADDRESS}, id=i + 1, refresh=True)
-    self.contracts._save_contracts_abi()
+    self.contracts.save_contracts_abi()
     contracts_count = self.client.count(index=TEST_CONTRACTS_INDEX, doc_type='contract', query="abi_extracted:true")['count']
     assert contracts_count == 10
 
@@ -139,9 +139,10 @@ class InputParsingTestCase():
       self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS, 'blockNumber': i}, id=i + 1, refresh=True)
     for i in tqdm(range(10)):
       self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {'to': TEST_CONTRACT_ADDRESS, 'input': TEST_CONTRACT_PARAMETERS}, id=i + 1, refresh=True)
+    self.contracts.save_contracts_abi()
     self.contracts.decode_inputs()
-    transactions = self.client.search(index=TEST_TRANSACTIONS_INDEX, doc_type=self.doc_type, query="decoded_input:*")['hits']['hits']
-    assert len(transactions) == 10
+    transactions = self.client.search(index=TEST_TRANSACTIONS_INDEX, doc_type=self.doc_type, query="*")['hits']['hits']
+    assert len([transaction["_source"]["decoded_input"] for transaction in transactions]) == 10
 
 class ExternalTransactionsInputParsingTestCase(InputParsingTestCase, unittest.TestCase):
   doc_type = "tx"

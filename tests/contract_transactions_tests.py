@@ -39,7 +39,7 @@ class ContractTransactionsTestCase():
         docs=["contract" for _ in transactions]
       ))
 
-    self.contract_transactions._extract_contract_addresses()
+    self.contract_transactions.extract_contract_addresses()
 
     process.assert_has_calls(calls)
 
@@ -85,7 +85,6 @@ class ContractTransactionsTestCase():
     self.contract_transactions._detect_transactions_by_contracts = MagicMock()
     process = Mock()
     process.configure_mock(
-      extract=self.contract_transactions._extract_contract_addresses,
       iterate=self.contract_transactions._iterate_contracts,
       detect=self.contract_transactions._detect_transactions_by_contracts
     )
@@ -93,7 +92,6 @@ class ContractTransactionsTestCase():
     self.contract_transactions.detect_contract_transactions()
 
     process.assert_has_calls([
-      call.extract(),
       call.iterate()
     ] + [call.detect(contracts) for contracts in contracts_list])
 
@@ -106,7 +104,8 @@ class InternalContractTransactionsTestCase(ContractTransactionsTestCase, unittes
   def test_iterate_internal_contract_transactions(self):
     self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "call"}, id=1, refresh=True)
     self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create"}, id=2, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'type': "create"}, id=3, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create", "error": "Out of gas"}, id=3, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'type': "create"}, id=4, refresh=True)
     iterator = self.contract_transactions._iterate_contract_transactions()
     transactions = next(iterator)
     transactions = [transaction['_id'] for transaction in transactions]
