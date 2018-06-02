@@ -63,7 +63,7 @@ class TokenHolders:
         }
       }
     }
-    res = requests.get('http://localhost:9200/' + self.indices['transaction'] + '/tx/_count', json=count_body)
+    res = requests.get('http://localhost:9200/' + self.indices['internal_transaction'] + '/tx/_count', json=count_body)
     res = res.json()
     txs_count = res['count']
     return txs_count
@@ -112,16 +112,17 @@ class TokenHolders:
     self._insert_multiple_docs(listed_tokens, 'token', self.indices['listed_token'])
 
   def _iterate_token_txs(self, token_address):
-    return self.client.iterate(self.indices['transaction'], 'tx', 'to:' + token_address)
+    return self.client.iterate(self.indices['internal_transaction'], 'tx', 'to:' + token_address)
 
   def _construct_tx_descr_from_input(self, tx):
     tx_input = tx['decoded_input']
+    is_valid_tx = 'error' not in tx.keys()
     if tx_input['name'] == 'transfer':
-      return {'method': tx_input['name'], 'from': tx['from'], 'to': tx_input['params'][0]['value'], 'value': tx_input['params'][1]['value'],'block_id': tx['blockNumber'], 'token': tx['to'], 'tx_index': self.indices['transaction']}
+      return {'method': tx_input['name'], 'from': tx['from'], 'to': tx_input['params'][0]['value'], 'value': tx_input['params'][1]['value'],'block_id': tx['blockNumber'], 'valid': is_valid_tx, 'token': tx['to'], 'tx_index': self.indices['internal_transaction']}
     elif tx_input['name'] == 'transferFrom':
-      return {'method': tx_input['name'], 'from': tx_input['params'][0]['value'], 'to': tx_input['params'][1]['value'], 'value': tx_input['params'][2]['value'], 'block_id': tx['blockNumber'], 'token': tx['to'], 'tx_index': self.indices['transaction']}
+      return {'method': tx_input['name'], 'from': tx_input['params'][0]['value'], 'to': tx_input['params'][1]['value'], 'value': tx_input['params'][2]['value'], 'block_id': tx['blockNumber'], 'valid': is_valid_tx, 'token': tx['to'], 'tx_index': self.indices['internal_transaction']}
     elif tx_input['name'] == 'approve':
-      return {'method': tx_input['name'], 'from': tx['from'], 'spender': tx_input['params'][0]['value'], 'value': tx_input['params'][1]['value'],'block_id': tx['blockNumber'], 'token': tx['to'], 'tx_index': self.indices['transaction']}
+      return {'method': tx_input['name'], 'from': tx['from'], 'spender': tx_input['params'][0]['value'], 'value': tx_input['params'][1]['value'],'block_id': tx['blockNumber'], 'valid': is_valid_tx, 'token': tx['to'], 'tx_index': self.indices['internal_transaction']}
     else:
       return
 
