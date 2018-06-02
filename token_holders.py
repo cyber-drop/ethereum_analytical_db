@@ -112,7 +112,7 @@ class TokenHolders:
     self._insert_multiple_docs(listed_tokens, 'token', self.indices['listed_token'])
 
   def _iterate_token_txs(self, token_address):
-    return self.client.iterate(self.indices['internal_transaction'], 'tx', 'to:' + token_address)
+    return self.client.iterate(self.indices['internal_transaction'], 'itx', 'to:' + token_address)
 
   def _construct_tx_descr_from_input(self, tx):
     tx_input = tx['decoded_input']
