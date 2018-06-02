@@ -85,7 +85,7 @@ class Contracts():
   def _iterate_contracts_without_abi(self):
     return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(_exists_:abi) AND ' + self._get_range_query())
 
-  def _save_contracts_abi(self):
+  def save_contracts_abi(self):
     for contracts in self._iterate_contracts_without_abi():
       abis = self._get_contracts_abi([contract["_source"]["address"] for contract in contracts])
       operations = [self.client.update_op(doc={'abi': abis[index], 'abi_extracted': True}, id=contract["_id"]) for index, contract in enumerate(contracts)]
@@ -111,7 +111,6 @@ class Contracts():
       self.client.bulk(operations, doc_type=self.doc_type, index=self.indices[self.index], refresh=True)
 
   def decode_inputs(self):
-    self._save_contracts_abi()
     for contracts in self._iterate_contracts_with_abi():
       self._set_contracts_abi({contract["_source"]["address"]: contract["_source"]["abi"] for contract in contracts})
       self._decode_inputs_for_contracts(contracts)

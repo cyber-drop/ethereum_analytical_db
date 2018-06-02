@@ -10,7 +10,7 @@ class ContractTransactions:
   def _iterate_contract_transactions(self):
     return self.client.iterate(self.indices[self.index], self.doc_type, self.contract_transactions_query)
 
-  def _extract_contract_addresses(self):
+  def extract_contract_addresses(self):
     for contract_transactions in self._iterate_contract_transactions():
       docs = [self._extract_contract_from_transactions(transaction["_source"]) for transaction in contract_transactions]
       self.client.bulk_index(docs=docs, doc_type='contract', index=self.indices["contract"], refresh=True)
@@ -36,7 +36,6 @@ class ContractTransactions:
     self.client.update_by_query(self.indices["contract"], 'contract', contracts_query, "ctx._source.transactions_detected = true")
 
   def detect_contract_transactions(self):
-    self._extract_contract_addresses()
     for contracts in self._iterate_contracts():
       contracts = [contract["_source"]["address"] for contract in contracts]
       self._detect_transactions_by_contracts(contracts)

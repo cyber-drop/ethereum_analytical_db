@@ -39,7 +39,7 @@ class ContractTransactionsTestCase():
         docs=["contract" for _ in transactions]
       ))
 
-    self.contract_transactions._extract_contract_addresses()
+    self.contract_transactions.extract_contract_addresses()
 
     process.assert_has_calls(calls)
 
@@ -85,7 +85,6 @@ class ContractTransactionsTestCase():
     self.contract_transactions._detect_transactions_by_contracts = MagicMock()
     process = Mock()
     process.configure_mock(
-      extract=self.contract_transactions._extract_contract_addresses,
       iterate=self.contract_transactions._iterate_contracts,
       detect=self.contract_transactions._detect_transactions_by_contracts
     )
@@ -93,7 +92,6 @@ class ContractTransactionsTestCase():
     self.contract_transactions.detect_contract_transactions()
 
     process.assert_has_calls([
-      call.extract(),
       call.iterate()
     ] + [call.detect(contracts) for contracts in contracts_list])
 
