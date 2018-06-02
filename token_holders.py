@@ -67,7 +67,6 @@ class TokenHolders:
     res = res.json()
     txs_count = res['count']
     return txs_count
-
   def _find_real_token(self, duplicates_list):
     for duplicate in duplicates_list:
       duplicate['_source']['txs_count'] = self._get_token_txs_count(duplicate['_source']['address'])
