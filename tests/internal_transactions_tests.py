@@ -273,12 +273,8 @@ class InternalTransactionsTestCase(unittest.TestCase):
   def test_save_traces(self):
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {"blockNumber": 123}, id=1, refresh=True)
     self.internal_transactions._save_traces([123])
-    transaction = self.client.get(TEST_TRANSACTIONS_INDEX, 'tx', 1)['_source']
-    assert transaction['trace']
-
-  def test_save_empty_traces(self):
-    self.internal_transactions._save_traces([])
-    assert True
+    block = self.client.get(TEST_BLOCKS_INDEX, 'b', 1)['_source']
+    assert block['traces_extracted']
 
   def test_preprocess_internal_transaction_with_empty_field(self):
     self.internal_transactions._preprocess_internal_transaction({"action": None})
