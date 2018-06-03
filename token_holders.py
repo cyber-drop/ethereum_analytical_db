@@ -111,8 +111,13 @@ class TokenHolders:
     listed_tokens = self._search_duplicates()
     self._insert_multiple_docs(listed_tokens, 'token', self.indices['listed_token'])
 
-  def _iterate_token_txs(self, token_address):
-    return self.client.iterate(self.indices['transaction'], 'tx', 'to:' + token_address)
+  def _iterate_tokens_txs(self, token_addresses):
+    query = {
+      "terms": {
+        "to": token_addresses
+      }
+    }
+    return self.client.iterate(self.indices['transaction'], 'tx', query)
 
   def _construct_tx_descr_from_input(self, tx):
     tx_input = tx['decoded_input']
@@ -145,15 +150,14 @@ class TokenHolders:
   def _iterate_tx_descriptions(self):
     return self.client.iterate(self.indices['token_tx'], 'tx', 'token:*')
 
-  def _extract_token_txs(self, token_address):
-    for txs_chunk in self._iterate_token_txs(token_address):
+  def _extract_tokens_txs(self, token_addresses):
+    for txs_chunk in self._iterate_tokens_txs(token_addresses):
       self._extract_descriptions_from_txs(txs_chunk) 
 
   def get_listed_tokens_txs(self):
     self._load_listed_tokens()
     for tokens in self._iterate_tokens():
-      for token in tokens:
-        self._extract_token_txs(token['_source']['address'])
+        self._extract_tokens_txs([token['_source']['address'] for token in tokens])
 
   def _get_listed_tokens_addresses(self):
     addresses = []

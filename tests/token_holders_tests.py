@@ -39,7 +39,7 @@ class TokenHoldersTestCase(unittest.TestCase):
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
 
-    self.token_holders._extract_token_txs('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d')
+    self.token_holders._extract_tokens_txs(['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'])
     token_txs = self.token_holders._iterate_token_tx_descriptions('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d')
     token_txs = [tx for txs_list in token_txs for tx in txs_list]
     methods = [tx['_source']['method'] for tx in token_txs]
