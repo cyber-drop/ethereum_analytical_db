@@ -135,7 +135,7 @@ class InternalTransactions:
         "number": blocks
       }
     }
-    self.client.update_by_query(self.indices["block"], 'b', query, 'ctx._source.trace = true')
+    self.client.update_by_query(self.indices["block"], 'b', query, 'ctx._source.traces_extracted = true')
 
   def _preprocess_internal_transaction(self, transaction):
     transaction = transaction.copy()
