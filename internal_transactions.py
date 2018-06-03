@@ -70,24 +70,15 @@ class InternalTransactions:
       yield elements
 
   def _iterate_blocks(self):
+
     ranges = [host_tuple[0:2] for host_tuple in self.parity_hosts]
-    range_query = self.client.make_range_query("blockNumber", *ranges)
+    range_query = self.client.make_range_query("number", *ranges)
     query = {
-      "size": 0,
-      "query": {
-        "query_string": {
-          "query": '!(_exists_:trace) AND ' + range_query
-        }
-      },
-      "aggs": {
-        "blocks": {
-          "terms": {"field": "blockNumber", "size": MAX_BLOCKS_NUMBER}
-        }
+      "query_string": {
+        "query": '!(_exists_:traces_extracted) AND ' + range_query
       }
     }
-    result = self.client.search(index=self.indices["transaction"], doc_type='tx', query=query)
-    blocks = [bucket["key"] for bucket in result["aggregations"]["blocks"]["buckets"]]
-    return blocks
+    return self.client.iterate(self.indices["block"], "b", query)
 
   def _iterate_transactions(self, blocks):
     query = {
@@ -97,7 +88,7 @@ class InternalTransactions:
     }
     return self.client.iterate(self.indices["transaction"], 'tx', query)
 
-  def _get_traces(self, blocks):    
+  def _get_traces(self, blocks):
     chunks = self._split_on_chunks(blocks, NUMBER_OF_PROCESSES)
     arguments = list(zip(repeat(self.parity_hosts), chunks))
     traces = self.pool.starmap(_get_traces_sync, arguments)
@@ -115,15 +106,16 @@ class InternalTransactions:
       else:
         transaction["hash"] = transaction["blockHash"]
 
-  def _classify_trace(self, transactions, trace):
+  # TODO get rid of this method
+  def _classify_trace(self, trace):
     transactions_dict = {
-      transaction["_id"]: transaction for transaction in transactions
+      transaction["hash"][:-2]: transaction for transaction in trace if transaction["hash"].endswith(".0")
     }
     for internal_transaction in trace:
       transaction_hash = internal_transaction["transactionHash"]
-      if not transaction_hash or (transaction_hash not in transactions_dict.keys()):
+      if not transaction_hash or (transaction_hash not in transactions_dict.keys()) or (transaction_hash.endswith(".0")):
         continue
-      transaction = transactions_dict[transaction_hash]["_source"]
+      transaction = transactions_dict[transaction_hash]["action"]
       action = internal_transaction["action"]
       if ("from" not in action.keys()) or ("to" not in action.keys()):
         internal_transaction["class"] = OTHER_TRANSACTION
@@ -137,14 +129,13 @@ class InternalTransactions:
       else:
         internal_transaction["class"] = OTHER_TRANSACTION
 
-  # TODO change
   def _save_traces(self, blocks):
-    transactions_query = {
+    query = {
       "terms": {
-        "blockNumber": blocks
+        "number": blocks
       }
     }
-    self.client.update_by_query(self.indices["transaction"], 'tx', transactions_query, 'ctx._source.trace = true')
+    self.client.update_by_query(self.indices["block"], 'b', query, 'ctx._source.trace = true')
 
   def _preprocess_internal_transaction(self, transaction):
     transaction = transaction.copy()
@@ -171,13 +162,11 @@ class InternalTransactions:
   def _extract_traces_chunk(self, blocks):
     blocks_traces = self._get_traces(blocks)
     self._set_trace_hashes(blocks_traces)
-    for transactions in self._iterate_transactions(blocks):
-      self._classify_trace(transactions, blocks_traces)
     self._save_internal_transactions(blocks_traces)
     self._save_miner_transactions(blocks_traces)
     self._save_traces(blocks)
 
   def extract_traces(self):
-    blocks_chunks = list(self._split_on_chunks(self._iterate_blocks(), NUMBER_OF_JOBS))
-    for blocks in tqdm(blocks_chunks):
+    for blocks in self._iterate_blocks():
+      blocks = [block["_source"]["number"] for block in blocks]
       self._extract_traces_chunk(blocks)
