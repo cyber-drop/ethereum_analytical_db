@@ -2,10 +2,10 @@ from contracts import ExternalContracts, InternalContracts, _get_contracts_abi_s
 import contracts
 import os
 import unittest
-from test_utils import TestElasticSearch
+from test_utils import TestElasticSearch, mockify
 from tqdm import *
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, Mock
 import ethereum
 import functools
 from time import sleep
@@ -157,6 +157,33 @@ class InputParsingTestCase():
     self.contracts._decode_inputs_for_contracts([])
 
     assert self.contracts.client.bulk.call_count == 9
+
+  def test_save_inputs_decoded(self):
+    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS + str(1)}, id=1, refresh=True)
+    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS + str(2)}, id=2, refresh=True)
+    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS + str(3)}, id=3, refresh=True)
+    self.contracts._save_inputs_decoded([TEST_CONTRACT_ADDRESS + str(1), TEST_CONTRACT_ADDRESS + str(3)])
+    contracts = self.client.search(index=TEST_CONTRACTS_INDEX, doc_type='contract', query="inputs_decoded:true")['hits']['hits']
+    contracts = [contract["_source"]["address"] for contract in contracts]
+    self.assertCountEqual(contracts, [TEST_CONTRACT_ADDRESS + str(1), TEST_CONTRACT_ADDRESS + str(3)])
+
+  def test_decode_inputs_save_inputs_decoded(self):
+    test_contracts = ["contract1", "contract2", "contract3"]
+    test_contracts_from_elasticsearch = [{"_source": {"abi": contract, "address": contract}} for contract in test_contracts]
+    mockify(self.contracts, {
+      "_iterate_contracts_with_abi": MagicMock(return_value=[test_contracts_from_elasticsearch])
+    }, ["decode_inputs"])
+    process = Mock(
+      decode=self.contracts._decode_inputs_for_contracts,
+      save=self.contracts._save_inputs_decoded
+    )
+
+    self.contracts.decode_inputs()
+
+    process.assert_has_calls([
+      call.decode(test_contracts_from_elasticsearch),
+      call.save(test_contracts)
+    ])
 
   def test_decode_inputs_for_big_portion_of_contracts(self):
     for i in tqdm(range(10)):
