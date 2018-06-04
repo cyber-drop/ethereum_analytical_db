@@ -91,6 +91,14 @@ class InputParsingTestCase():
       self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS, "blockNumber": i, 'abi_extracted': True}, id=i + 11, refresh=True)
     for i in tqdm(range(5)):
       self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS, "blockNumber": i, 'abi_extracted': True, 'abi': True}, id=i + 21, refresh=True)
+    for i in tqdm(range(5)):
+      self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
+        'address': TEST_CONTRACT_ADDRESS,
+        "blockNumber": i,
+        'abi_extracted': True,
+        'abi': True,
+        self.doc_type + "_inputs_decoded": True
+      }, id=i + 25, refresh=True)
 
   def test_iterate_contracts_without_abi(self):
     self.contracts = self.contracts_class(
@@ -120,12 +128,12 @@ class InputParsingTestCase():
   def test_iterate_contracts_with_abi(self):
     self.contracts = self.contracts_class(
       {"contract": TEST_CONTRACTS_INDEX, self.index: TEST_TRANSACTIONS_INDEX},
-      parity_hosts=[(0, 8, "http://localhost:8545")]
+      parity_hosts=[(0, 4, "http://localhost:8545")]
     )
     self.add_contracts_with_and_without_abi()
     contracts = [c for c in self.contracts._iterate_contracts_with_abi()]
     contracts = [c["_id"] for contracts_list in contracts for c in contracts_list]
-    self.assertCountEqual(contracts, [str(i) for i in range(21, 26)])
+    self.assertCountEqual(contracts, [str(i) for i in range(21, 25)])
 
   def test_decode_inputs_for_contracts(self):
     self.contracts._set_contracts_abi({TEST_CONTRACT_ADDRESS: TEST_CONTRACT_ABI})
@@ -163,7 +171,7 @@ class InputParsingTestCase():
     self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS + str(2)}, id=2, refresh=True)
     self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS + str(3)}, id=3, refresh=True)
     self.contracts._save_inputs_decoded([TEST_CONTRACT_ADDRESS + str(1), TEST_CONTRACT_ADDRESS + str(3)])
-    contracts = self.client.search(index=TEST_CONTRACTS_INDEX, doc_type='contract', query="inputs_decoded:true")['hits']['hits']
+    contracts = self.client.search(index=TEST_CONTRACTS_INDEX, doc_type='contract', query=self.doc_type + "_inputs_decoded:true")['hits']['hits']
     contracts = [contract["_source"]["address"] for contract in contracts]
     self.assertCountEqual(contracts, [TEST_CONTRACT_ADDRESS + str(1), TEST_CONTRACT_ADDRESS + str(3)])
 
