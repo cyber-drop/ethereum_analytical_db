@@ -105,7 +105,11 @@ class Contracts():
       self.client.bulk(operations, doc_type='contract', index=self.indices["contract"], refresh=True)
 
   def _iterate_contracts_with_abi(self):
-    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND _exists_:abi AND ' + self._get_range_query())
+    return self.client.iterate(
+      self.indices["contract"], 'contract',
+      'address:* AND _exists_:abi AND ' + self._get_range_query()
+      + " AND !(_exists_:" + self.doc_type + "_inputs_decoded)"
+    )
 
   def _save_inputs_decoded(self, contracts):
     query = {
@@ -113,7 +117,12 @@ class Contracts():
         "address": contracts
       }
     }
-    self.client.update_by_query(index=self.indices["contract"], doc_type='contract', query=query, script='ctx._source.inputs_decoded = true')
+    self.client.update_by_query(
+      index=self.indices["contract"],
+      doc_type='contract',
+      query=query,
+      script='ctx._source.' + self.doc_type + '_inputs_decoded = true'
+    )
 
   def _decode_inputs_for_contracts(self, contracts):
     contracts = [contract['_source']['address'] for contract in contracts]
