@@ -5,7 +5,11 @@ import unittest
 from test_utils import TestElasticSearch
 from tqdm import *
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
+import ethereum
+import functools
+from time import sleep
+import multiprocessing
 
 class InputParsingTestCase():
   def setUp(self):
@@ -72,11 +76,19 @@ class InputParsingTestCase():
     ])
     self.assertSequenceEqual(response, [TEST_CONTRACT_DECODED_PARAMETERS, TEST_CONTRACT_DECODED_PARAMETERS])
 
+  def test_decode_inputs_batch_timeout(self):
+    def sleepy(*args):
+      sleep(60)
+      return "input"
+    self.contracts._decode_input = MagicMock(side_effect=sleepy)
+    with self.assertRaises(multiprocessing.context.TimeoutError):
+      self.contracts._decode_inputs_batch([("0x0", "0x")])
+
   def add_contracts_with_and_without_abi(self):
     for i in tqdm(range(10)):
       self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS, "blockNumber": i}, id=i + 1, refresh=True)
     for i in tqdm(range(10)):
-      self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS, "blockNumber": i, 'abi': True}, id=i + 11, refresh=True)
+      self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS, "blockNumber": i, 'abi_extracted': True}, id=i + 11, refresh=True)
 
   def test_iterate_contracts_without_abi(self):
     self.contracts = self.contracts_class(
@@ -133,6 +145,26 @@ class InputParsingTestCase():
     transactions = self.client.search(index=TEST_TRANSACTIONS_INDEX, doc_type=self.doc_type, query="*")['hits']['hits']
     decoded_inputs = [t["_source"]["decoded_input"] for t in transactions]
     self.assertCountEqual(decoded_inputs, [TEST_CONTRACT_DECODED_PARAMETERS] * 10)
+
+  def test_decode_inputs_for_contracts_exception(self):
+    def exception_on_seven(inputs):
+      if inputs[0][1] == 7:
+        raise multiprocessing.context.TimeoutError()
+      return ["input"] * len(inputs)
+    test_transactions = [[{
+      "_id": i*10 + j,
+      "_source": {
+        "to": i,
+        "input": j
+      }
+    } for i in range(10)] for j in range(10)]
+    self.contracts._iterate_transactions_by_targets = MagicMock(return_value=test_transactions)
+    self.contracts.client.bulk = MagicMock()
+    self.contracts._decode_inputs_batch = MagicMock(side_effect=exception_on_seven)
+
+    self.contracts._decode_inputs_for_contracts([])
+
+    assert self.contracts.client.bulk.call_count == 9
 
   def test_decode_inputs_for_big_portion_of_contracts(self):
     for i in tqdm(range(10)):
