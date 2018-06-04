@@ -15,13 +15,13 @@ GRAB_ABI_PATH = "/usr/local/qblocks/bin/grabABI {} > /dev/null 2>&1"
 GRAB_ABI_CACHE_PATH = "/home/{}/.quickBlocks/cache/abis/{}.json"
 NUMBER_OF_PROCESSES = 10
 
+timeout_pool = multiprocessing.pool.ThreadPool(processes=1)
 # Solution from https://stackoverflow.com/questions/492519/timeout-on-a-function-call
 def timeout(max_timeout):
   def timeout_decorator(item):
     @functools.wraps(item)
     def func_wrapper(*args, **kwargs):
-      pool = multiprocessing.pool.ThreadPool(processes=1)
-      async_result = pool.apply_async(item, args, kwargs)
+      async_result = timeout_pool.apply_async(item, args, kwargs)
       return async_result.get(max_timeout)
     return func_wrapper
   return timeout_decorator
