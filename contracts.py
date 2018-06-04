@@ -8,10 +8,23 @@ from ethereum.abi import (
 from ethereum.utils import encode_int, zpad, decode_hex
 from multiprocessing import Pool
 from config import PARITY_HOSTS
+import multiprocessing.pool
+import functools
 
 GRAB_ABI_PATH = "/usr/local/qblocks/bin/grabABI {} > /dev/null 2>&1"
 GRAB_ABI_CACHE_PATH = "/home/{}/.quickBlocks/cache/abis/{}.json"
 NUMBER_OF_PROCESSES = 10
+
+# Solution from https://stackoverflow.com/questions/492519/timeout-on-a-function-call
+def timeout(max_timeout):
+  def timeout_decorator(item):
+    @functools.wraps(item)
+    def func_wrapper(*args, **kwargs):
+      pool = multiprocessing.pool.ThreadPool(processes=1)
+      async_result = pool.apply_async(item, args, kwargs)
+      return async_result.get(max_timeout)
+    return func_wrapper
+  return timeout_decorator
 
 def _get_contracts_abi_sync(addresses):
   abis = {}
@@ -73,9 +86,9 @@ class Contracts():
           continue
         return {'name': method_name, 'params': args}
 
+  @timeout(10)
   def _decode_inputs_batch(self, encoded_params):
     return [self._decode_input(contract, call_data) for contract, call_data in encoded_params]
-
 
   def _get_range_query(self):
     ranges = [range_tuple[0:2] for range_tuple in self.parity_hosts]
@@ -83,7 +96,7 @@ class Contracts():
     return range_query
 
   def _iterate_contracts_without_abi(self):
-    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(_exists_:abi) AND ' + self._get_range_query())
+    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(_exists_:abi_extracted) AND ' + self._get_range_query())
 
   def save_contracts_abi(self):
     for contracts in self._iterate_contracts_without_abi():
@@ -94,22 +107,16 @@ class Contracts():
   def _iterate_contracts_with_abi(self):
     return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND _exists_:abi AND ' + self._get_range_query())
 
-  def _iterate_transactions_by_targets(self, targets):
-    query = {
-      "terms": {
-        "to": targets
-      }
-    }
-    return self.client.iterate(self.indices[self.index], self.doc_type, query)
-
   def _decode_inputs_for_contracts(self, contracts):
     contracts = [contract['_source']['address'] for contract in contracts]
     for transactions in self._iterate_transactions_by_targets(contracts):
-      inputs = [(transaction["_source"]["to"], transaction["_source"]["input"]) for transaction in transactions]
-      decoded_inputs = self._decode_inputs_batch(inputs)
-      operations = [self.client.update_op(doc={'decoded_input': decoded_inputs[index]}, id=transaction["_id"]) for index, transaction in enumerate(transactions)]
-      self.client.bulk(operations, doc_type=self.doc_type, index=self.indices[self.index], refresh=True)
-
+      try:
+        inputs = [(transaction["_source"]["to"], transaction["_source"]["input"]) for transaction in transactions]
+        decoded_inputs = self._decode_inputs_batch(inputs)
+        operations = [self.client.update_op(doc={'decoded_input': decoded_inputs[index]}, id=transaction["_id"]) for index, transaction in enumerate(transactions)]
+        self.client.bulk(operations, doc_type=self.doc_type, index=self.indices[self.index], refresh=True)
+      except:
+        pass
   def decode_inputs(self):
     for contracts in self._iterate_contracts_with_abi():
       self._set_contracts_abi({contract["_source"]["address"]: contract["_source"]["abi"] for contract in contracts})
@@ -119,6 +126,32 @@ class ExternalContracts(Contracts):
   doc_type = "tx"
   index = "transaction"
 
+  def _iterate_transactions_by_targets(self, targets):
+    query = {
+      "terms": {
+        "to": targets
+      }
+    }
+    return self.client.iterate(self.indices[self.index], self.doc_type, query)
+
 class InternalContracts(Contracts):
   doc_type = "itx"
   index = "internal_transaction"
+
+  def _iterate_transactions_by_targets(self, targets):
+    query = {
+      "bool": {
+        "must": [
+          {
+            "terms": {
+              "to": targets
+            }
+          }, {
+            "term": {
+              "callType": "call"
+            }
+          }
+        ]
+      }
+    }
+    return self.client.iterate(self.indices[self.index], self.doc_type, query)
