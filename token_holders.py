@@ -6,94 +6,11 @@ import json
 from pyelasticsearch import bulk_chunks
 
 class TokenHolders:
-  def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200"):
+  def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200", tx_index='internal'):
     self.indices = elasticsearch_indices
     self.client = CustomElasticSearch(elasticsearch_host)
-
-  def _get_cmc_tokens_list(self):
-    response = requests.get('https://api.coinmarketcap.com/v2/listings/')
-    names = [(token['name'], token['symbol']) for token in response.json()['data']]
-    return names
-
-  def _construct_token_queries(self, names):
-    queries = []
-    for name in names:
-      query = {
-        'query': {
-          'bool': {
-            'must': [
-              {'match': {'token_symbol':  name[1]}},
-              {'match': {'token_name': name[0]}},
-              {'exists': {'field': 'abi'}}
-            ]
-          }
-        }
-      }
-      queries.append(query)
-    return queries
-
-  def _construct_msearch_body(self, queries_list, index, doc_type):
-    search_list = []
-    for query in queries_list:
-      search_list.append({'index': index, 'type': doc_type})
-      search_list.append(query)
-    body = ''
-    for obj in search_list:
-      body += '%s \n' %json.dumps(obj)
-    return body
-
-  def _search_multiple_tokens(self, token_names):
-    queries = self._construct_token_queries(token_names)
-    body = self._construct_msearch_body(queries, self.indices['contract'], 'contract')
-    response = self.client.send_request('GET', [self.indices['contract'], 'contract', '_msearch'], body, {})
-    results = response['responses']
-    tokens = [result['hits']['hits'] for result in results if len(result['hits']['hits']) > 0]
-    return tokens
-
-  def _get_listed_tokens(self):
-    coinmarketcap_names = self._get_cmc_tokens_list()
-    token_contracts = self._search_multiple_tokens(coinmarketcap_names)
-    return token_contracts
-
-  def _get_token_txs_count(self, token_address):
-    count_body = {
-      'query': {
-        'term': {
-          'to': token_address
-        }
-      }
-    }
-    res = requests.get('http://localhost:9200/' + self.indices['internal_transaction'] + '/tx/_count', json=count_body)
-    res = res.json()
-    txs_count = res['count']
-    return txs_count
-  def _find_real_token(self, duplicates_list):
-    for duplicate in duplicates_list:
-      duplicate['_source']['txs_count'] = self._get_token_txs_count(duplicate['_source']['address'])
-    duplicates_list = sorted(duplicates_list, key=lambda x: x['_source']['txs_count'], reverse=True)
-    real_token = duplicates_list[0]
-    real_token['_source']['duplicated'] = True
-    real_token['_source']['duplicates'] = [duplicate['_source']['address'] for duplicate in duplicates_list[0:]]
-    return real_token
-
-  def _extend_token_descr(self, token):
-    token['_source']['txs_count'] = self._get_token_txs_count(token['_source']['address'])
-    token['_source']['duplicated'] = False
-    return token
-
-  def _remove_identical_descriptions(self, descr_list):
-    descr_list = [json.dumps(token['_source']) for token in descr_list]
-    descr_list = set(descr_list)
-    descr_list = [json.loads(token) for token in descr_list]
-    return descr_list
-
-  def _search_duplicates(self):
-    token_contracts = self._get_listed_tokens()
-    non_duplicated_tokens = [self._extend_token_descr(contracts[0]) for contracts in token_contracts if len(contracts) == 1]
-    duplicated_tokens = [self._find_real_token(contracts) for contracts in token_contracts if len(contracts) > 1]
-    result = non_duplicated_tokens + duplicated_tokens
-    result = self._remove_identical_descriptions(result)
-    return result
+    self.tx_index = self.indices['internal_transaction'] if tx_index == 'internal' else self.indices['transaction']
+    self.tx_type = 'itx' if tx_index == 'internal' else 'tx'
 
   def _construct_bulk_insert_ops(self, docs):
     for doc in docs:
@@ -104,11 +21,7 @@ class TokenHolders:
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
 
   def _iterate_tokens(self):
-    return self.client.iterate(self.indices['listed_token'], 'token', 'token_name:*')
-
-  def _load_listed_tokens(self):
-    listed_tokens = self._search_duplicates()
-    self._insert_multiple_docs(listed_tokens, 'token', self.indices['listed_token'])
+    return self.client.iterate(self.indices['contract'], 'contract', 'cmc_listed:true')
 
   def _iterate_tokens_txs(self, token_addresses):
     query = {
@@ -116,7 +29,7 @@ class TokenHolders:
         "to": token_addresses
       }
     }
-    return self.client.iterate(self.indices['transaction'], 'tx', query)
+    return self.client.iterate(self.tx_index, self.tx_type, query)
 
   def _construct_tx_descr_from_input(self, tx):
     tx_input = tx['decoded_input']
@@ -131,17 +44,14 @@ class TokenHolders:
       return
 
   def _check_tx_input(self, tx):
-    if 'decoded_input' in tx['_source'].keys():
+    if 'decoded_input' in tx['_source'].keys() and tx['_source']['decoded_input'] != None:
       return self._construct_tx_descr_from_input(tx['_source'])
     else:
       return
 
   def _extract_descriptions_from_txs(self, txs):
-    txs_info = []
-    for tx in txs:
-      tx_descr = self._check_tx_input(tx)
-      if tx_descr != None:
-        txs_info.append(tx_descr)
+    txs_info = [self._check_tx_input(tx) for tx in txs]
+    txs_info = [tx for tx in txs_info if tx != None]
     self._insert_multiple_docs(txs_info, 'tx', self.indices['token_tx'])
 
   def _iterate_token_tx_descriptions(self, token_address):
@@ -155,7 +65,6 @@ class TokenHolders:
       self._extract_descriptions_from_txs(txs_chunk) 
 
   def get_listed_tokens_txs(self):
-    self._load_listed_tokens()
     for tokens in self._iterate_tokens():
         self._extract_tokens_txs([token['_source']['address'] for token in tokens])
 
