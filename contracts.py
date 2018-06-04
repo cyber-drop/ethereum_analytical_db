@@ -15,7 +15,7 @@ GRAB_ABI_PATH = "/usr/local/qblocks/bin/grabABI {} > /dev/null 2>&1"
 GRAB_ABI_CACHE_PATH = "/home/{}/.quickBlocks/cache/abis/{}.json"
 NUMBER_OF_PROCESSES = 10
 
-
+# Solution from https://stackoverflow.com/questions/492519/timeout-on-a-function-call
 def timeout(max_timeout):
   def timeout_decorator(item):
     @functools.wraps(item)
@@ -96,7 +96,7 @@ class Contracts():
     return range_query
 
   def _iterate_contracts_without_abi(self):
-    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(_exists_:abi) AND ' + self._get_range_query())
+    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(_exists_:abi_extracted) AND ' + self._get_range_query())
 
   def save_contracts_abi(self):
     for contracts in self._iterate_contracts_without_abi():
@@ -106,14 +106,6 @@ class Contracts():
 
   def _iterate_contracts_with_abi(self):
     return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND _exists_:abi AND ' + self._get_range_query())
-
-  def _iterate_transactions_by_targets(self, targets):
-    query = {
-      "terms": {
-        "to": targets
-      }
-    }
-    return self.client.iterate(self.indices[self.index], self.doc_type, query)
 
   def _decode_inputs_for_contracts(self, contracts):
     contracts = [contract['_source']['address'] for contract in contracts]
@@ -134,6 +126,32 @@ class ExternalContracts(Contracts):
   doc_type = "tx"
   index = "transaction"
 
+  def _iterate_transactions_by_targets(self, targets):
+    query = {
+      "terms": {
+        "to": targets
+      }
+    }
+    return self.client.iterate(self.indices[self.index], self.doc_type, query)
+
 class InternalContracts(Contracts):
   doc_type = "itx"
   index = "internal_transaction"
+
+  def _iterate_transactions_by_targets(self, targets):
+    query = {
+      "bool": {
+        "must": [
+          {
+            "terms": {
+              "to": targets
+            }
+          }, {
+            "term": {
+              "callType": "call"
+            }
+          }
+        ]
+      }
+    }
+    return self.client.iterate(self.indices[self.index], self.doc_type, query)
