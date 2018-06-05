@@ -62,7 +62,7 @@ def _get_state(token, address_field):
   }
   result = client.send_request("GET", [app.config["token_tx"], "tx", "_search"], aggregation, {})
   documents = result['aggregations']['holders']["buckets"]
-  return {document["key"]: document["state"]["value"] for document in documents}
+  return {document["key"]: float(document["state"]["value"]) for document in documents}
 
 def get_incomes(token):
   return _get_state(token, "to.keyword")
