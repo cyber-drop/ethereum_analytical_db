@@ -10,7 +10,7 @@ class APITestCase(unittest.TestCase):
     self.client.recreate_index(TEST_CONTRACTS_INDEX)
     self.client.recreate_index(TEST_TOKEN_TRANSACTIONS_INDEX)
     server.app.config.update({
-      "token_txs": TEST_TOKEN_TRANSACTIONS_INDEX,
+      "token_tx": TEST_TOKEN_TRANSACTIONS_INDEX,
       "contract": TEST_CONTRACTS_INDEX
     })
     self.app = server.app.test_client()
