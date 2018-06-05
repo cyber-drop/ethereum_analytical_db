@@ -39,8 +39,32 @@ def _get_contracts_abi_sync(addresses):
       abis[key] = []
   return abis
 
+# Solution from https://ethereum.stackexchange.com/questions/20897/how-to-decode-input-data-from-tx-using-python3?rq=1
+def _decode_input(contract_abi, call_data):
+  call_data_bin = decode_hex(call_data)
+  method_signature = call_data_bin[:4]
+  for description in contract_abi:
+    if description.get('type') != 'function':
+      continue
+    method_name = normalize_abi_method_name(description['name'])
+    arg_types = [item['type'] for item in description['inputs']]
+    method_id = get_abi_method_id(method_name, arg_types)
+    if zpad(encode_int(method_id), 4) == method_signature:
+      try:
+        args = decode_abi(arg_types, call_data_bin[4:])
+        args = [{'type': arg_types[index], 'value': str(value)} for index, value in enumerate(args)]
+      except AssertionError:
+        continue
+      return {'name': method_name, 'params': args}
+
+def _decode_inputs_batch_sync(encoded_params):
+  return {
+    hash: _decode_input(contract_abi, call_data)
+    for hash, (contract_abi, call_data) in encoded_params.items()
+  }
+
 class Contracts():
-  _contracts_abi = []
+  _contracts_abi = {}
 
   def __init__(self, indices, host="http://localhost:9200", parity_hosts=PARITY_HOSTS):
     self.indices = indices
@@ -68,27 +92,11 @@ class Contracts():
     abis = {key: abi for abis_dict in self.pool.map(_get_contracts_abi_sync, dict_chunks) for key, abi in abis_dict.items()}
     return list(abis.values())
 
-  # Solution from https://ethereum.stackexchange.com/questions/20897/how-to-decode-input-data-from-tx-using-python3?rq=1
-  def _decode_input(self, contract, call_data):
-    call_data_bin = decode_hex(call_data)
-    method_signature = call_data_bin[:4]
-    for description in self._contracts_abi[contract]:
-      if description.get('type') != 'function':
-        continue
-      method_name = normalize_abi_method_name(description['name'])
-      arg_types = [item['type'] for item in description['inputs']]
-      method_id = get_abi_method_id(method_name, arg_types)
-      if zpad(encode_int(method_id), 4) == method_signature:
-        try:
-          args = decode_abi(arg_types, call_data_bin[4:])          
-          args = [{'type': arg_types[index], 'value': str(value)} for index, value in enumerate(args)]
-        except AssertionError:
-          continue
-        return {'name': method_name, 'params': args}
-
-  @timeout(10)
   def _decode_inputs_batch(self, encoded_params):
-    return [self._decode_input(contract, call_data) for contract, call_data in encoded_params]
+    chunks = list(self._split_on_chunks(list(encoded_params.items()), NUMBER_OF_PROCESSES))
+    chunks = [dict(chunk) for chunk in chunks]
+    decoded_inputs = self.pool.map(_decode_inputs_batch_sync, chunks)
+    return {hash: input for chunk in decoded_inputs for hash, input in chunk.items()}
 
   def _get_range_query(self):
     ranges = [range_tuple[0:2] for range_tuple in self.parity_hosts]
@@ -128,9 +136,15 @@ class Contracts():
     contracts = [contract['_source']['address'] for contract in contracts]
     for transactions in self._iterate_transactions_by_targets(contracts):
       try:
-        inputs = [(transaction["_source"]["to"], transaction["_source"]["input"]) for transaction in transactions]
+        inputs = {
+          transaction["_id"]: (
+            self._contracts_abi[transaction["_source"]["to"]],
+            transaction["_source"]["input"]
+          )
+          for transaction in transactions
+        }
         decoded_inputs = self._decode_inputs_batch(inputs)
-        operations = [self.client.update_op(doc={'decoded_input': decoded_inputs[index]}, id=transaction["_id"]) for index, transaction in enumerate(transactions)]
+        operations = [self.client.update_op(doc={'decoded_input': input}, id=hash) for hash, input in decoded_inputs.items()]
         self.client.bulk(operations, doc_type=self.doc_type, index=self.indices[self.index], refresh=True)
       except:
         pass

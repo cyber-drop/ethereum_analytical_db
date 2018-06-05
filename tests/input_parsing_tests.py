@@ -68,15 +68,31 @@ class InputParsingTestCase():
     self.contracts.pool.map.assert_called_with(contracts._get_contracts_abi_sync, [dict(chunk) for chunk in chunks])
     self.assertSequenceEqual(["abi1", "abi2"], response)
 
-  def test_decode_inputs_batch(self):
-    self.contracts._set_contracts_abi({"0x0": TEST_CONTRACT_ABI})
-    response = self.contracts._decode_inputs_batch([
-      ("0x0", TEST_CONTRACT_PARAMETERS),
-      ("0x0", TEST_CONTRACT_PARAMETERS)
-    ])
-    self.assertSequenceEqual(response, [TEST_CONTRACT_DECODED_PARAMETERS, TEST_CONTRACT_DECODED_PARAMETERS])
+  def test_decode_inputs_batch_sync(self):
+    response = contracts._decode_inputs_batch_sync({
+      "0x1": (TEST_CONTRACT_ABI, TEST_CONTRACT_PARAMETERS),
+      "0x2": (TEST_CONTRACT_ABI, TEST_CONTRACT_PARAMETERS)
+    })
+    self.assertSequenceEqual(response, {
+      "0x1": TEST_CONTRACT_DECODED_PARAMETERS,
+      "0x2": TEST_CONTRACT_DECODED_PARAMETERS
+    })
 
-  def test_decode_inputs_batch_timeout(self):
+  def test_decode_inputs_batch(self):
+    inputs = {"0x" + str(i): "input" + str(i) for i in range(100)}
+    chunks = [[("0x1", "input1")], [("0x1", "input2")]]
+    decoded_inputs = [{"0x1": "decoded_input2"}, {"0x0": "decoded_input1"}]
+
+    self.contracts._split_on_chunks = MagicMock(return_value=chunks)
+    self.contracts.pool.map = MagicMock(return_value=decoded_inputs)
+
+    response = self.contracts._decode_inputs_batch(inputs)
+
+    self.contracts._split_on_chunks.assert_called_with([(hash, input) for hash, input in inputs.items()], 10)
+    self.contracts.pool.map.assert_called_with(contracts._decode_inputs_batch_sync, [dict(chunk) for chunk in chunks])
+    self.assertSequenceEqual({"0x0": "decoded_input1", "0x1": "decoded_input2"}, response)
+
+  def xtest_decode_inputs_batch_timeout(self):
     def sleepy(*args):
       sleep(60)
       return "input"
@@ -148,21 +164,24 @@ class InputParsingTestCase():
 
   def test_decode_inputs_for_contracts_exception(self):
     def exception_on_seven(inputs):
-      if inputs[0][1] == 7:
+      if "input7" in str(inputs):
         raise multiprocessing.context.TimeoutError()
-      return ["input"] * len(inputs)
+      return {key: "input" for key in inputs}
+
     test_transactions = [[{
       "_id": i*10 + j,
       "_source": {
         "to": i,
-        "input": j
+        "input": "input" + str(j)
       }
     } for i in range(10)] for j in range(10)]
+    self.contracts._set_contracts_abi({i: "abi" + str(i) for i in range(10)})
     self.contracts._iterate_transactions_by_targets = MagicMock(return_value=test_transactions)
     self.contracts.client.bulk = MagicMock()
     self.contracts._decode_inputs_batch = MagicMock(side_effect=exception_on_seven)
 
     self.contracts._decode_inputs_for_contracts([])
+    print(self.contracts.client.bulk.call_count)
 
     assert self.contracts.client.bulk.call_count == 9
 
