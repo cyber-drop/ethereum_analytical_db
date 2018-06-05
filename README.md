@@ -1,5 +1,11 @@
 # Internal transactions parsing
 ## Usage
+To run API server, execute command below:
+```bash
+$ export FLASK_APP=./api/server.py
+$ python3 -m flask run
+```
+
 To run internal transactions parsing, you can use command 
 ```bash
 $ python3 ./extractor.py --index ELASTICSEARCH_INDEX --operation CHOSEN_OPERATION
