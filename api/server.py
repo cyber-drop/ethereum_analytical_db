@@ -36,9 +36,13 @@ def _get_state(token, address_field):
   aggregation = {
     "size": 0,
     "query": {
-      "term": {
-        "token": token
+      "bool": {
+        "must": [
+          {"term": {"token": token}},
+          {"exists": {"field": "value"}}
+        ]
       }
+
     },
     "aggs": {
       "holders": {
@@ -49,7 +53,7 @@ def _get_state(token, address_field):
         "aggs": {
           "state": {
             "sum": {
-              "script": "Integer.parseInt(doc['value.keyword'].value)"
+              "field": "value"
             }
           }
         }
