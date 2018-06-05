@@ -28,7 +28,7 @@ def get_holders_number(token):
       }
     }
   }
-  result = client.send_request("GET", [app.config["token_txs"], "tx", "_search"], aggregation, {})
+  result = client.send_request("GET", [app.config["token_tx"], "tx", "_search"], aggregation, {})
   return result['aggregations']['senders']["value"] + result["aggregations"]["receivers"]["value"]
 
 def _get_state(token, address_field):
@@ -36,9 +36,13 @@ def _get_state(token, address_field):
   aggregation = {
     "size": 0,
     "query": {
-      "term": {
-        "token": token
+      "bool": {
+        "must": [
+          {"term": {"token": token}},
+          {"exists": {"field": "value"}}
+        ]
       }
+
     },
     "aggs": {
       "holders": {
@@ -49,14 +53,14 @@ def _get_state(token, address_field):
         "aggs": {
           "state": {
             "sum": {
-              "script": "Integer.parseInt(doc['value.keyword'].value)"
+              "field": "value"
             }
           }
         }
       }
     }
   }
-  result = client.send_request("GET", [app.config["token_txs"], "tx", "_search"], aggregation, {})
+  result = client.send_request("GET", [app.config["token_tx"], "tx", "_search"], aggregation, {})
   documents = result['aggregations']['holders']["buckets"]
   return {document["key"]: document["state"]["value"] for document in documents}
 

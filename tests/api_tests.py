@@ -4,13 +4,86 @@ import unittest
 from test_utils import TestElasticSearch
 from unittest.mock import MagicMock, Mock, patch, call
 
+class InOutTransactionsTestCase():
+  def setUp(self):
+    self.client = TestElasticSearch()
+    self.client.recreate_index(TEST_CONTRACTS_INDEX)
+    self.client.recreate_index(TEST_TOKEN_TRANSACTIONS_INDEX)
+    server.app.config.update({
+      "token_tx": TEST_TOKEN_TRANSACTIONS_INDEX,
+      "contract": TEST_CONTRACTS_INDEX
+    })
+
+  def test_get_state(self):
+    test_incomes = {
+      "0x1": 10000,
+      "0x2": 10000
+    }
+    self.client.index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", doc={
+      self.to_field: "0x1",
+      self.from_field: "0x2",
+      "token": "0x1",
+      "value": 10000
+    }, refresh=True)
+    self.client.index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", doc={
+      self.to_field: "0x2",
+      self.from_field: "0x1",
+      "token": "0x1",
+      "value": 10000
+    }, refresh=True)
+    self.client.index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", doc={
+      self.to_field: "0x2",
+      self.from_field: "0x1",
+      "token": "0x0",
+      "value": 10000
+    }, refresh=True)
+
+    received_incomes = self._call_method("0x1")
+    self.assertSequenceEqual(test_incomes, received_incomes)
+
+  def test_get_incomes_with_none_value(self):
+    self.client.index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", doc={
+      self.to_field: "0x2",
+      self.from_field: "0x1",
+      "token": "0x1",
+      "value": None
+    }, refresh=True)
+
+    received_incomes = self._call_method("0x1")
+    self.assertSequenceEqual({}, received_incomes)
+
+  def test_get_incomes_for_many_token_holders(self):
+    test_incomes = {"0x" + str(i): 1 for i in range(10000)}
+    docs = [{
+      self.to_field: "0x" + str(i),
+      self.from_field: "0x2",
+      "value": 1,
+      "token": "0x1"
+    } for i in range(10000)]
+    self.client.bulk_index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", docs=docs, refresh=True)
+
+    received_incomes = self._call_method("0x1")
+    self.assertSequenceEqual(test_incomes, received_incomes)
+
+class InTransactionsTestCase(InOutTransactionsTestCase, unittest.TestCase):
+  to_field = "to"
+  from_field = "from"
+  def _call_method(self, token):
+    return get_incomes(token)
+
+class OutTransactionsTestCase(InOutTransactionsTestCase, unittest.TestCase):
+  to_field = "from"
+  from_field = "to"
+  def _call_method(self, token):
+    return get_outcomes(token)
+
 class APITestCase(unittest.TestCase):
   def setUp(self):
     self.client = TestElasticSearch()
     self.client.recreate_index(TEST_CONTRACTS_INDEX)
     self.client.recreate_index(TEST_TOKEN_TRANSACTIONS_INDEX)
     server.app.config.update({
-      "token_txs": TEST_TOKEN_TRANSACTIONS_INDEX,
+      "token_tx": TEST_TOKEN_TRANSACTIONS_INDEX,
       "contract": TEST_CONTRACTS_INDEX
     })
     self.app = server.app.test_client()
@@ -31,46 +104,6 @@ class APITestCase(unittest.TestCase):
 
     assert 2 == get_holders_number("0x1")
 
-  def test_get_incomes(self):
-    test_incomes = {
-      "0x1": 10000,
-      "0x2": 10000
-    }
-    self.client.index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", doc={
-      "to": "0x1",
-      "from": "0x2",
-      "token": "0x1",
-      "value": "10000"
-    }, refresh=True)
-    self.client.index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", doc={
-      "to": "0x2",
-      "from": "0x1",
-      "token": "0x1",
-      "value": "10000"
-    }, refresh=True)
-    self.client.index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", doc={
-      "to": "0x2",
-      "from": "0x1",
-      "token": "0x0",
-      "value": "10000"
-    }, refresh=True)
-
-    received_incomes = get_incomes("0x1")
-    self.assertSequenceEqual(test_incomes, received_incomes)
-
-  def test_get_incomes_for_many_token_holders(self):
-    test_incomes = {"0x" + str(i): 1 for i in range(10000)}
-    docs = [{
-      "to": "0x" + str(i),
-      "from": "0x2",
-      "value": "1",
-      "token": "0x1"
-    } for i in range(10000)]
-    self.client.bulk_index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", docs=docs, refresh=True)
-
-    received_incomes = get_incomes("0x1")
-    self.assertSequenceEqual(test_incomes, received_incomes)
-
   def test_get_outcomes(self):
     test_outcomes = {
       "0x1": 10000,
@@ -80,30 +113,41 @@ class APITestCase(unittest.TestCase):
       "from": "0x1",
       "to": "0x2",
       "token": "0x1",
-      "value": "10000"
+      "value": 10000
     }, refresh=True)
     self.client.index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", doc={
       "from": "0x2",
       "to": "0x1",
       "token": "0x1",
-      "value": "10000"
+      "value": 10000
     }, refresh=True)
     self.client.index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", doc={
       "from": "0x2",
       "to": "0x1",
       "token": "0x0",
-      "value": "10000"
+      "value": 10000
     }, refresh=True)
 
     received_outcomes = get_outcomes("0x1")
     self.assertSequenceEqual(test_outcomes, received_outcomes)
+
+  def test_get_outcomes_with_none_value(self):
+    self.client.index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", doc={
+      "to": "0x2",
+      "from": "0x1",
+      "token": "0x1",
+      "value": None
+    }, refresh=True)
+
+    received_incomes = get_outcomes("0x1")
+    self.assertSequenceEqual({}, received_incomes)
 
   def test_get_outcomes_for_many_token_holders(self):
     test_outcomes = {"0x" + str(i): 1 for i in range(10000)}
     docs = [{
       "from": "0x" + str(i),
       "to": "0x2",
-      "value": "1",
+      "value": 1,
       "token": "0x1"
     } for i in range(10000)]
     self.client.bulk_index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", docs=docs, refresh=True)
