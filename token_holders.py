@@ -36,22 +36,25 @@ class TokenHolders:
 
   def _convert_transfer_value(self, value, decimals):
     if decimals == 1:
-      return value
+      return (value, None)
     value = int(value)
     rounded = value / math.pow(10, decimals)
-    rounded = "{0:.5f}".format(rounded)
-    return rounded
+    rounded = Decimal("{0:.5f}".format(rounded))
+    return (str(rounded), rounded)
 
   def _construct_tx_descr_from_input(self, tx):
     tx_input = tx['decoded_input']
     is_valid_tx = 'error' not in tx.keys()
     decimals = self.token_decimals[tx['to']] if tx['to'] in self.token_decimals.keys() else 1
     if tx_input['name'] == 'transfer':
-      return {'method': tx_input['name'], 'from': tx['from'], 'to': tx_input['params'][0]['value'], 'value': self._convert_transfer_value(tx_input['params'][1]['value'], decimals),'block_id': tx['blockNumber'], 'valid': is_valid_tx, 'token': tx['to'], 'tx_index': self.indices['internal_transaction'], 'tx_hash': tx['hash']}
+      value = self._convert_transfer_value(tx_input['params'][1]['value'], decimals)
+      return {'method': tx_input['name'], 'from': tx['from'], 'to': tx_input['params'][0]['value'], 'value': value[1], 'raw_value': value[0], 'block_id': tx['blockNumber'], 'valid': is_valid_tx, 'token': tx['to'], 'tx_index': self.indices['internal_transaction'], 'tx_hash': tx['hash']}
     elif tx_input['name'] == 'transferFrom':
-      return {'method': tx_input['name'], 'from': tx_input['params'][0]['value'], 'to': tx_input['params'][1]['value'], 'value': self._convert_transfer_value(tx_input['params'][2]['value'], decimals), 'block_id': tx['blockNumber'], 'valid': is_valid_tx, 'token': tx['to'], 'tx_index': self.indices['internal_transaction'], 'tx_hash': tx['hash']}
+      value = self._convert_transfer_value(tx_input['params'][2]['value'], decimals)
+      return {'method': tx_input['name'], 'from': tx_input['params'][0]['value'], 'to': tx_input['params'][1]['value'], 'value': value[1], 'raw_value': value[0], 'block_id': tx['blockNumber'], 'valid': is_valid_tx, 'token': tx['to'], 'tx_index': self.indices['internal_transaction'], 'tx_hash': tx['hash']}
     elif tx_input['name'] == 'approve':
-      return {'method': tx_input['name'], 'from': tx['from'], 'spender': tx_input['params'][0]['value'], 'value': self._convert_transfer_value(tx_input['params'][1]['value'], decimals),'block_id': tx['blockNumber'], 'valid': is_valid_tx, 'token': tx['to'], 'tx_index': self.indices['internal_transaction'], 'tx_hash': tx['hash']}
+      value = self._convert_transfer_value(tx_input['params'][1]['value'], decimals)
+      return {'method': tx_input['name'], 'from': tx['from'], 'spender': tx_input['params'][0]['value'], 'value': value[1], 'raw_value': value[0], 'block_id': tx['blockNumber'], 'valid': is_valid_tx, 'token': tx['to'], 'tx_index': self.indices['internal_transaction'], 'tx_hash': tx['hash']}
     else:
       return
 

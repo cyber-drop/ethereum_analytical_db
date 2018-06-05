@@ -17,12 +17,12 @@ class TokenHoldersTestCase(unittest.TestCase):
     token_txs = self.token_holders._iterate_token_tx_descriptions('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d')
     token_txs = [tx for txs_list in token_txs for tx in txs_list]
     methods = [tx['_source']['method'] for tx in token_txs]
-    amounts = [tx['_source']['value'] for tx in token_txs]
+    amounts = [tx['_source']['raw_value'] for tx in token_txs]
     with_error = [tx for tx in token_txs if tx['_source']['valid'] == False]
     self.assertCountEqual(['transfer', 'approve', 'transferFrom'], methods)
     self.assertCountEqual(['356245680000000000000', '356245680000000000000', '2266000000000000000000'], amounts)
     assert len(with_error) == 1
-
+  
   def test_get_listed_tokens_txs(self):
     for i, address in enumerate(TEST_TOKEN_ADDRESSES):
       self.client.index(TEST_INDEX, 'contract', {'address': address, 'cmc_listed': True, 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi'], 'decimals': 18}, refresh=True)
@@ -33,7 +33,7 @@ class TokenHoldersTestCase(unittest.TestCase):
     all_descrptions = [tx for txs_list in all_descrptions for tx in txs_list]
     tokens = set([descr['_source']['token'] for descr in all_descrptions])
     amounts = [tx['_source']['value'] for tx in all_descrptions]
-    self.assertCountEqual(['2266.00000', '356.24568', '356.24568', '2352.00000'], amounts)
+    self.assertCountEqual([2266.0, 356.24568, 356.24568, 2352.0], amounts)
     self.assertCountEqual(['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', '0xa74476443119a942de498590fe1f2454d7d4ac0d'], tokens)
     assert len(all_descrptions) == 4
   
