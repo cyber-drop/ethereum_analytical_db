@@ -64,7 +64,7 @@ class InOutTransactionsTestCase():
     received_incomes = self._call_method("0x1")
     self.assertSequenceEqual({}, received_incomes)
 
-  def test_get_incomes_for_many_token_holders(self):
+  def test_get_state_for_many_token_holders(self):
     test_incomes = {"0x" + str(i): 1 for i in range(10000)}
     docs = [{
       self.to_field: "0x" + str(i),
@@ -77,17 +77,43 @@ class InOutTransactionsTestCase():
     received_incomes = self._call_method("0x1")
     self.assertSequenceEqual(test_incomes, received_incomes)
 
+  def test_get_state_before_block(self):
+    self.client.index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", doc={
+      self.to_field: "0x2",
+      self.from_field: "0x1",
+      "token": "0x1",
+      "value": 1,
+      "block_id": 0,
+    }, refresh=True)
+    self.client.index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", doc={
+      self.to_field: "0x2",
+      self.from_field: "0x1",
+      "token": "0x1",
+      "value": 1,
+      "block_id": 1,
+    }, refresh=True)
+    self.client.index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", doc={
+      self.to_field: "0x2",
+      self.from_field: "0x1",
+      "token": "0x1",
+      "value": 1,
+      "block_id": 2,
+    }, refresh=True)
+
+    received_incomes = self._call_method("0x1", 1)
+    self.assertSequenceEqual({"0x2": 2}, received_incomes)
+
 class InTransactionsTestCase(InOutTransactionsTestCase, unittest.TestCase):
   to_field = "to"
   from_field = "from"
-  def _call_method(self, token):
-    return get_incomes(token)
+  def _call_method(self, *args):
+    return get_incomes(*args)
 
 class OutTransactionsTestCase(InOutTransactionsTestCase, unittest.TestCase):
   to_field = "from"
   from_field = "to"
-  def _call_method(self, token):
-    return get_outcomes(token)
+  def _call_method(self, *args):
+    return get_outcomes(*args)
 
 class APITestCase(unittest.TestCase):
   def setUp(self):
@@ -139,11 +165,11 @@ class APITestCase(unittest.TestCase):
         outcomes=test_outcomes_mock
       )
 
-      received_balances = get_balances("0x1")
+      received_balances = get_balances("0x1", 1)
 
       process.assert_has_calls([
-        call.incomes("0x1"),
-        call.outcomes("0x1")
+        call.incomes("0x1", 1),
+        call.outcomes("0x1", 1)
       ])
       self.assertSequenceEqual(test_balances, received_balances)
 
@@ -155,9 +181,15 @@ class APITestCase(unittest.TestCase):
     }
     test_balances_mock = MagicMock(return_value=test_balances)
     with patch("api.server.get_balances", test_balances_mock):
-      received_balances = self.app.get("/balances?token=0x0").json
-      test_balances_mock.assert_called_with("0x0")
+      received_balances = self.app.get("/balances?token=0x0&block=1").json
+      test_balances_mock.assert_called_with("0x0", 1)
       self.assertSequenceEqual(test_balances, received_balances)
+
+  def test_get_balances_api_empty_block(self):
+    test_balances_mock = MagicMock(return_value={})
+    with patch("api.server.get_balances", test_balances_mock):
+      self.app.get("/balances?token=0x0")
+      test_balances_mock.assert_called_with("0x0", None)
 
 TEST_CONTRACTS_INDEX = 'test-ethereum-contracts'
 TEST_TOKEN_TRANSACTIONS_INDEX = 'test-ethereum-transactions'
