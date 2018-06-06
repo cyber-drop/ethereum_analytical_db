@@ -41,7 +41,7 @@ class InOutTransactionsTestCase():
     received_incomes = self._call_method("0x1")
     self.assertSequenceEqual(test_incomes, received_incomes)
 
-  def test_get_incomes_with_none_value(self):
+  def test_get_state_with_none_value(self):
     self.client.index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", doc={
       self.to_field: "0x2",
       self.from_field: "0x1",
@@ -52,7 +52,7 @@ class InOutTransactionsTestCase():
     received_incomes = self._call_method("0x1")
     self.assertSequenceEqual({}, received_incomes)
 
-  def test_get_incomes_with_infinity_value(self):
+  def test_get_state_with_infinity_value(self):
     docs = [{
       self.to_field: "0x1",
       self.from_field: "0x2",
@@ -62,7 +62,7 @@ class InOutTransactionsTestCase():
     self.client.bulk_index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", docs=docs, refresh=True)
 
     received_incomes = self._call_method("0x1")
-    self.assertSequenceEqual({"0x1": float("inf")}, received_incomes)
+    self.assertSequenceEqual({}, received_incomes)
 
   def test_get_incomes_for_many_token_holders(self):
     test_incomes = {"0x" + str(i): 1 for i in range(10000)}
