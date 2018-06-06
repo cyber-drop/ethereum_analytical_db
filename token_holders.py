@@ -11,8 +11,8 @@ class TokenHolders:
   def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200", tx_index='internal'):
     self.indices = elasticsearch_indices
     self.client = CustomElasticSearch(elasticsearch_host)
-    self.tx_index = self.indices['internal_transaction'] if tx_index == 'internal' else self.indices['transaction']
-    self.tx_type = 'itx' if tx_index == 'internal' else 'tx'
+    self.tx_index = ''
+    self.tx_type = ''
     self.token_decimals = {}
 
   def _construct_bulk_insert_ops(self, docs):
@@ -90,7 +90,9 @@ class TokenHolders:
     update_docs = [{'doc': {'tx_descr_scanned': True}, 'id': address} for address in token_addresses]
     self._update_multiple_docs(update_docs, 'contract', self.indices['contract'])
 
-  def get_listed_tokens_txs(self):
+  def get_listed_tokens_txs(self, tx_index):
+    self.tx_index = self.indices['internal_transaction'] if tx_index == 'internal' else self.indices['transaction']
+    self.tx_type = 'itx' if tx_index == 'internal' else 'tx'
     for tokens in self._iterate_tokens():
       self.token_decimals = {token['_source']['address']: token['_source']['decimals'] for token in tokens if 'decimals' in token['_source'].keys()}
       self._extract_tokens_txs([token['_source']['address'] for token in tokens])
