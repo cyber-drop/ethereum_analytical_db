@@ -23,19 +23,19 @@ class InOutTransactionsTestCase():
       self.to_field: "0x1",
       self.from_field: "0x2",
       "token": "0x1",
-      "value": 10000
+      "value": 10000,
     }, refresh=True)
     self.client.index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", doc={
       self.to_field: "0x2",
       self.from_field: "0x1",
       "token": "0x1",
-      "value": 10000
+      "value": 10000,
     }, refresh=True)
     self.client.index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", doc={
       self.to_field: "0x2",
       self.from_field: "0x1",
       "token": "0x0",
-      "value": 10000
+      "value": 10000,
     }, refresh=True)
 
     received_incomes = self._call_method("0x1")
@@ -46,17 +46,30 @@ class InOutTransactionsTestCase():
       self.to_field: "0x2",
       self.from_field: "0x1",
       "token": "0x1",
-      "value": None
+      "value": None,
     }, refresh=True)
 
     received_incomes = self._call_method("0x1")
     self.assertSequenceEqual({}, received_incomes)
 
-  def test_get_state_with_infinity_value(self):
+  def test_get_state_for_approve_transactions(self):
+    self.client.index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", doc={
+      self.to_field: "0x2",
+      self.from_field: "0x1",
+      "token": "0x1",
+      "value": 10,
+      "method": "approve"
+    }, refresh=True)
+
+    received_incomes = self._call_method("0x1")
+    self.assertSequenceEqual({}, received_incomes)
+
+  def test_get_state_with_invalid_transactions(self):
     docs = [{
       self.to_field: "0x1",
       self.from_field: "0x2",
-      "value": 1e59,
+      "valid": False,
+      "value": 100,
       "token": "0x1"
     } for i in range(10000)]
     self.client.bulk_index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", docs=docs, refresh=True)
@@ -70,7 +83,7 @@ class InOutTransactionsTestCase():
       self.to_field: "0x" + str(i),
       self.from_field: "0x2",
       "value": 1,
-      "token": "0x1"
+      "token": "0x1",
     } for i in range(10000)]
     self.client.bulk_index(index=TEST_TOKEN_TRANSACTIONS_INDEX, doc_type="tx", docs=docs, refresh=True)
 
