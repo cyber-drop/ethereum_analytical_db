@@ -36,6 +36,17 @@ class TokenHoldersTestCase(unittest.TestCase):
     self.assertCountEqual([2266.0, 356.24568, 356.24568, 2352.0], amounts)
     self.assertCountEqual(['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', '0xa74476443119a942de498590fe1f2454d7d4ac0d'], tokens)
     assert len(all_descrptions) == 4
+
+  def test_set_scanned_flags(self):
+    for i, address in enumerate(TEST_TOKEN_ADDRESSES):
+      self.client.index(TEST_INDEX, 'contract', {'address': address, 'cmc_listed': True, 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi'], 'decimals': 18}, id=address, refresh=True)
+    for tx in TEST_TOKEN_TXS:
+      self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
+    self.token_holders.get_listed_tokens_txs()
+    tokens = self.token_holders._iterate_tokens()
+    tokens = [t for token in tokens for t in token]
+    flags = [token['_source']['tx_descr_scanned'] for token in tokens]
+    self.assertCountEqual([True, True], flags)
   
   def test_run(self):
     for i, address in enumerate(TEST_TOKEN_ADDRESSES):
