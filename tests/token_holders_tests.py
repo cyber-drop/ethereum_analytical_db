@@ -1,5 +1,5 @@
 import unittest
-from token_holders import TokenHolders
+from token_holders import TokenHolders, ExternalTokenTransactions, InternalTokenTransactions
 from test_utils import TestElasticSearch
 
 class TokenHoldersTestCase(unittest.TestCase):
@@ -9,8 +9,11 @@ class TokenHoldersTestCase(unittest.TestCase):
     self.client.recreate_index(TEST_TX_INDEX)
     self.client.recreate_index(TEST_TOKEN_TX_INDEX)
     self.client.recreate_index(TEST_ITX_INDEX)
-    self.token_holders = TokenHolders({'contract': TEST_INDEX, 'internal_transaction': TEST_ITX_INDEX, 'transaction': TEST_TX_INDEX, 'token_tx': TEST_TOKEN_TX_INDEX}, tx_index='plain')
+    self.token_holders = self.token_holders_class({'contract': TEST_INDEX, 'internal_transaction': TEST_ITX_INDEX, 'transaction': TEST_TX_INDEX, 'token_tx': TEST_TOKEN_TX_INDEX})
   
+class ExternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase):
+  token_holders_class = ExternalTokenTransactions
+
   def test_extract_token_txs(self):
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0], 'cmc_listed': True, 'token_name': TEST_TOKEN_NAMES[0], 'token_symbol': TEST_TOKEN_SYMBOLS[0], 'abi': ['mock_abi'], 'decimals': 18}, id=TEST_TOKEN_ADDRESSES[0], refresh=True)
     for tx in TEST_TOKEN_TXS:
@@ -24,13 +27,14 @@ class TokenHoldersTestCase(unittest.TestCase):
     self.assertCountEqual(['transfer', 'approve', 'transferFrom'], methods)
     self.assertCountEqual(['356245680000000000000', '356245680000000000000', '2266000000000000000000'], amounts)
     assert len(with_error) == 1
-  
+
   def test_get_listed_tokens_txs(self):
     for i, address in enumerate(TEST_TOKEN_ADDRESSES):
       self.client.index(TEST_INDEX, 'contract', {'address': address, 'cmc_listed': True, 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi'], 'decimals': 18}, id=address, refresh=True)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
-    self.token_holders.get_listed_tokens_txs('plain')
+    self.token_holders.get_listed_tokens_txs()
+    time.sleep(5)
     all_descrptions = self.token_holders._iterate_tx_descriptions()
     all_descrptions = [tx for txs_list in all_descrptions for tx in txs_list]
     tokens = set([descr['_source']['token'] for descr in all_descrptions])
@@ -44,23 +48,12 @@ class TokenHoldersTestCase(unittest.TestCase):
       self.client.index(TEST_INDEX, 'contract', {'address': address, 'cmc_listed': True, 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi'], 'decimals': 18}, id=address, refresh=True)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
-    self.token_holders.get_listed_tokens_txs('plain')
+    self.token_holders.get_listed_tokens_txs()
     tokens = self.token_holders._iterate_tokens()
     tokens = [t for token in tokens for t in token]
     flags = [token['_source']['tx_descr_scanned'] for token in tokens]
     self.assertCountEqual([True, True], flags)
 
-  def test_get_listed_tokens_itxs(self):
-    for i, address in enumerate(TEST_TOKEN_ADDRESSES):
-      self.client.index(TEST_INDEX, 'contract', {'address': address, 'cmc_listed': True, 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi'], 'decimals': 18}, id=address, refresh=True)
-    for tx in TEST_TOKEN_ITXS:
-      self.client.index(TEST_ITX_INDEX, 'itx', tx, refresh=True)
-    self.token_holders.get_listed_tokens_txs('internal')
-    all_descrptions = self.token_holders._iterate_tx_descriptions()
-    all_descrptions = [tx for txs_list in all_descrptions for tx in txs_list]
-    hashes = [d['_source']['tx_hash'] for d in all_descrptions]
-    self.assertCountEqual(['0x04692fb0a2d1a9c8b6ea8cfc643422800b81da50df1578f3494aef0ef9be6009', '0xce37439c6809ca9d1b1d5707c7df34ceec1e4e472f0ca07c87fa449a93b02431', '0x366c6344bdb4cb1bb8cfbce5770419b03f49d631d5803e5fbcf8de9b8f1a5d66'], hashes)
-  
   def test_run(self):
     for i, address in enumerate(TEST_TOKEN_ADDRESSES):
       self.client.index(TEST_INDEX, 'contract', {'address': address, 'cmc_listed': True, 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi']}, refresh=True)
@@ -70,7 +63,21 @@ class TokenHoldersTestCase(unittest.TestCase):
     token = list(set([descr['_source']['token'] for descr in all_descrptions]))[0]
     assert token == '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'
     assert len(all_descrptions) == 2
-  
+
+class InternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase):
+  token_holders_class = InternalTokenTransactions
+
+  def test_get_listed_tokens_itxs(self):
+    for i, address in enumerate(TEST_TOKEN_ADDRESSES):
+      self.client.index(TEST_INDEX, 'contract', {'address': address, 'cmc_listed': True, 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi'], 'decimals': 18}, id=address, refresh=True)
+    for tx in TEST_TOKEN_ITXS:
+      self.client.index(TEST_ITX_INDEX, 'itx', tx, refresh=True)
+    self.token_holders.get_listed_tokens_txs()
+    all_descrptions = self.token_holders._iterate_tx_descriptions()
+    all_descrptions = [tx for txs_list in all_descrptions for tx in txs_list]
+    hashes = [d['_source']['tx_hash'] for d in all_descrptions]
+    self.assertCountEqual(['0x04692fb0a2d1a9c8b6ea8cfc643422800b81da50df1578f3494aef0ef9be6009', '0xce37439c6809ca9d1b1d5707c7df34ceec1e4e472f0ca07c87fa449a93b02431', '0x366c6344bdb4cb1bb8cfbce5770419b03f49d631d5803e5fbcf8de9b8f1a5d66'], hashes)
+
 TEST_INDEX = 'test-ethereum-contracts'
 TEST_TX_INDEX = 'test-ethereum-txs'
 TEST_ITX_INDEX = 'test-ethereum-internal-txs'
