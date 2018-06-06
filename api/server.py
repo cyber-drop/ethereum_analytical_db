@@ -38,9 +38,12 @@ def _get_state(token, address_field, block):
     "query": {
       "bool": {
         "must": [
-          {"range": {"value": {"lte": 1e10}}},
           {"term": {"token": token}},
           {"exists": {"field": "value"}}
+        ],
+        "must_not": [
+          {"term": {"valid": False}},
+          {"term": {"method": "approve"}}
         ]
       }
 
