@@ -2,17 +2,14 @@ from web3 import Web3, HTTPProvider
 from custom_elastic_search import CustomElasticSearch
 from config import INDICES
 import requests
-import json
 from pyelasticsearch import bulk_chunks
 import math
 from decimal import Decimal
 
 class TokenHolders:
-  def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200", tx_index='internal'):
+  def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200"):
     self.indices = elasticsearch_indices
     self.client = CustomElasticSearch(elasticsearch_host)
-    self.tx_index = ''
-    self.tx_type = ''
     self.token_decimals = {}
 
   def _construct_bulk_insert_ops(self, docs):
@@ -40,7 +37,7 @@ class TokenHolders:
         "to": token_addresses
       }
     }
-    return self.client.iterate(self.tx_index, self.tx_type, query)
+    return self.client.iterate(self.indices[self.tx_index], self.tx_type, query)
 
   def _convert_transfer_value(self, value, decimals):
     if decimals == 1:
@@ -90,9 +87,7 @@ class TokenHolders:
     update_docs = [{'doc': {'tx_descr_scanned': True}, 'id': address} for address in token_addresses]
     self._update_multiple_docs(update_docs, 'contract', self.indices['contract'])
 
-  def get_listed_tokens_txs(self, tx_index):
-    self.tx_index = self.indices['internal_transaction'] if tx_index == 'internal' else self.indices['transaction']
-    self.tx_type = 'itx' if tx_index == 'internal' else 'tx'
+  def get_listed_tokens_txs(self):
     for tokens in self._iterate_tokens():
       self.token_decimals = {token['_source']['address']: token['_source']['decimals'] for token in tokens if 'decimals' in token['_source'].keys()}
       self._extract_tokens_txs([token['_source']['address'] for token in tokens])
@@ -113,3 +108,13 @@ class TokenHolders:
         tx_descr = self._construct_tx_descr_from_input(tx)
         transfers.append(tx_descr)
     self._insert_multiple_docs(transfers, 'tx', self.indices['token_tx'])
+
+class ExternalTokenTransactions(TokenHolders):
+  tx_index = 'transaction'
+  tx_type = 'tx'
+
+class InternalTokenTransactions(TokenHolders):
+  tx_index = 'internal_transaction'
+  tx_type = 'itx'
+
+
