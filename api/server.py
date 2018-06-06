@@ -31,7 +31,7 @@ def get_holders_number(token):
   result = client.send_request("GET", [app.config["token_tx"], "tx", "_search"], aggregation, {})
   return result['aggregations']['senders']["value"] + result["aggregations"]["receivers"]["value"]
 
-def _get_state(token, address_field):
+def _get_state(token, address_field, block):
   client = CustomElasticSearch("http://localhost:9200")
   aggregation = {
     "size": 0,
@@ -61,23 +61,28 @@ def _get_state(token, address_field):
       }
     }
   }
+  if block:
+    aggregation["query"]["bool"]["must"].append({"range": {"block_id": {"lte": block}}})
   result = client.send_request("GET", [app.config["token_tx"], "tx", "_search"], aggregation, {})
   documents = result['aggregations']['holders']["buckets"]
   return {document["key"]: float(document["state"]["value"]) for document in documents}
 
-def get_incomes(token):
-  return _get_state(token, "to.keyword")
+def get_incomes(token, block=None):
+  return _get_state(token, "to.keyword", block)
 
-def get_outcomes(token):
-  return _get_state(token, "from.keyword")
+def get_outcomes(token, block=None):
+  return _get_state(token, "from.keyword", block)
 
-def get_balances(token):
-  incomes = get_incomes(token)
-  outcomes = get_outcomes(token)
+def get_balances(token, block=None):
+  incomes = get_incomes(token, block)
+  outcomes = get_outcomes(token, block)
   addresses = list(incomes.keys()) + list(outcomes.keys())
   return {address: incomes.get(address, 0) - outcomes.get(address, 0) for address in addresses}
 
 @app.route("/balances")
 def get_balances_api():
   token = request.args.get("token")
-  return jsonify(get_balances(token))
+  block = int(request.args.get("block", 0))
+  if not block:
+    block = None
+  return jsonify(get_balances(token, block))
