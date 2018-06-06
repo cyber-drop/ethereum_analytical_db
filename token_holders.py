@@ -19,8 +19,16 @@ class TokenHolders:
     for doc in docs:
       yield self.client.index_op(doc, id=doc['tx_hash'])
 
+  def _construct_bulk_update_ops(self, docs):
+    for doc in docs:
+      yield self.client.update_op(doc['doc'], id=doc['id'])
+
   def _insert_multiple_docs(self, docs, doc_type, index_name):
     for chunk in bulk_chunks(self._construct_bulk_insert_ops(docs), docs_per_chunk=1000):
+      self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
+
+  def _update_multiple_docs(self, docs, doc_type, index_name):
+    for chunk in bulk_chunks(self._construct_bulk_update_ops(docs), docs_per_chunk=1000):
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
 
   def _iterate_tokens(self):
@@ -60,7 +68,7 @@ class TokenHolders:
       return
 
   def _check_tx_input(self, tx):
-    if 'decoded_input' in tx['_source'].keys() and tx['_source']['decoded_input'] != None:
+    if 'decoded_input' in tx['_source'].keys() and tx['_source']['decoded_input'] != None and len(tx['_source']['decoded_input']['params']) > 0:
       return self._construct_tx_descr_from_input(tx['_source'])
     else:
       return
@@ -78,7 +86,9 @@ class TokenHolders:
 
   def _extract_tokens_txs(self, token_addresses):
     for txs_chunk in self._iterate_tokens_txs(token_addresses):
-      self._extract_descriptions_from_txs(txs_chunk) 
+      self._extract_descriptions_from_txs(txs_chunk)
+    update_docs = [{'doc': {'tx_descr_scanned': True}, 'id': address} for address in token_addresses]
+    self._update_multiple_docs(update_docs, 'contract', self.indices['contract'])
 
   def get_listed_tokens_txs(self):
     for tokens in self._iterate_tokens():
