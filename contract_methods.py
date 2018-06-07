@@ -5,6 +5,7 @@ from config import INDICES, PARITY_HOSTS
 import json
 import math
 from decimal import Decimal
+from pyelasticsearch import bulk_chunks
 
 with open('standard-token-abi.json') as json_file:
   standard_token_abi = json.load(json_file)
@@ -118,13 +119,28 @@ class ContractMethods:
     else:
       update_body = {'is_token': False}
       self._update_contract_descr(contract['_id'], update_body)
-  
+
+  def _construct_bulk_update_ops(self, docs):
+    for doc in docs:
+      yield self.client.update_op(doc['doc'], id=doc['id'])
+
+  def _update_multiple_docs(self, docs, doc_type, index_name):
+    for chunk in bulk_chunks(self._construct_bulk_update_ops(docs), docs_per_chunk=1000):
+      self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
+
+  def _iterate_blocks(self):
+    return self.client.iterate(self.indices["block"], 'block', 'number:*')
+
   def search_methods(self):
     for contracts_chunk in self._iterate_contracts():
       for contract in contracts_chunk:
         self._classify_contract(contract)
+      update_ops = [{'id': contract['_source']['blockNumber'], 'doc': {'standard_contract_methods': True}} for contract in contracts_chunk]
+      self._update_multiple_docs(update_ops, 'block', self.indices['block'])
     for tokens_chunk in self._iterate_non_standard():
       for token in tokens_chunk:
         name, symbol, decimals, total_supply, owner = self._get_constants(token['_source']['address'])
         update_body = {'token_name': name, 'token_symbol': symbol, 'decimals': decimals, 'total_supply': total_supply, 'token_owner': owner}
         self._update_contract_descr(token['_id'], update_body)
+      update_ops = [{'id': contract['_source']['blockNumber'], 'doc': {'nonstandard_contract_methods': True}} for token in tokens_chunk]
+      self._update_multiple_docs(update_ops, 'block', self.indices['block'])
