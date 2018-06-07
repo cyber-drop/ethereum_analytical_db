@@ -7,7 +7,7 @@ class ContractMethodsTestCase(unittest.TestCase):
     self.client = TestElasticSearch()
     self.client.recreate_index(TEST_INDEX)
     self.client.recreate_index(TEST_BLOCK_INDEX)
-    self.contract_methods = ContractMethods({"contract": TEST_INDEX, 'block': TEST_BLOCK_INDEX}, parity_hosts=[('', '','https://mainnet.infura.io/SuP0gwmZ0hYfutY70s6V')])
+    self.contract_methods = ContractMethods({"contract": TEST_INDEX, 'block': TEST_BLOCK_INDEX})
 
   def test_iterate_non_standard(self):
     for i in range(4):
