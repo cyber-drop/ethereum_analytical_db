@@ -9,9 +9,9 @@ class ContractMethodsTestCase(unittest.TestCase):
     self.contract_methods = ContractMethods({"contract": TEST_INDEX})
 
   def test_iterate_non_standard(self):
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[0], 'bytecode': TEST_BYTECODES[0]}, id=1, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[3], 'bytecode': TEST_BYTECODES[3]}, id=2, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[4], 'bytecode': TEST_BYTECODES[4]}, id=3, refresh=True)
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[0], 'blockNumber': 5748810, 'bytecode': TEST_BYTECODES[0]}, id=1, refresh=True)
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[3], 'blockNumber': 5748809, 'bytecode': TEST_BYTECODES[3]}, id=2, refresh=True)
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[4], 'blockNumber': 5748808, 'bytecode': TEST_BYTECODES[4]}, id=3, refresh=True)
     self.contract_methods.search_methods()
     iterator = self.contract_methods._iterate_non_standard()
     contracts = [c for contracts_list in iterator for c in contracts_list]
@@ -34,9 +34,20 @@ class ContractMethodsTestCase(unittest.TestCase):
     empty_constants = self.contract_methods._get_constants(TEST_EMPTY_CONTRACT)
     self.assertCountEqual(('', '', '0', 0, 'None',), empty_constants)
 
+  def test_iterate_sorted(self):
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[0], 'blockNumber': 5748810, 'bytecode': TEST_BYTECODES[0]}, id=1, refresh=True)
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[3], 'blockNumber': 5748809, 'bytecode': TEST_BYTECODES[3]}, id=2, refresh=True)
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[4], 'blockNumber': 5748808, 'bytecode': TEST_BYTECODES[4]}, id=3, refresh=True)
+    contracts = self.contract_methods._iterate_contracts()
+    contracts = [c['_source'] for contract in contracts for c in contract]
+    for c in contracts:
+      del c['bytecode']
+    print(contracts)
+    assert contracts[0]['blockNumber'] == 5748808
+
   def test_search_methods(self):
     for i, address in enumerate(TEST_CONTRACT_ADDRESSES):
-      self.client.index(TEST_INDEX, 'contract', {'address': address, 'bytecode': TEST_BYTECODES[i]}, refresh=True)
+      self.client.index(TEST_INDEX, 'contract', {'address': address, 'blockNumber': 5748810, 'bytecode': TEST_BYTECODES[i]}, refresh=True)
     self.contract_methods.search_methods()
     iterator = self.contract_methods._iterate_contracts()
     contracts = contracts = [c for contracts_list in iterator for c in contracts_list]
