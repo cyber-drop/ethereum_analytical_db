@@ -46,7 +46,7 @@ def search_methods(host):
   contract_methods.search_methods()
 
 def extract_tokens_txs(host):
-  token_holders = TokenHolders(INDICES, host)
+  token_holders = ExternalTokenTransactions(INDICES, host)
   token_holders.get_listed_tokens_txs()
 
 operations = {
