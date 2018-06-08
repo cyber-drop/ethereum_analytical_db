@@ -37,14 +37,6 @@ class ContractMethodsTestCase(unittest.TestCase):
     empty_constants = self.contract_methods._get_constants(TEST_EMPTY_CONTRACT)
     self.assertCountEqual(('', '', '0', 0, 'None',), empty_constants)
 
-  def test_iterate_sorted(self):
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[0], 'blockNumber': 5748810, 'bytecode': TEST_BYTECODES[0]}, id=1, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[3], 'blockNumber': 5748809, 'bytecode': TEST_BYTECODES[3]}, id=2, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[4], 'blockNumber': 5748808, 'bytecode': TEST_BYTECODES[4]}, id=3, refresh=True)
-    contracts = self.contract_methods._iterate_contracts()
-    contracts = [c['_source'] for contract in contracts for c in contract]
-    assert contracts[0]['blockNumber'] == 5748808
-
   def test_update_block_flags(self):
     for i in range(5):
       self.client.index(TEST_BLOCK_INDEX, 'block', {'number': 5748807 + i}, id=5748807+i, refresh=True)

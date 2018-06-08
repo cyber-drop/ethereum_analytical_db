@@ -20,15 +20,7 @@ class ContractMethods:
     self.constants = ['name', 'symbol', 'decimals', 'total_supply', 'owner']
 
   def _iterate_contracts(self):
-    query = {
-      'query': {
-        'exists': {
-          'field': 'address'
-          }
-      },
-      'sort': 'blockNumber'
-    }
-    return self.client.iterate_sorted(self.indices["contract"], 'contract', query)
+    return self.client.iterate(self.indices["contract"], 'contract', 'address:*')
 
   def _iterate_non_standard(self):
     return self.client.iterate(self.indices["contract"], 'contract', 'standards: None')
