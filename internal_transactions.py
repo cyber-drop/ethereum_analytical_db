@@ -1,4 +1,5 @@
 from custom_elastic_search import CustomElasticSearch, NUMBER_OF_JOBS
+from pyelasticsearch.exceptions import BulkError
 import requests
 import json
 from time import sleep
@@ -159,11 +160,24 @@ class InternalTransactions:
     self.client.bulk_index(docs=docs, index=self.indices["miner_transaction"], doc_type="tx", id_field="hash",
                            refresh=True)
 
+  def _save_transactions_error(self, blocks_traces):
+    operations = [self.client.update_op(
+      doc={"error": transaction["error"]},
+      id=transaction["transactionHash"]
+    ) for transaction in blocks_traces
+      if ("error" in transaction.keys()) and ("transactionHash" in transaction.keys())]
+    if operations:
+      try:
+        self.client.bulk(operations, index=self.indices["transaction"], doc_type="tx", refresh=True)
+      except BulkError:
+        pass
+
   def _extract_traces_chunk(self, blocks):
     blocks_traces = self._get_traces(blocks)
     self._set_trace_hashes(blocks_traces)
     self._save_internal_transactions(blocks_traces)
     self._save_miner_transactions(blocks_traces)
+    self._save_transactions_error(blocks_traces)
     self._save_traces(blocks)
 
   def extract_traces(self):
