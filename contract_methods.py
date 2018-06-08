@@ -20,10 +20,13 @@ class ContractMethods:
     self.constants = ['name', 'symbol', 'decimals', 'total_supply', 'owner']
 
   def _iterate_contracts(self):
-    return self.client.iterate(self.indices["contract"], 'contract', 'address:*')
+    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(methods:true)')
+
+  def _iterate_processed_contracts(self):
+    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND methods:true')
 
   def _iterate_non_standard(self):
-    return self.client.iterate(self.indices["contract"], 'contract', 'standards: None')
+    return self.client.iterate(self.indices["contract"], 'contract', 'standards:None AND !(methods:true)')
 
   def _extract_first_bytes(self, func):
     return str(self.w3.toHex(self.w3.sha3(text=func)[0:4]))[2:]
