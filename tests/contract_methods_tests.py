@@ -10,8 +10,6 @@ class ContractMethodsTestCase(unittest.TestCase):
     self.contract_methods = ContractMethods({"contract": TEST_INDEX, 'block': TEST_BLOCK_INDEX})
 
   def test_iterate_non_standard(self):
-    for i in range(4):
-      self.client.index(TEST_BLOCK_INDEX, 'block', {'number': 5748807 + i}, id=5748807+i, refresh=True)
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[0], 'blockNumber': 5748810, 'bytecode': TEST_BYTECODES[0]}, id=1, refresh=True)
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[3], 'blockNumber': 5748809, 'bytecode': TEST_BYTECODES[3]}, id=2, refresh=True)
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[4], 'blockNumber': 5748808, 'bytecode': TEST_BYTECODES[4]}, id=3, refresh=True)
@@ -37,22 +35,20 @@ class ContractMethodsTestCase(unittest.TestCase):
     empty_constants = self.contract_methods._get_constants(TEST_EMPTY_CONTRACT)
     self.assertCountEqual(('', '', '0', 0, 'None',), empty_constants)
 
-  def test_update_block_flags(self):
-    for i in range(5):
-      self.client.index(TEST_BLOCK_INDEX, 'block', {'number': 5748807 + i}, id=5748807+i, refresh=True)
+  def test_set_contract_flags(self):
     for i, address in enumerate(TEST_CONTRACT_ADDRESSES):
       self.client.index(TEST_INDEX, 'contract', {'address': address, 'blockNumber': 5748807 + i, 'bytecode': TEST_BYTECODES[i]}, refresh=True)
     self.contract_methods.search_methods()
-    blocks = self.contract_methods._iterate_blocks()
-    blocks = [b['_source'] for block in blocks for b in block]
-    flags = [b['standard_contract_methods'] for b in blocks]
-    non_standard_flags = [b['nonstandard_contract_methods'] for b in blocks if 'nonstandard_contract_methods' in b.keys()]
-    self.assertCountEqual([True, True, True, True, True], flags)
-    self.assertCountEqual([True], non_standard_flags)
+    self.client.index(TEST_INDEX, 'contract', {'address': '0xd4fa1460f537bb9085d22c7bccb5dd450ef28e3a'}, refresh=True)
+    iterator = self.contract_methods._iterate_contracts()
+    contracts = contracts = [c for contracts_list in iterator for c in contracts_list]
+    flags = [c['_source']['methods'] for c in contracts if 'methods' in c['_source'].keys()]
+    unprocessed = [c for c in contracts if 'methods' not in c['_source'].keys()]
+    flags = list(set(flags))
+    self.assertCountEqual([True], flags)
+    assert len(unprocessed) == 1
 
   def test_search_methods(self):
-    for i in range(5):
-      self.client.index(TEST_BLOCK_INDEX, 'block', {'number': 5748807 + i}, id=5748807+i, refresh=True)
     for i, address in enumerate(TEST_CONTRACT_ADDRESSES):
       self.client.index(TEST_INDEX, 'contract', {'address': address, 'blockNumber': 5748807 + i, 'bytecode': TEST_BYTECODES[i]}, refresh=True)
     self.contract_methods.search_methods()
