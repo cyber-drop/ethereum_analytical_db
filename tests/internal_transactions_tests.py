@@ -290,6 +290,40 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert len(internal_transactions) == 1
     assert internal_transactions[0]["_id"] == "0x0.10"
 
+  def test_save_transactions_error(self):
+    test_traces = [{
+      "transactionHash": "0x1",
+      "error": "Out of gas"
+    }, {
+      "transactionHash": "0x2"
+    }, {
+      "transactionHash": "0x2",
+      "error": "Bad instruction"
+    }, {
+      "transactionHash": "0x3"
+    }]
+    self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type="tx", doc={'hash': "0x1"}, id="0x1", refresh=True)
+    self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type="tx", doc={'hash': "0x2"}, id="0x2", refresh=True)
+    self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type="tx", doc={'hash': "0x3"}, id="0x3", refresh=True)
+
+    self.internal_transactions._save_transactions_error(test_traces)
+
+    transactions = self.client.search(index=TEST_TRANSACTIONS_INDEX, doc_type="tx", query="_exists_:error")['hits']['hits']
+    errors = {transaction["_id"]: transaction["_source"]["error"] for transaction in transactions}
+    assert errors['0x1'] == "Out of gas"
+    assert errors['0x2'] == "Bad instruction"
+    assert "0x3" not in errors.keys()
+
+  def test_save_transactions_error_ignore_miner_transaction(self):
+    test_traces = [{"transactionHash": None}]
+    self.internal_transactions._save_transactions_error(test_traces)
+    assert True
+
+  def test_save_transactions_error_ignore_missing_transaction(self):
+    test_traces = [{"transactionHash": "0x1", "error": "Bad instruction"}]
+    self.internal_transactions._save_transactions_error(test_traces)
+    assert True
+
   def test_save_miner_transaction(self):
     trace = [{"transactionHash": None, "hash": "0x1"}, {"transactionHash": "0x1"}]
     self.internal_transactions._save_miner_transactions(trace)
@@ -319,6 +353,25 @@ class InternalTransactionsTestCase(unittest.TestCase):
       call.set_hashes(test_traces),
       call.save_transactions(test_traces),
       call.save_rewards(test_traces),
+      call.save_traces(test_blocks)
+    ]
+    process.assert_has_calls(calls)
+
+  def test_extract_traces_chunk_save_transaction_error(self):
+    test_blocks = ["0x1"]
+    test_traces = []
+    mockify(self.internal_transactions, {
+      "_get_traces": MagicMock(return_value=test_traces)
+    }, ["_extract_traces_chunk"])
+    process = Mock(
+      save_traces=self.internal_transactions._save_traces,
+      save_errors=self.internal_transactions._save_transactions_error
+    )
+
+    self.internal_transactions._extract_traces_chunk(test_blocks)
+
+    calls = [
+      call.save_errors(test_traces),
       call.save_traces(test_blocks)
     ]
     process.assert_has_calls(calls)
