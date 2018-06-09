@@ -7,17 +7,27 @@ class ContractMethodsTestCase(unittest.TestCase):
     self.client = TestElasticSearch()
     self.client.recreate_index(TEST_INDEX)
     self.contract_methods = ContractMethods({"contract": TEST_INDEX})
+  
+  def iterate_processed_contracts(self):
+    return self.contract_methods.client.iterate(TEST_INDEX, 'contract', 'address:* AND methods:true')
 
   def test_iterate_non_standard(self):
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[0], 'bytecode': TEST_BYTECODES[0]}, id=1, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[3], 'bytecode': TEST_BYTECODES[3]}, id=2, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[4], 'bytecode': TEST_BYTECODES[4]}, id=3, refresh=True)
-    self.contract_methods.search_methods()
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[0], 'blockNumber': 5748810, 'standards': ['erc20'], 'bytecode': TEST_BYTECODES[0]}, id=1, refresh=True)
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[3], 'blockNumber': 5748809, 'standards': ['erc20'], 'bytecode': TEST_BYTECODES[3]}, id=2, refresh=True)
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[4], 'blockNumber': 5748808, 'standards': 'None', 'bytecode': TEST_BYTECODES[4]}, id=3, refresh=True)
     iterator = self.contract_methods._iterate_non_standard()
     contracts = [c for contracts_list in iterator for c in contracts_list]
     contracts = [contract['_id'] for contract in contracts]
     self.assertCountEqual(['3'], contracts)
   
+  def tests_iterate_unprocessed(self):
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[0], 'methods': True}, id=1, refresh=True)
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[3]}, id=2, refresh=True)
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[4]}, id=3, refresh=True)
+    contracts = self.contract_methods._iterate_contracts()
+    contracts = [c['_id'] for contract in contracts for c in contract]
+    self.assertCountEqual(['2', '3'], contracts)
+
   def test_check_if_token(self):
     is_token = self.contract_methods._check_is_token(TEST_BYTECODES[2])
     assert is_token == True
@@ -34,11 +44,22 @@ class ContractMethodsTestCase(unittest.TestCase):
     empty_constants = self.contract_methods._get_constants(TEST_EMPTY_CONTRACT)
     self.assertCountEqual(('', '', '0', 0, 'None',), empty_constants)
 
+  def test_set_contract_flags(self):
+    for i, address in enumerate(TEST_CONTRACT_ADDRESSES):
+      self.client.index(TEST_INDEX, 'contract', {'address': address, 'blockNumber': 5748807 + i, 'bytecode': TEST_BYTECODES[i]}, refresh=True)
+    self.contract_methods.search_methods()
+    self.client.index(TEST_INDEX, 'contract', {'address': '0xd4fa1460f537bb9085d22c7bccb5dd450ef28e3a'}, refresh=True)
+    iterator = self.iterate_processed_contracts()
+    contracts = contracts = [c for contracts_list in iterator for c in contracts_list]
+    flags = [c['_source']['methods'] for c in contracts if 'methods' in c['_source'].keys()]
+    flags = list(set(flags))
+    self.assertCountEqual([True], flags)
+
   def test_search_methods(self):
     for i, address in enumerate(TEST_CONTRACT_ADDRESSES):
-      self.client.index(TEST_INDEX, 'contract', {'address': address, 'bytecode': TEST_BYTECODES[i]}, refresh=True)
+      self.client.index(TEST_INDEX, 'contract', {'address': address, 'blockNumber': 5748807 + i, 'bytecode': TEST_BYTECODES[i]}, refresh=True)
     self.contract_methods.search_methods()
-    iterator = self.contract_methods._iterate_contracts()
+    iterator = self.iterate_processed_contracts()
     contracts = contracts = [c for contracts_list in iterator for c in contracts_list]
     tokens = [contract['_source']['token_name'] for contract in contracts if contract['_source']['is_token'] == True]
     self.assertCountEqual(['RUN COIN', 'bangbeipay', 'YNOTCoin', 'Josh Bucks'], tokens)
