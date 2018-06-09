@@ -1,7 +1,6 @@
 import unittest
 from token_holders import TokenHolders, ExternalTokenTransactions, InternalTokenTransactions
 from test_utils import TestElasticSearch
-import time
 
 class TokenHoldersTestCase(unittest.TestCase):
   def setUp(self):
@@ -23,7 +22,6 @@ class ExternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
     self.token_holders._extract_tokens_txs(['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'])
-    time.sleep(5)
     token_txs = self.token_holders._iterate_token_tx_descriptions('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d')
     token_txs = [tx for txs_list in token_txs for tx in txs_list]
     methods = [tx['_source']['method'] for tx in token_txs]
@@ -46,7 +44,6 @@ class ExternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
     self.token_holders.get_listed_tokens_txs()
-    time.sleep(5)
     all_descrptions = self.token_holders._iterate_tx_descriptions()
     all_descrptions = [tx for txs_list in all_descrptions for tx in txs_list]
     tokens = set([descr['_source']['token'] for descr in all_descrptions])
@@ -61,7 +58,6 @@ class ExternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
     self.token_holders.get_listed_tokens_txs()
-    time.sleep(5)
     tokens = self.iterate_processed()
     tokens = [t for token in tokens for t in token]
     flags = [token['_source']['tx_descr_scanned'] for token in tokens]
@@ -71,7 +67,6 @@ class ExternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase)
     for i, address in enumerate(TEST_TOKEN_ADDRESSES):
       self.client.index(TEST_INDEX, 'contract', {'address': address, 'cmc_id': str(1234+i), 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi']}, refresh=True)
     self.token_holders.run(TEST_BLOCK)
-    time.sleep(5)
     all_descrptions = self.token_holders._iterate_tx_descriptions()
     all_descrptions = [tx for txs_list in all_descrptions for tx in txs_list]
     token = list(set([descr['_source']['token'] for descr in all_descrptions]))[0]
@@ -83,7 +78,6 @@ class ExternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
     self.token_holders._extract_tokens_txs(['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'])
-    time.sleep(5)
     token_txs = self.token_holders._iterate_token_tx_descriptions('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d')
     token_txs = [tx for txs_list in token_txs for tx in txs_list]
     tx_indices = [tx['_source']['tx_index'] for tx in token_txs]
@@ -99,7 +93,6 @@ class InternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase)
     for tx in TEST_TOKEN_ITXS:
       self.client.index(TEST_ITX_INDEX, 'itx', tx, refresh=True)
     self.token_holders.get_listed_tokens_txs()
-    time.sleep(5)
     all_descrptions = self.token_holders._iterate_tx_descriptions()
     all_descrptions = [tx for txs_list in all_descrptions for tx in txs_list]
     hashes = [d['_source']['tx_hash'] for d in all_descrptions]
@@ -110,7 +103,6 @@ class InternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_ITX_INDEX, 'itx', tx, refresh=True)
     self.token_holders._extract_tokens_txs(['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'])
-    time.sleep(5)
     token_txs = self.token_holders._iterate_token_tx_descriptions('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d')
     token_txs = [tx for txs_list in token_txs for tx in txs_list]
     tx_indices = [tx['_source']['tx_index'] for tx in token_txs]
