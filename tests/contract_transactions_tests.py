@@ -31,7 +31,7 @@ class ContractTransactionsTestCase():
     calls = [call.iterate()]
     for transactions in transactions_list:
       for transaction in transactions:
-        calls.append(call.extract(transaction["_source"]))
+        calls.append(call.extract(transaction))
       calls.append(call.index(
         refresh=True,
         doc_type='contract',
@@ -117,9 +117,16 @@ class InternalContractTransactionsTestCase(ContractTransactionsTestCase, unittes
       "input": "0x1",
       "address": "0x2",
       "code": "0x3",
+      "blockNumber": 100
     }
-    contract = self.contract_transactions._extract_contract_from_transactions(transaction)
-    assert contract["creator"] == transaction["from"]
+    transaction_id = "0x10"
+    contract = self.contract_transactions._extract_contract_from_transactions({
+      "_source": transaction,
+      "_id": transaction_id
+    })
+    assert contract["owner"] == transaction["from"]
+    assert contract["blockNumber"] == transaction["blockNumber"]
+    assert contract["parent_transaction"] == transaction_id
     assert contract["address"] == transaction["address"]
     assert contract["id"] == transaction["address"]
     assert contract["bytecode"] == transaction["code"]
@@ -137,11 +144,15 @@ class ExternalContractTransactionsTestCase(ContractTransactionsTestCase, unittes
       "input": "0x3",
       "blockNumber": 100
     }
-    contract = self.contract_transactions._extract_contract_from_transactions(transaction)
+    transaction_id = "0x10"
+    contract = self.contract_transactions._extract_contract_from_transactions({
+      "_source": transaction,
+      "_id": transaction_id
+    })
     assert contract["owner"] == transaction["from"]
     assert contract["address"] == transaction["creates"]
     assert contract["id"] == transaction["creates"]
-    assert contract["parent_transaction"] == transaction["hash"]
+    assert contract["parent_transaction"] == transaction_id
     assert contract["blockNumber"] == transaction["blockNumber"]
     assert contract["bytecode"] == transaction["input"]
 
@@ -149,7 +160,8 @@ class ExternalContractTransactionsTestCase(ContractTransactionsTestCase, unittes
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'creates': TEST_TRANSACTION_TO, 'to': None}, id=1, refresh=True)
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to': None}, id=2, refresh=True)
     self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to': TEST_TRANSACTION_TO}, id=3, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'creates': TEST_TRANSACTION_TO, 'to': None}, id=4, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'creates': TEST_TRANSACTION_TO, 'to': None, 'error': "Out of gas"}, id=4, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'creates': TEST_TRANSACTION_TO, 'to': None}, id=5, refresh=True)
     iterator = self.contract_transactions._iterate_contract_transactions()
     transactions = next(iterator)
     transactions = [transaction['_id'] for transaction in transactions]

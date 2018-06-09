@@ -8,11 +8,11 @@ class ContractTransactions:
     self.ethereum_api_host = ethereum_api_host
 
   def _iterate_contract_transactions(self):
-    return self.client.iterate(self.indices[self.index], self.doc_type, self.contract_transactions_query)
+    return self.client.iterate(self.indices[self.index], self.doc_type, self.contract_transactions_query + ' AND !(_exists_:error)')
 
   def extract_contract_addresses(self):
     for contract_transactions in self._iterate_contract_transactions():
-      docs = [self._extract_contract_from_transactions(transaction["_source"]) for transaction in contract_transactions]
+      docs = [self._extract_contract_from_transactions(transaction) for transaction in contract_transactions]
       self.client.bulk_index(docs=docs, doc_type='contract', index=self.indices["contract"], refresh=True)
 
   def _extract_contract_from_transactions(self):
@@ -46,24 +46,28 @@ class ExternalContractTransactions(ContractTransactions):
   contract_transactions_query = '(_exists_:creates)'
 
   def _extract_contract_from_transactions(self, transaction):
+    transaction_body = transaction["_source"]
     return {
-      "id": transaction["creates"],
-      "address": transaction["creates"],
-      "owner": transaction["from"],
-      "parent_transaction": transaction["hash"],
-      "blockNumber": transaction["blockNumber"],
-      "bytecode": transaction["input"]
+      "id": transaction_body["creates"],
+      "address": transaction_body["creates"],
+      "owner": transaction_body["from"],
+      "parent_transaction": transaction["_id"],
+      "blockNumber": transaction_body["blockNumber"],
+      "bytecode": transaction_body["input"]
     }
 
 class InternalContractTransactions(ContractTransactions):
   index = "internal_transaction"
   doc_type = "itx"
-  contract_transactions_query = "type:create AND !(_exists_:error)"
+  contract_transactions_query = "type:create"
 
   def _extract_contract_from_transactions(self, transaction):
+    transaction_body = transaction["_source"]
     return {
-      "id": transaction["address"],
-      "address": transaction["address"],
-      "creator": transaction["from"],
-      "bytecode": transaction["code"]
+      "id": transaction_body["address"],
+      "address": transaction_body["address"],
+      "owner": transaction_body["from"],
+      "bytecode": transaction_body["code"],
+      "blockNumber": transaction_body["blockNumber"],
+      "parent_transaction": transaction["_id"]
     }
