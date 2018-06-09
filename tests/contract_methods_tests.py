@@ -7,6 +7,9 @@ class ContractMethodsTestCase(unittest.TestCase):
     self.client = TestElasticSearch()
     self.client.recreate_index(TEST_INDEX)
     self.contract_methods = ContractMethods({"contract": TEST_INDEX})
+  
+  def iterate_processed_contracts(self):
+    return self.contract_methods.client.iterate(TEST_INDEX, 'contract', 'address:* AND methods:true')
 
   def test_iterate_non_standard(self):
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[0], 'blockNumber': 5748810, 'standards': ['erc20'], 'bytecode': TEST_BYTECODES[0]}, id=1, refresh=True)
@@ -46,7 +49,7 @@ class ContractMethodsTestCase(unittest.TestCase):
       self.client.index(TEST_INDEX, 'contract', {'address': address, 'blockNumber': 5748807 + i, 'bytecode': TEST_BYTECODES[i]}, refresh=True)
     self.contract_methods.search_methods()
     self.client.index(TEST_INDEX, 'contract', {'address': '0xd4fa1460f537bb9085d22c7bccb5dd450ef28e3a'}, refresh=True)
-    iterator = self.contract_methods._iterate_processed_contracts()
+    iterator = self.iterate_processed_contracts()
     contracts = contracts = [c for contracts_list in iterator for c in contracts_list]
     flags = [c['_source']['methods'] for c in contracts if 'methods' in c['_source'].keys()]
     flags = list(set(flags))
@@ -56,7 +59,7 @@ class ContractMethodsTestCase(unittest.TestCase):
     for i, address in enumerate(TEST_CONTRACT_ADDRESSES):
       self.client.index(TEST_INDEX, 'contract', {'address': address, 'blockNumber': 5748807 + i, 'bytecode': TEST_BYTECODES[i]}, refresh=True)
     self.contract_methods.search_methods()
-    iterator = self.contract_methods._iterate_processed_contracts()
+    iterator = self.iterate_processed_contracts()
     contracts = contracts = [c for contracts_list in iterator for c in contracts_list]
     tokens = [contract['_source']['token_name'] for contract in contracts if contract['_source']['is_token'] == True]
     self.assertCountEqual(['RUN COIN', 'bangbeipay', 'YNOTCoin', 'Josh Bucks'], tokens)
