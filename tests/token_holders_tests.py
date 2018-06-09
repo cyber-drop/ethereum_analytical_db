@@ -19,6 +19,7 @@ class ExternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase)
 
   def test_extract_token_txs(self):
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0], 'cmc_id': '1234', 'token_name': TEST_TOKEN_NAMES[0], 'token_symbol': TEST_TOKEN_SYMBOLS[0], 'abi': ['mock_abi'], 'decimals': 18}, id=TEST_TOKEN_ADDRESSES[0], refresh=True)
+
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
     self.token_holders._extract_tokens_txs(['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'])
