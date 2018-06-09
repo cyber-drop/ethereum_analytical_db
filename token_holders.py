@@ -29,7 +29,7 @@ class TokenHolders:
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
 
   def _iterate_tokens(self):
-    return self.client.iterate(self.indices['contract'], 'contract', 'cmc_listed:true')
+    return self.client.iterate(self.indices['contract'], 'contract', '_exists_:cmc_id AND !(tx_descr_scanned:true)')
 
   def _iterate_tokens_txs(self, token_addresses):
     query = {
