@@ -2,29 +2,34 @@ from web3 import Web3, HTTPProvider
 from custom_elastic_search import CustomElasticSearch
 from config import INDICES
 import requests
-import json
 from pyelasticsearch import bulk_chunks
 import math
 from decimal import Decimal
 
 class TokenHolders:
-  def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200", tx_index='internal'):
+  def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200"):
     self.indices = elasticsearch_indices
     self.client = CustomElasticSearch(elasticsearch_host)
-    self.tx_index = self.indices['internal_transaction'] if tx_index == 'internal' else self.indices['transaction']
-    self.tx_type = 'itx' if tx_index == 'internal' else 'tx'
     self.token_decimals = {}
 
   def _construct_bulk_insert_ops(self, docs):
     for doc in docs:
       yield self.client.index_op(doc, id=doc['tx_hash'])
 
+  def _construct_bulk_update_ops(self, docs):
+    for doc in docs:
+      yield self.client.update_op(doc['doc'], id=doc['id'])
+
   def _insert_multiple_docs(self, docs, doc_type, index_name):
     for chunk in bulk_chunks(self._construct_bulk_insert_ops(docs), docs_per_chunk=1000):
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
 
+  def _update_multiple_docs(self, docs, doc_type, index_name):
+    for chunk in bulk_chunks(self._construct_bulk_update_ops(docs), docs_per_chunk=1000):
+      self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
+
   def _iterate_tokens(self):
-    return self.client.iterate(self.indices['contract'], 'contract', 'cmc_listed:true')
+    return self.client.iterate(self.indices['contract'], 'contract', '_exists_:cmc_id AND !(tx_descr_scanned:true)')
 
   def _iterate_tokens_txs(self, token_addresses):
     query = {
@@ -32,7 +37,7 @@ class TokenHolders:
         "to": token_addresses
       }
     }
-    return self.client.iterate(self.tx_index, self.tx_type, query)
+    return self.client.iterate(self.indices[self.tx_index], self.tx_type, query)
 
   def _convert_transfer_value(self, value, decimals):
     if decimals == 1:
@@ -46,20 +51,21 @@ class TokenHolders:
     tx_input = tx['decoded_input']
     is_valid_tx = 'error' not in tx.keys()
     decimals = self.token_decimals[tx['to']] if tx['to'] in self.token_decimals.keys() else 1
+    tx_hash = tx['transactionHash'] if 'transactionHash' in tx.keys() else tx['hash']
     if tx_input['name'] == 'transfer':
       value = self._convert_transfer_value(tx_input['params'][1]['value'], decimals)
-      return {'method': tx_input['name'], 'from': tx['from'], 'to': tx_input['params'][0]['value'], 'value': value[1], 'raw_value': value[0], 'block_id': tx['blockNumber'], 'valid': is_valid_tx, 'token': tx['to'], 'tx_index': self.indices['internal_transaction'], 'tx_hash': tx['hash']}
+      return {'method': tx_input['name'], 'from': tx['from'], 'to': tx_input['params'][0]['value'], 'value': value[1], 'raw_value': value[0], 'block_id': tx['blockNumber'], 'valid': is_valid_tx, 'token': tx['to'], 'tx_index': self.indices[self.tx_index], 'tx_hash': tx_hash}
     elif tx_input['name'] == 'transferFrom':
       value = self._convert_transfer_value(tx_input['params'][2]['value'], decimals)
-      return {'method': tx_input['name'], 'from': tx_input['params'][0]['value'], 'to': tx_input['params'][1]['value'], 'value': value[1], 'raw_value': value[0], 'block_id': tx['blockNumber'], 'valid': is_valid_tx, 'token': tx['to'], 'tx_index': self.indices['internal_transaction'], 'tx_hash': tx['hash']}
+      return {'method': tx_input['name'], 'from': tx_input['params'][0]['value'], 'to': tx_input['params'][1]['value'], 'value': value[1], 'raw_value': value[0], 'block_id': tx['blockNumber'], 'valid': is_valid_tx, 'token': tx['to'], 'tx_index': self.indices[self.tx_index], 'tx_hash': tx_hash}
     elif tx_input['name'] == 'approve':
       value = self._convert_transfer_value(tx_input['params'][1]['value'], decimals)
-      return {'method': tx_input['name'], 'from': tx['from'], 'spender': tx_input['params'][0]['value'], 'value': value[1], 'raw_value': value[0], 'block_id': tx['blockNumber'], 'valid': is_valid_tx, 'token': tx['to'], 'tx_index': self.indices['internal_transaction'], 'tx_hash': tx['hash']}
+      return {'method': tx_input['name'], 'from': tx['from'], 'spender': tx_input['params'][0]['value'], 'value': value[1], 'raw_value': value[0], 'block_id': tx['blockNumber'], 'valid': is_valid_tx, 'token': tx['to'], 'tx_index': self.indices[self.tx_index], 'tx_hash': tx_hash}
     else:
       return
 
   def _check_tx_input(self, tx):
-    if 'decoded_input' in tx['_source'].keys() and tx['_source']['decoded_input'] != None:
+    if 'decoded_input' in tx['_source'].keys() and tx['_source']['decoded_input'] != None and len(tx['_source']['decoded_input']['params']) > 0:
       return self._construct_tx_descr_from_input(tx['_source'])
     else:
       return
@@ -77,7 +83,9 @@ class TokenHolders:
 
   def _extract_tokens_txs(self, token_addresses):
     for txs_chunk in self._iterate_tokens_txs(token_addresses):
-      self._extract_descriptions_from_txs(txs_chunk) 
+      self._extract_descriptions_from_txs(txs_chunk)
+    update_docs = [{'doc': {'tx_descr_scanned': True}, 'id': address} for address in token_addresses]
+    self._update_multiple_docs(update_docs, 'contract', self.indices['contract'])
 
   def get_listed_tokens_txs(self):
     for tokens in self._iterate_tokens():
@@ -100,3 +108,13 @@ class TokenHolders:
         tx_descr = self._construct_tx_descr_from_input(tx)
         transfers.append(tx_descr)
     self._insert_multiple_docs(transfers, 'tx', self.indices['token_tx'])
+
+class ExternalTokenTransactions(TokenHolders):
+  tx_index = 'transaction'
+  tx_type = 'tx'
+
+class InternalTokenTransactions(TokenHolders):
+  tx_index = 'internal_transaction'
+  tx_type = 'itx'
+
+
