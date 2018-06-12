@@ -87,9 +87,28 @@ class TokenHolders:
     update_docs = [{'doc': {'tx_descr_scanned': True}, 'id': address} for address in token_addresses]
     self._update_multiple_docs(update_docs, 'contract', self.indices['contract'])
 
+  def _construct_creation_descr(self, contract):
+    to = contract['token_owner'] if 'token_owner' in contract.keys() and contract['token_owner'] != 'None' else contract['owner']
+    return {
+      'method': 'initial', 
+      'to': to, 
+      'value': contract['total_supply'], 
+      'raw_value': str(contract['total_supply']), 
+      'block_id': contract['blockNumber'], 
+      'valid': True, 
+      'token': contract['address'],
+      'tx_index': self.indices['transaction'], 
+      'tx_hash': contract['parent_transaction']
+    }
+
+  def _extract_contract_creation_descr(self, contracts):
+    descriptions = [self._construct_creation_descr(contract['_source']) for contract in contracts]
+    self._insert_multiple_docs(descriptions, 'tx', self.indices['token_tx'])
+
   def get_listed_tokens_txs(self):
     for tokens in self._iterate_tokens():
       self.token_decimals = {token['_source']['address']: token['_source']['decimals'] for token in tokens if 'decimals' in token['_source'].keys()}
+      self._extract_contract_creation_descr(tokens)
       self._extract_tokens_txs([token['_source']['address'] for token in tokens])
 
   def _get_listed_tokens_addresses(self):
