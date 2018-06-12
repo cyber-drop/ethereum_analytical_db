@@ -144,6 +144,8 @@ class InternalTransactions:
       if (field in transaction.keys()) and (transaction[field]):
         transaction.update(transaction[field])
         del transaction[field]
+    if "value" in transaction.keys():
+      transaction["value"] = int(transaction["value"], 0) / 1e18
     return transaction
 
   def _save_internal_transactions(self, blocks_traces):

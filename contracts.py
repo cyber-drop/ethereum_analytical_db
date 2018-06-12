@@ -155,7 +155,6 @@ class Contracts():
       self._decode_inputs_for_contracts(contracts)
       self._save_inputs_decoded([contract["_source"]["address"] for contract in contracts])
 
-
 class ExternalContracts(Contracts):
   doc_type = "tx"
   index = "transaction"
