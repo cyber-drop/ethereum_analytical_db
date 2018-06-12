@@ -81,7 +81,7 @@ def get_token_outcomes(token, block=None):
 def _get_internal_ethereum_state(field, start, end, index="internal_transaction", value="value"):
   client = CustomElasticSearch("http://localhost:9200")
   aggregation = {
-    "size": 10,
+    "size": 0,
     "query": {
       "bool": {
         "must_not": [
