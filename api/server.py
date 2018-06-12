@@ -78,14 +78,14 @@ def get_token_incomes(token, block=None):
 def get_token_outcomes(token, block=None):
   return _get_state(token, "from.keyword", block)
 
-def _get_internal_ethereum_state(field, start, end):
+def _get_internal_ethereum_state(field, start, end, index="internal_transaction", value="value"):
   client = CustomElasticSearch("http://localhost:9200")
   aggregation = {
-    "size": 0,
+    "size": 10,
     "query": {
       "bool": {
         "must_not": [
-          {"term": {"value": hex(0)}}
+          {"term": {value: hex(0)}}
         ]
       }
     },
@@ -100,22 +100,22 @@ def _get_internal_ethereum_state(field, start, end):
               "script": """
                 double value = 0.0;
                 int size = 7;
-                String stringValue = doc['value'].value.substring(2);
+                String stringValue = doc['{value}'].value.substring(2);
                 String chunk = "";
-                for (int i = 0; i < stringValue.length(); i++) {
+                for (int i = 0; i < stringValue.length(); i++) {{
                   chunk += stringValue.charAt(i);
-                  if (i%size == 0) {
+                  if (i%size == 0) {{
                     long longChunk = Long.parseLong(chunk, 16);
                     value = value*(1 << (size * 4)) + longChunk;
                     chunk = "";
-                  }
-                } 
-                if (chunk.length() > 0) {
+                  }}
+                }}
+                if (chunk.length() > 0) {{
                   long longChunk = Long.parseLong(chunk, 16);
                   value = value*(1 << (chunk.length() * 4)) + longChunk;
-                }
+                }}
                 return value / 1e18
-              """
+              """.format(value=value)
             }
           }
         }
@@ -131,7 +131,8 @@ def _get_internal_ethereum_state(field, start, end):
         }
       }
     }]
-  result = client.send_request("GET", [app.config["internal_transaction"], "_search"], aggregation, {})
+  result = client.send_request("GET", [app.config[index], "_search"], aggregation, {})
+  print(result)
   documents = result['aggregations']['holders']["buckets"]
   return {document["key"]: float(document["state"]["value"]) for document in documents}
 
@@ -140,6 +141,9 @@ def get_internal_ethereum_incomes(start=None, end=None):
 
 def get_internal_ethereum_outcomes(start=None, end=None):
   return _get_internal_ethereum_state("from", start, end)
+
+def get_ethereum_rewards(start=None, end=None):
+  return _get_internal_ethereum_state("author.keyword", start, end, index="miner_transaction", value="value.keyword")
 
 def _get_ethereum_state(field, start, end):
   client = CustomElasticSearch("http://localhost:9200")
@@ -176,8 +180,7 @@ def _get_ethereum_state(field, start, end):
         }
       }
     })
-  indices = ",".join([app.config["transaction"], app.config["internal_transaction"]])
-  result = client.send_request("GET", [indices, "_search"], aggregation, {})
+  result = client.send_request("GET", [app.config["transaction"], "_search"], aggregation, {})
   documents = result['aggregations']['holders']["buckets"]
   return {document["key"]: float(document["state"]["value"]) for document in documents}
 
@@ -205,17 +208,20 @@ def get_ethereum_balances(block=None):
     outcomes = get_ethereum_outcomes(start, end)
     internal_incomes = get_internal_ethereum_incomes(start, end)
     internal_outcomes = get_internal_ethereum_outcomes(start, end)
+    rewards = get_ethereum_rewards(start, end)
     addresses = set(
       list(incomes.keys()) +
       list(outcomes.keys()) +
       list(internal_incomes.keys()) +
-      list(internal_outcomes.keys())
+      list(internal_outcomes.keys()) +
+      list(rewards.keys())
     )
     balances = {
       address: incomes.get(address, 0)
                - outcomes.get(address, 0)
                + internal_incomes.get(address, 0)
                - internal_outcomes.get(address, 0)
+               + rewards.get(address, 0)
       for address in addresses
     }
     for address in balances.keys():
