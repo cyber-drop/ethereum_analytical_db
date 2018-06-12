@@ -6,6 +6,8 @@ from config import INDICES
 app = Flask(__name__)
 app.config.update(INDICES)
 
+BLOCKS_CHUNK_SIZE = 10000
+
 def get_holders_number(token):
   client = CustomElasticSearch("http://localhost:9200")
   aggregation = {
@@ -76,7 +78,7 @@ def get_token_incomes(token, block=None):
 def get_token_outcomes(token, block=None):
   return _get_state(token, "from.keyword", block)
 
-def _get_internal_ethereum_state(field, block):
+def _get_internal_ethereum_state(field, start, end):
   client = CustomElasticSearch("http://localhost:9200")
   aggregation = {
     "size": 0,
@@ -99,8 +101,6 @@ def _get_internal_ethereum_state(field, block):
                 double value = 0.0;
                 int size = 7;
                 String stringValue = doc['value'].value.substring(2);
-                if (stringValue.length() == 0)
-                  return 0.0;
                 String chunk = "";
                 for (int i = 0; i < stringValue.length(); i++) {
                   chunk += stringValue.charAt(i);
@@ -122,11 +122,12 @@ def _get_internal_ethereum_state(field, block):
       }
     }
   }
-  if block:
+  if start and end:
     aggregation["query"]["bool"]["must"] = [{
       "range": {
         "blockNumber": {
-          "lte": block
+          "lte": end,
+          "gte": start
         }
       }
     }]
@@ -134,13 +135,13 @@ def _get_internal_ethereum_state(field, block):
   documents = result['aggregations']['holders']["buckets"]
   return {document["key"]: float(document["state"]["value"]) for document in documents}
 
-def get_internal_ethereum_incomes(block=None):
-  return _get_internal_ethereum_state("to", block)
+def get_internal_ethereum_incomes(start=None, end=None):
+  return _get_internal_ethereum_state("to", start, end)
 
-def get_internal_ethereum_outcomes(block=None):
-  return _get_internal_ethereum_state("from", block)
+def get_internal_ethereum_outcomes(start=None, end=None):
+  return _get_internal_ethereum_state("from", start, end)
 
-def _get_ethereum_state(field, block):
+def _get_ethereum_state(field, start, end):
   client = CustomElasticSearch("http://localhost:9200")
   aggregation = {
     "size": 0,
@@ -166,11 +167,12 @@ def _get_ethereum_state(field, block):
       }
     }
   }
-  if block:
+  if start and end:
     aggregation["query"]["bool"]["must"].append({
       "range": {
         "blockNumber": {
-          "lte": block
+          "lte": start,
+          "gte": end
         }
       }
     })
@@ -179,11 +181,11 @@ def _get_ethereum_state(field, block):
   documents = result['aggregations']['holders']["buckets"]
   return {document["key"]: float(document["state"]["value"]) for document in documents}
 
-def get_ethereum_incomes(block=None):
-  return _get_ethereum_state("to", block)
+def get_ethereum_incomes(start=None, end=None):
+  return _get_ethereum_state("to", start, end)
 
-def get_ethereum_outcomes(block=None):
-  return _get_ethereum_state("from", block)
+def get_ethereum_outcomes(start=None, end=None):
+  return _get_ethereum_state("from", start, end)
 
 def get_token_balances(token, block=None):
   incomes = get_token_incomes(token, block)
@@ -191,24 +193,38 @@ def get_token_balances(token, block=None):
   addresses = set(list(incomes.keys()) + list(outcomes.keys()))
   return {address: incomes.get(address, 0) - outcomes.get(address, 0) for address in addresses}
 
+def _split_range(start, end, size):
+  ranges = list(zip(list(range(start, end, size)), list(range(start + size - 1, end, size))))
+  ranges.append((start + int((end - start) / size) * size, end))
+  return ranges
+
 def get_ethereum_balances(block=None):
-  incomes = get_ethereum_incomes(block)
-  outcomes = get_ethereum_outcomes(block)
-  internal_incomes = get_internal_ethereum_incomes(block)
-  internal_outcomes = get_internal_ethereum_outcomes(block)
-  addresses = set(
-    list(incomes.keys()) +
-    list(outcomes.keys()) +
-    list(internal_incomes.keys()) +
-    list(internal_outcomes.keys())
-  )
-  return {
-    address: incomes.get(address, 0)
-             - outcomes.get(address, 0)
-             + internal_incomes.get(address, 0)
-             - internal_outcomes.get(address, 0)
-    for address in addresses
-  }
+  final_balances = {}
+  for start, end in _split_range(0, block, BLOCKS_CHUNK_SIZE):
+    incomes = get_ethereum_incomes(start, end)
+    outcomes = get_ethereum_outcomes(start, end)
+    internal_incomes = get_internal_ethereum_incomes(start, end)
+    internal_outcomes = get_internal_ethereum_outcomes(start, end)
+    addresses = set(
+      list(incomes.keys()) +
+      list(outcomes.keys()) +
+      list(internal_incomes.keys()) +
+      list(internal_outcomes.keys())
+    )
+    balances = {
+      address: incomes.get(address, 0)
+               - outcomes.get(address, 0)
+               + internal_incomes.get(address, 0)
+               - internal_outcomes.get(address, 0)
+      for address in addresses
+    }
+    for address in balances.keys():
+      if address not in final_balances.keys():
+        final_balances[address] = 0
+      final_balances[address] += balances[address]
+
+  return final_balances
+
 
 @app.route("/token_balances")
 def get_token_balances_api():
