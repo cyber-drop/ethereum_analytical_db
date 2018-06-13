@@ -5,8 +5,7 @@ from api.server import get_ethereum_incomes, \
   get_internal_ethereum_outcomes, \
   get_ethereum_balances, \
   _split_range, \
-  get_ethereum_rewards, \
-  get_max_block
+  get_ethereum_rewards
 import unittest
 from tests.test_utils import TestElasticSearch
 from unittest.mock import MagicMock, Mock, patch, call
@@ -151,17 +150,6 @@ class APITestCase(unittest.TestCase):
     })
     self.app = server.app.test_client()
 
-  def test_get_max_block(self):
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 1
-    }, refresh=True)
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 2
-    }, refresh=True)
-    max_block = get_max_block()
-    assert max_block == 2
-    assert type(max_block) == int
-
   def test_split_range(self):
     ranges = _split_range(1, 1000, size=200)
     self.assertSequenceEqual([(1, 200), (201, 400), (401, 600), (601, 800), (801, 1000)], ranges)
@@ -249,7 +237,7 @@ class APITestCase(unittest.TestCase):
     test_balances_mock = MagicMock(return_value={})
     test_max_block_mock = MagicMock(return_value=test_max_block)
     with patch("api.server.get_ethereum_balances", test_balances_mock), \
-         patch("api.server.get_max_block", test_max_block_mock):
+         patch("utils.get_max_block", test_max_block_mock):
       self.app.get("/ethereum_balances")
       test_max_block_mock.assert_any_call()
       test_balances_mock.assert_called_with(test_max_block)

@@ -1,37 +1,16 @@
 import flask
 from flask import Flask, jsonify, request
-from custom_elastic_search import CustomElasticSearch
 from config import INDICES
 from tqdm import *
+import utils
 
 app = Flask(__name__)
 app.config.update(INDICES)
 
 BLOCKS_CHUNK_SIZE = 100000
 
-client = CustomElasticSearch("http://localhost:9200")
-
-def get_elasticsearch_connection():
-  return client
-
-def get_max_block():
-  client = get_elasticsearch_connection()
-  aggregation = {
-    "size": 0,
-    "aggs": {
-      "max_block": {
-        "max": {
-          "field": "number"
-        }
-      }
-    }
-  }
-  result = client.send_request("GET", [app.config["block"], "b", "_search"], aggregation, {})
-  return int(result['aggregations']['max_block']["value"])
-
-
 def get_holders_number(token):
-  client = get_elasticsearch_connection()
+  client = utils.get_elasticsearch_connection()
   aggregation = {
     "size": 0,
     "query": {
@@ -56,7 +35,7 @@ def get_holders_number(token):
   return result['aggregations']['senders']["value"] + result["aggregations"]["receivers"]["value"]
 
 def _get_token_state(token, address_field, block):
-  client = get_elasticsearch_connection()
+  client = utils.get_elasticsearch_connection()
   aggregation = {
     "size": 0,
     "query": {
@@ -101,7 +80,7 @@ def get_token_outcomes(token, block=None):
   return _get_token_state(token, "from.keyword", block)
 
 def _get_ethereum_state(field, start, end, index="transaction"):
-  client = get_elasticsearch_connection()
+  client = utils.get_elasticsearch_connection()
   aggregation = {
     "size": 0,
     "query": {
@@ -208,5 +187,5 @@ def get_token_balances_api():
 def get_ethereum_balances_api():
   block = int(request.args.get("block", 0))
   if not block:
-    block = get_max_block()
+    block = utils.get_max_block()
   return jsonify(get_ethereum_balances(block))
