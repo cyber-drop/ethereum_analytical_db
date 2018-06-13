@@ -2,13 +2,6 @@ import requests
 from custom_elastic_search import CustomElasticSearch
 from config import INDICES
 import datetime
-import time
-from tqdm import *
-from os import listdir
-from os.path import isfile, join
-from decimal import *
-import pandas as pd 
-import itertools
 from pyelasticsearch import bulk_chunks
 
 class TokenPrices:
@@ -20,8 +13,14 @@ class TokenPrices:
     for i in range(0, len(l), n):
         yield l[i:i+n]
 
+  def _to_usd(self, value, price):
+    return value * price
+
+  def _from_usd(self, value, price):
+    return value / price
+
   def _iterate_cc_tokens(self):
-    return self.client.iterate(self.indices['contract'], 'contract', 'cc_listed:true')
+    return self.client.iterate(self.indices['contract'], 'contract', 'cc_sym:*')
 
   def _get_cc_tokens(self):
     tokens = [token_chunk for token_chunk in self._iterate_cc_tokens()]
@@ -30,7 +29,7 @@ class TokenPrices:
 
   def _get_prices_for_fsyms(self, symbol_list):
     fsyms = ','.join(symbol_list)
-    url = 'https://min-api.cryptocompare.com/data/pricemulti?fsyms={}&tsyms=ETH,BTC,USD'.format(fsyms)
+    url = 'https://min-api.cryptocompare.com/data/pricemulti?fsyms={}&tsyms=BTC'.format(fsyms)
     try:
       prices = requests.get(url).json()
     except:
@@ -39,18 +38,30 @@ class TokenPrices:
 
   def _make_multi_prices_req(self, tokens):
     token_list_chunks = list(self._chunks(tokens, 60))
-    all_prices = {}
+    all_prices = []
     for symbols in token_list_chunks:
       prices = self._get_prices_for_fsyms(symbols)
       if prices != None:
-        all_prices.update(prices)
+        prices = [{'token': key, 'BTC': float('{:0.10f}'.format(prices[key]['BTC']))} for key in prices.keys()]
+        all_prices.append(prices)
+    all_prices = [price for prices in all_prices for price in prices]
     return all_prices
+
+  def _get_btc_eth_current_prices(self):
+    url = 'https://min-api.cryptocompare.com/data/pricemulti?fsyms=BTC,ETH&tsyms=USD'
+    res = requests.get(url).json()
+    self.btc_price = res['BTC']['USD']
+    self.eth_price = res['ETH']['USD']
 
   def _get_multi_prices(self):
     now = datetime.datetime.now()
+    self._get_btc_eth_current_prices()
     token_syms = [token['cc_sym'] for token in self._get_cc_tokens()]
-    res = self._make_multi_prices_req(token_syms)
-    prices = [{'fsym': key, 'ETH': res[key]['ETH'], 'BTC': res[key]['BTC'], 'USD': res[key]['USD'], 'date': now.strftime("%Y-%m-%d")} for key in res.keys()]
+    prices = self._make_multi_prices_req(token_syms)
+    for price in prices:
+      price['USD'] = float('{:0.10f}'.format(self._to_usd(price['BTC'], self.btc_price)))
+      price['ETH'] = float('{:0.10f}'.format(self._from_usd(price['USD'], self.eth_price)))
+      price['timestamp'] = now.strftime("%Y-%m-%d")
     return prices
 
   def _construct_bulk_insert_ops(self, docs):
@@ -63,7 +74,4 @@ class TokenPrices:
 
   def get_recent_token_prices(self):
     prices = self._get_multi_prices()
-    self._insert_multiple_docs(prices, 'cc_price', self.indices['token_prices'])
-
-  def _iterate_prices(self):
-    return self.client.iterate(self.indices['token_prices'], 'cc_price', 'fsym:*')
+    self._insert_multiple_docs(prices, 'price', self.indices['token_prices'])
