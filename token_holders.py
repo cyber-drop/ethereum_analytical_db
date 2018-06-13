@@ -88,11 +88,17 @@ class TokenHolders:
     self._update_multiple_docs(update_docs, 'contract', self.indices['contract'])
 
   def _construct_creation_descr(self, contract):
-    to = contract['token_owner'] if 'token_owner' in contract.keys() and contract['token_owner'] != 'None' else contract['owner']
+    if 'token_owner' in contract.keys() and contract['token_owner'] != 'None':
+      to = contract['token_owner']
+    elif 'owner' in contract.keys():
+      to = contract['owner']
+    else:
+      to = contract['creator']
+    value = contract['total_supply'] if 'total_supply' in contract.keys() and contract['total_supply'] != 'None' else '0'
     return {
       'method': 'initial', 
       'to': to, 
-      'raw_value': contract['total_supply'], 
+      'raw_value': value, 
       'block_id': contract['blockNumber'], 
       'valid': True, 
       'token': contract['address'],
