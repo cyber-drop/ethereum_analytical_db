@@ -207,7 +207,7 @@ class TransactionsElasticSearchOptimizationTestCase(ElasticSearchOptimizationTes
 
 class InternalTransactionsElasticSearchOptimizationTestCase(ElasticSearchOptimizationTestCase, unittest.TestCase):
   string_fields = ["callType", "from", "gas", "hash", "blockTimestamp", "gasUsed",
-                   "blockHash", "transactionHash", "refundAddress", "to", "value",
+                   "blockHash", "transactionHash", "refundAddress", "to",
                    "type", "address", "balance", "blockNumber"]
   text_fields = ["input", "code", "init", "error", "output"]
   object_fields = ["traceAddress", "decoded_input"]
@@ -220,7 +220,7 @@ class InternalTransactionsElasticSearchOptimizationTestCase(ElasticSearchOptimiz
     "gasUsed": "0x6",
     "from": "0x6a0a0fc761c612c340a0e98d33b37a75e5268472",
     "gas": "0x6",
-    "value": "0x0",
+    "value": 0,
     "class": 3,
     "to": "0x0f045b8a7f4587cdff0919fe8d12613a7e1b7230",
     "callType": "call",

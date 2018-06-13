@@ -55,7 +55,7 @@ def get_holders_number(token):
   result = client.send_request("GET", [app.config["token_tx"], "tx", "_search"], aggregation, {})
   return result['aggregations']['senders']["value"] + result["aggregations"]["receivers"]["value"]
 
-def _get_state(token, address_field, block):
+def _get_token_state(token, address_field, block):
   client = get_elasticsearch_connection()
   aggregation = {
     "size": 0,
@@ -95,78 +95,12 @@ def _get_state(token, address_field, block):
   return {document["key"]: float(document["state"]["value"]) for document in documents}
 
 def get_token_incomes(token, block=None):
-  return _get_state(token, "to.keyword", block)
+  return _get_token_state(token, "to.keyword", block)
 
 def get_token_outcomes(token, block=None):
-  return _get_state(token, "from.keyword", block)
+  return _get_token_state(token, "from.keyword", block)
 
-def _get_internal_ethereum_state(field, start, end, index="internal_transaction", value="value"):
-  client = get_elasticsearch_connection()
-  aggregation = {
-    "size": 0,
-    "query": {
-      "bool": {
-        "must_not": [
-          {"term": {value: hex(0)}}
-        ]
-      }
-    },
-    "aggs": {
-      "holders": {
-        "terms": {
-          "field": field
-        },
-        "aggs": {
-          "state": {
-            "sum": {
-              "script": """
-                double value = 0.0;
-                int size = 7;
-                String stringValue = doc['{value}'].value.substring(2);
-                String chunk = "";
-                for (int i = 0; i < stringValue.length(); i++) {{
-                  chunk += stringValue.charAt(i);
-                  if (i%size == 0) {{
-                    long longChunk = Long.parseLong(chunk, 16);
-                    value = value*(1 << (size * 4)) + longChunk;
-                    chunk = "";
-                  }}
-                }}
-                if (chunk.length() > 0) {{
-                  long longChunk = Long.parseLong(chunk, 16);
-                  value = value*(1 << (chunk.length() * 4)) + longChunk;
-                }}
-                return value / 1e18
-              """.format(value=value)
-            }
-          }
-        }
-      }
-    }
-  }
-  if start and end:
-    aggregation["query"]["bool"]["must"] = [{
-      "range": {
-        "blockNumber": {
-          "lte": end,
-          "gte": start
-        }
-      }
-    }]
-  result = client.send_request("GET", [app.config[index], "_search"], aggregation, {})
-  documents = result['aggregations']['holders']["buckets"]
-  return {document["key"]: float(document["state"]["value"]) for document in documents}
-
-def get_internal_ethereum_incomes(start=None, end=None):
-  return _get_internal_ethereum_state("to", start, end)
-
-def get_internal_ethereum_outcomes(start=None, end=None):
-  return _get_internal_ethereum_state("from", start, end)
-
-def get_ethereum_rewards(start=None, end=None):
-  return _get_internal_ethereum_state("author.keyword", start, end, index="miner_transaction", value="value.keyword")
-
-def _get_ethereum_state(field, start, end):
+def _get_ethereum_state(field, start, end, index="transaction"):
   client = get_elasticsearch_connection()
   aggregation = {
     "size": 0,
@@ -201,7 +135,7 @@ def _get_ethereum_state(field, start, end):
         }
       }
     })
-  result = client.send_request("GET", [app.config["transaction"], "_search"], aggregation, {})
+  result = client.send_request("GET", [app.config[index], "_search"], aggregation, {})
   documents = result['aggregations']['holders']["buckets"]
   return {document["key"]: float(document["state"]["value"]) for document in documents}
 
@@ -210,6 +144,15 @@ def get_ethereum_incomes(start=None, end=None):
 
 def get_ethereum_outcomes(start=None, end=None):
   return _get_ethereum_state("from", start, end)
+
+def get_internal_ethereum_incomes(start=None, end=None):
+  return _get_ethereum_state("to", start, end, index="internal_transaction")
+
+def get_internal_ethereum_outcomes(start=None, end=None):
+  return _get_ethereum_state("from", start, end, index="internal_transaction")
+
+def get_ethereum_rewards(start=None, end=None):
+  return _get_ethereum_state("author.keyword", start, end, index="miner_transaction")
 
 def get_token_balances(token, block=None):
   incomes = get_token_incomes(token, block)

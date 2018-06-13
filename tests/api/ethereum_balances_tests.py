@@ -94,10 +94,9 @@ class BigHexValues():
       self.value_field: "0x2b5ea42903702b000"
     }, refresh=True)
     received_balances = self._get_state()
-    print(received_balances)
     self.assertSequenceEqual({"0x1": 50.001851}, received_balances)
 
-class InEthereumInternalTransactionsTestCase(EthereumTransactionsTestCase, BigHexValues, unittest.TestCase):
+class InEthereumInternalTransactionsTestCase(EthereumTransactionsTestCase, unittest.TestCase):
   index_key = "internal_transaction"
   doc_type = "itx"
   to_field = "to"
@@ -105,12 +104,12 @@ class InEthereumInternalTransactionsTestCase(EthereumTransactionsTestCase, BigHe
   value_field = "value"
 
   def _convert_value(self, value):
-    return hex(int(value * 1e18))
+    return value
 
   def _get_state(self, *args, **kwargs):
     return get_internal_ethereum_incomes(*args, **kwargs)
 
-class OutEthereumInternalTransactionsTestCase(EthereumTransactionsTestCase, BigHexValues, unittest.TestCase):
+class OutEthereumInternalTransactionsTestCase(EthereumTransactionsTestCase, unittest.TestCase):
   index_key = "internal_transaction"
   doc_type = "itx"
   to_field = "from"
@@ -118,12 +117,12 @@ class OutEthereumInternalTransactionsTestCase(EthereumTransactionsTestCase, BigH
   value_field = "value"
 
   def _convert_value(self, value):
-    return hex(int(value * 1e18))
+    return value
 
   def _get_state(self, *args, **kwargs):
     return get_internal_ethereum_outcomes(*args, **kwargs)
 
-class MinerEthereumExternalTransactionsTestCase(EthereumTransactionsTestCase, BigHexValues, unittest.TestCase):
+class MinerEthereumExternalTransactionsTestCase(EthereumTransactionsTestCase, unittest.TestCase):
   index_key = "miner_transaction"
   doc_type = "tx"
   to_field = "author"
@@ -135,7 +134,7 @@ class MinerEthereumExternalTransactionsTestCase(EthereumTransactionsTestCase, Bi
     self.client.recreate_index(TEST_TRANSACTIONS_INDEX)
 
   def _convert_value(self, value):
-    return hex(int(value * 1e18))
+    return value
 
   def _get_state(self, *args, **kwargs):
     return get_ethereum_rewards(*args, **kwargs)
