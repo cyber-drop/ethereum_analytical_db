@@ -260,6 +260,10 @@ class InternalTransactionsTestCase(unittest.TestCase):
     transaction = self.internal_transactions._preprocess_internal_transaction({"value": hex(int(50.001851 * 1e18))})
     assert transaction["value"] == 50.001851
 
+  def test_preprocess_internal_transaction_empty_value(self):
+    transaction = self.internal_transactions._preprocess_internal_transaction({"value": "0x"})
+    assert transaction["value"] == 0
+
   def test_save_internal_transactions(self):
     test_trace = [{"transactionHash": "0x0", "hash": "0x0.{}".format(i + 1)} for i in range(10)]
     test_preprocessed_trace = [{
