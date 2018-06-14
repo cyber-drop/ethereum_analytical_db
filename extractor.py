@@ -5,7 +5,7 @@ from contract_transactions import InternalContractTransactions, ExternalContract
 from internal_transactions import InternalTransactions
 from contracts import InternalContracts, ExternalContracts, Contracts
 from contract_methods import ContractMethods
-from token_holders import TokenHolders
+from token_holders import ExternalTokenTransactions, InternalTokenTransactions
 from config import INDICES
 
 def prepare_indices(host):
