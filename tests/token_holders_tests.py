@@ -17,9 +17,11 @@ class ExternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase)
   def iterate_processed(self):
     return self.token_holders.client.iterate(TEST_INDEX, 'contract', '_exists_:cmc_id AND tx_descr_scanned:true')
 
-  def test_extract_token_txs(self):
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0], 'cmc_id': '1234', 'token_name': TEST_TOKEN_NAMES[0], 'token_symbol': TEST_TOKEN_SYMBOLS[0], 'abi': ['mock_abi'], 'decimals': 18}, id=TEST_TOKEN_ADDRESSES[0], refresh=True)
+  def iterate_supply_transfers(self):
+    return self.token_holders.client.iterate(TEST_TOKEN_TX_INDEX, 'tx', 'method:initial')
 
+  def test_extract_token_txs(self):
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0], 'total_supply': '100000000', 'blockNumber': 5000000, 'owner': '0x1554aa0026292d03cfc8a2769df8dd4d169d590a', 'parent_transaction': TEST_PARENT_TXS[0], 'cmc_id': '1234', 'token_name': TEST_TOKEN_NAMES[0], 'token_symbol': TEST_TOKEN_SYMBOLS[0], 'abi': ['mock_abi'], 'decimals': 18}, id=TEST_TOKEN_ADDRESSES[0], refresh=True)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
     self.token_holders._extract_tokens_txs(['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'])
@@ -33,15 +35,15 @@ class ExternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase)
     assert len(with_error) == 1
 
   def test_iterate_unprocessed_tokens(self):
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0], 'cmc_id': '1234', 'token_name': TEST_TOKEN_NAMES[0], 'token_symbol': TEST_TOKEN_SYMBOLS[0], 'abi': ['mock_abi'], 'decimals': 18}, id=TEST_TOKEN_ADDRESSES[0], refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[1], 'cmc_id': '1235', 'tx_descr_scanned': True, 'token_name': TEST_TOKEN_NAMES[0], 'token_symbol': TEST_TOKEN_SYMBOLS[0], 'abi': ['mock_abi'], 'decimals': 18}, id=TEST_TOKEN_ADDRESSES[1], refresh=True)
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0], 'total_supply': '100000000', 'blockNumber': 5000000, 'owner': '0x1554aa0026292d03cfc8a2769df8dd4d169d590a', 'parent_transaction': TEST_PARENT_TXS[0], 'cmc_id': '1234', 'token_name': TEST_TOKEN_NAMES[0], 'token_symbol': TEST_TOKEN_SYMBOLS[0], 'abi': ['mock_abi'], 'decimals': 18}, id=TEST_TOKEN_ADDRESSES[0], refresh=True)
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[1], 'total_supply': '100000000', 'blockNumber': 5000000, 'owner': '0x1554aa0026292d03cfc8a2769df8dd4d169d590a', 'parent_transaction': TEST_PARENT_TXS[0], 'cmc_id': '1235', 'tx_descr_scanned': True, 'token_name': TEST_TOKEN_NAMES[0], 'token_symbol': TEST_TOKEN_SYMBOLS[0], 'abi': ['mock_abi'], 'decimals': 18}, id=TEST_TOKEN_ADDRESSES[1], refresh=True)
     tokens = self.token_holders._iterate_tokens()
     tokens = [t['_source'] for token in tokens for t in token]
     assert tokens[0]['cmc_id'] == '1234'
 
   def test_get_listed_tokens_txs(self):
     for i, address in enumerate(TEST_TOKEN_ADDRESSES):
-      self.client.index(TEST_INDEX, 'contract', {'address': address, 'cmc_id': str(1234+i), 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi'], 'decimals': 18}, id=address, refresh=True)
+      self.client.index(TEST_INDEX, 'contract', {'address': address, 'total_supply': '100000000', 'blockNumber': 5000000, 'owner': '0x1554aa0026292d03cfc8a2769df8dd4d169d590a', 'parent_transaction': TEST_PARENT_TXS[0], 'cmc_id': str(1234+i), 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi'], 'decimals': 18}, id=address, refresh=True)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
     self.token_holders.get_listed_tokens_txs()
@@ -49,13 +51,13 @@ class ExternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase)
     all_descrptions = [tx for txs_list in all_descrptions for tx in txs_list]
     tokens = set([descr['_source']['token'] for descr in all_descrptions])
     amounts = [tx['_source']['value'] for tx in all_descrptions]
-    self.assertCountEqual([2266.0, 356.24568, 356.24568, 2352.0], amounts)
+    self.assertCountEqual([2266.0, 356.24568, 356.24568, 2352.0, 100000000], amounts)
     self.assertCountEqual(['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', '0xa74476443119a942de498590fe1f2454d7d4ac0d'], tokens)
-    assert len(all_descrptions) == 4
+    assert len(all_descrptions) == 5
 
   def test_set_scanned_flags(self):
     for i, address in enumerate(TEST_TOKEN_ADDRESSES):
-      self.client.index(TEST_INDEX, 'contract', {'address': address, 'cmc_id': str(1234+i), 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi'], 'decimals': 18}, id=address, refresh=True)
+      self.client.index(TEST_INDEX, 'contract', {'address': address, 'total_supply': '100000000', 'blockNumber': 5000000, 'owner': '0x1554aa0026292d03cfc8a2769df8dd4d169d590a', 'parent_transaction': TEST_PARENT_TXS[0], 'cmc_id': str(1234+i), 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi'], 'decimals': 18}, id=address, refresh=True)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
     self.token_holders.get_listed_tokens_txs()
@@ -85,19 +87,32 @@ class ExternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase)
     tx_indices = list(set(tx_indices))
     self.assertCountEqual([TEST_TX_INDEX], tx_indices)
 
+  def test_extract_contract_creation_descr(self):
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0], 'total_supply': '100000000', 'blockNumber': 5000000, 'owner': '0x1554aa0026292d03cfc8a2769df8dd4d169d590a', 'parent_transaction': TEST_PARENT_TXS[0], 'cmc_id': str(1234), 'token_name': TEST_TOKEN_NAMES[0], 'token_symbol': TEST_TOKEN_SYMBOLS[0], 'abi': ['mock_abi']}, id=TEST_TOKEN_ADDRESSES[0], refresh=True)
+    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[1], 'total_supply': '200000000', 'blockNumber': 5000010, 'token_owner': '0x17Bc58b788808DaB201a9A90817fF3C168BF3d61', 'parent_transaction': TEST_PARENT_TXS[1], 'cmc_id': str(1235), 'token_name': TEST_TOKEN_NAMES[0], 'token_symbol': TEST_TOKEN_SYMBOLS[1], 'abi': ['mock_abi']}, id=TEST_TOKEN_ADDRESSES[1], refresh=True)
+    for tx in TEST_TOKEN_TXS:
+      self.client.index(TEST_TX_INDEX, 'tx', tx, refresh=True)
+    self.token_holders.get_listed_tokens_txs()
+    supply_transfers = self.iterate_supply_transfers()
+    supply_transfers = [t['_source'] for transfers in supply_transfers for t in transfers]
+    values = [t['raw_value'] for t in supply_transfers]
+    owners = [t['to'] for t in supply_transfers]
+    self.assertCountEqual(['100000000', '200000000'], values)
+    self.assertCountEqual(['0x1554aa0026292d03cfc8a2769df8dd4d169d590a', '0x17Bc58b788808DaB201a9A90817fF3C168BF3d61'], owners)
+
 class InternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase):
   token_holders_class = InternalTokenTransactions
 
   def test_get_listed_tokens_itxs(self):
     for i, address in enumerate(TEST_TOKEN_ADDRESSES):
-      self.client.index(TEST_INDEX, 'contract', {'address': address, 'cmc_id': str(1234+i), 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi'], 'decimals': 18}, id=address, refresh=True)
+      self.client.index(TEST_INDEX, 'contract', {'address': address, 'total_supply': '100000000', 'blockNumber': 5000000, 'owner': '0x1554aa0026292d03cfc8a2769df8dd4d169d590a', 'parent_transaction': TEST_PARENT_TXS[0], 'cmc_id': str(1234+i), 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi'], 'decimals': 18}, id=address, refresh=True)
     for tx in TEST_TOKEN_ITXS:
       self.client.index(TEST_ITX_INDEX, 'itx', tx, refresh=True)
     self.token_holders.get_listed_tokens_txs()
     all_descrptions = self.token_holders._iterate_tx_descriptions()
     all_descrptions = [tx for txs_list in all_descrptions for tx in txs_list]
     hashes = [d['_source']['tx_hash'] for d in all_descrptions]
-    self.assertCountEqual(['0x04692fb0a2d1a9c8b6ea8cfc643422800b81da50df1578f3494aef0ef9be6009', '0xce37439c6809ca9d1b1d5707c7df34ceec1e4e472f0ca07c87fa449a93b02431', '0x366c6344bdb4cb1bb8cfbce5770419b03f49d631d5803e5fbcf8de9b8f1a5d66'], hashes)
+    self.assertCountEqual(['0x8a634bd8b381c09eec084fd7df6bdce03ccbc92f247f59d4fcc22e02131c0158', '0x04692fb0a2d1a9c8b6ea8cfc643422800b81da50df1578f3494aef0ef9be6009', '0xce37439c6809ca9d1b1d5707c7df34ceec1e4e472f0ca07c87fa449a93b02431', '0x366c6344bdb4cb1bb8cfbce5770419b03f49d631d5803e5fbcf8de9b8f1a5d66'], hashes)
 
   def test_set_internal_transaction_index(self):
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0], 'cmc_id': '1234', 'token_name': TEST_TOKEN_NAMES[0], 'token_symbol': TEST_TOKEN_SYMBOLS[0], 'abi': ['mock_abi'], 'decimals': 18}, id=TEST_TOKEN_ADDRESSES[0], refresh=True)
@@ -118,6 +133,7 @@ TEST_TOKEN_TX_INDEX = 'test-token-txs'
 TEST_TOKEN_ADDRESSES = ['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d',
   '0xa74476443119a942de498590fe1f2454d7d4ac0d'
   ]
+TEST_PARENT_TXS = ['0x8a634bd8b381c09eec084fd7df6bdce03ccbc92f247f59d4fcc22e02131c0158', '0xf349e35ce06112455d01e63ee2d447f626a88b646749c1cf2bffe474afeb703a']
 TEST_TOKEN_NAMES = ['Aeternity', 'Golem Network Token']
 TEST_TOKEN_SYMBOLS = ['AE', 'GNT']
 TEST_TOKEN_TXS = [
