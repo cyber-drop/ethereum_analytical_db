@@ -45,8 +45,12 @@ def search_methods(host):
   contract_methods = ContractMethods(INDICES, host)
   contract_methods.search_methods()
 
-def extract_tokens_txs(host):
+def extract_token_external_txs(host):
   token_holders = ExternalTokenTransactions(INDICES, host)
+  token_holders.get_listed_tokens_txs()
+
+def extract_token_internal_txs(host):
+  token_holders = InternalTokenTransactions(INDICES, host)
   token_holders.get_listed_tokens_txs()
 
 operations = {
@@ -59,7 +63,8 @@ operations = {
   "parse-inputs": parse_inputs,
   "parse-internal-inputs": parse_internal_inputs,
   "search-methods": search_methods,
-  "extract-tokens-txs": extract_tokens_txs
+  "extract-token-external-txs": extract_token_external_txs,
+  "extract-token-internal-txs": extract_token_internal_txs
 }
 
 @click.command()
