@@ -197,7 +197,16 @@ class ExternalContracts(Contracts):
   index = "transaction"
 
   def _iterate_transactions_by_targets(self, targets, max_block):
-    query = self._create_transactions_request(targets, max_block)
+    query = {
+      "bool": {
+        "must": [
+          self._create_transactions_request(targets, max_block)
+        ],
+        "must_not": [
+          {"exists": {"field": "error"}}
+        ]
+      }
+    }
     return self.client.iterate(self.indices[self.index], self.doc_type, query)
 
 class InternalContracts(Contracts):
@@ -208,11 +217,10 @@ class InternalContracts(Contracts):
     query = {
       "bool": {
         "must": [
-          {
-            "term": {
-              "callType": "call"
-            }
-          }
+          {"term": {"callType": "call"}},
+        ],
+        "must_not": [
+          {"exists": {"field": "error"}}
         ]
       }
     }

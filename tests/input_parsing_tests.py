@@ -326,6 +326,16 @@ class ExternalTransactionsInputParsingTestCase(InputParsingTestCase, unittest.Te
   contracts_class = ExternalContracts
   doc = {'to': TEST_CONTRACT_ADDRESS, 'input': TEST_CONTRACT_PARAMETERS, 'blockNumber': 10}
 
+  def test_iterate_transactions_by_targets_ignore_transactions_with_error(self):
+    self.contracts._create_transactions_request = MagicMock(return_value={"exists": {"field": "to"}})
+    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
+      'to': TEST_CONTRACT_ADDRESS,
+      "error": "Out of gas",
+    }, id=1, refresh=True)
+    targets = {TEST_CONTRACT_ADDRESS: 0}
+    transactions = [c for c in self.contracts._iterate_transactions_by_targets(targets, 10)]
+    assert not transactions
+
   def test_iterate_transactions_by_targets(self):
     test_max_block = 15
     for i in tqdm(range(test_max_block)):
@@ -358,6 +368,17 @@ class InternalTransactionsInputParsingTestCase(InputParsingTestCase, unittest.Te
     transactions = [c for c in self.contracts._iterate_transactions_by_targets(targets, 10)]
     transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
     self.assertCountEqual(transactions, ['2'])
+
+  def test_iterate_transactions_by_targets_ignore_transactions_with_error(self):
+    self.contracts._create_transactions_request = MagicMock(return_value={"exists": {"field": "to"}})
+    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
+      'to': TEST_CONTRACT_ADDRESS,
+      'callType': 'call',
+      "error": "Out of gas",
+    }, id=1, refresh=True)
+    targets = {TEST_CONTRACT_ADDRESS: 0}
+    transactions = [c for c in self.contracts._iterate_transactions_by_targets(targets, 10)]
+    assert not transactions
 
   def test_iterate_transactions_by_targets_select_unprocessed_transactions(self):
     self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
