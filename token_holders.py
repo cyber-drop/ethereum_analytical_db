@@ -14,9 +14,9 @@ class TokenHolders:
     self.client = CustomElasticSearch(elasticsearch_host)
     self.token_decimals = {}
     self.w3 = Web3()
-    self.address_uint_signatures = ['a9059cbb', '095ea7b3']
-    self.two_addr_signatures = ['23b872dd']
-    self.multiple_addr_signatures = ['1e89d545']
+    self.address_uint_signatures = ['a9059cbb2ab09eb219583f4a59a5d0623ade346d962bcd4e46b11da047c9049b', '095ea7b334ae44009aa867bfb386f5c3b4b443ac6f0ee573fa91c4608fbadfba']
+    self.two_addr_signatures = ['23b872dd7302113369cda2901243429419bec145408fa8b352b3dd92b66c680b']
+    self.multiple_addr_signatures = ['1e89d545eebf91d5481429c67cfc7e656784011dcbbb3dc83efb9dbe66de6530']
 
   def _construct_bulk_insert_ops(self, docs):
     for doc in docs:
@@ -54,7 +54,7 @@ class TokenHolders:
     return (str(rounded), rounded)
 
   def _extract_first_bytes(self, func):
-    return str(self.w3.toHex(self.w3.sha3(text=func)[0:4]))[2:]
+    return str(self.w3.toHex(self.w3.sha3(text=func)))[2:]
 
   def _construct_signature(self, inputs):
     method = inputs['name']

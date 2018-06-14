@@ -1,6 +1,7 @@
 import unittest
 from token_holders import TokenHolders, ExternalTokenTransactions, InternalTokenTransactions
 from tests.test_utils import TestElasticSearch
+import time
 
 class TokenHoldersTestCase(unittest.TestCase):
   def setUp(self):
