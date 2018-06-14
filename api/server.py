@@ -7,7 +7,7 @@ import utils
 app = Flask(__name__)
 app.config.update(INDICES)
 
-BLOCKS_CHUNK_SIZE = 100000
+PARTITION_SIZE = 100
 
 def get_holders_number(token):
   client = utils.get_elasticsearch_connection()
@@ -33,6 +33,66 @@ def get_holders_number(token):
   }
   result = client.send_request("GET", [app.config["token_tx"], "tx", "_search"], aggregation, {})
   return result['aggregations']['senders']["value"] + result["aggregations"]["receivers"]["value"]
+
+def _get_ethereum_holders_number(block, index, doc_type):
+  client = utils.get_elasticsearch_connection()
+  aggregation = {
+    "size": 0,
+    "query": {
+      "range": {
+        "blockNumber": {
+          "lte": block
+        }
+      }
+    },
+    "aggs": {
+      "senders": {
+        "cardinality": {
+          "field": "to"
+        }
+      },
+      "receivers": {
+        "cardinality": {
+          "field": "from"
+        }
+      }
+    }
+  }
+  result = client.send_request("GET", [app.config[index], doc_type, "_search"], aggregation, {})
+  return result['aggregations']['senders']["value"] + result["aggregations"]["receivers"]["value"]
+
+def _get_ethereum_external_holders_number(block):
+  return _get_ethereum_holders_number(block, "transaction", "tx")
+
+def _get_ethereum_internal_holders_number(block):
+  return _get_ethereum_holders_number(block, "internal_transaction", "itx")
+
+def _get_ethereum_miners_number(block):
+  client = utils.get_elasticsearch_connection()
+  aggregation = {
+    "size": 0,
+    "query": {
+      "range": {
+        "blockNumber": {
+          "lte": block
+        }
+      }
+    },
+    "aggs": {
+      "miners": {
+        "cardinality": {
+          "field": "author.keyword"
+        }
+      }
+    }
+  }
+  result = client.send_request("GET", [app.config["miner_transaction"], "tx", "_search"], aggregation, {})
+  return result['aggregations']['miners']["value"]
+
+def get_ethereum_holders_number(block):
+  return _get_ethereum_external_holders_number(block) \
+         + _get_ethereum_internal_holders_number(block) \
+         + _get_ethereum_miners_number(block)
 
 def _get_token_state(token, address_field, block):
   client = utils.get_elasticsearch_connection()
@@ -79,59 +139,69 @@ def get_token_incomes(token, block=None):
 def get_token_outcomes(token, block=None):
   return _get_token_state(token, "from.keyword", block)
 
-def _get_ethereum_state(field, start, end, index="transaction"):
+def _get_ethereum_state(field, block, index="transaction"):
   client = utils.get_elasticsearch_connection()
-  aggregation = {
-    "size": 0,
-    "query": {
-      "bool": {
-        "must": [
-          {"range": {"value": {"gt": 0}}}
-        ]
-      }
-    },
-    "aggs": {
-      "holders": {
-        "terms": {
-          "field": field
-        },
-        "aggs": {
-          "state": {
-            "sum": {
-              "field": "value"
+  final_result = {}
+  size = get_ethereum_holders_number(block)
+  partitions = int(size / PARTITION_SIZE)
+  for partition in range(partitions):
+    aggregation = {
+      "size": 0,
+      "query": {
+        "bool": {
+          "must": [
+            {"range": {"value": {"gt": 0}}}
+          ]
+        }
+      },
+      "aggs": {
+        "holders": {
+          "terms": {
+            "field": field,
+            "size": size,
+            "include": {
+              "partition": partition,
+              "num_partitions": partitions
+            }
+          },
+          "aggs": {
+            "state": {
+              "sum": {
+                "field": "value"
+              }
             }
           }
         }
       }
     }
-  }
-  if start and end:
-    aggregation["query"]["bool"]["must"].append({
-      "range": {
-        "blockNumber": {
-          "lte": start,
-          "gte": end
+    if block:
+      aggregation["query"]["bool"]["must"].append({
+        "range": {
+          "blockNumber": {
+            "lte": block
+          }
         }
-      }
-    })
-  result = client.send_request("GET", [app.config[index], "_search"], aggregation, {})
-  documents = result['aggregations']['holders']["buckets"]
-  return {document["key"]: float(document["state"]["value"]) for document in documents}
+      })
+    result = client.send_request("GET", [app.config[index], "_search"], aggregation, {})
+    documents = result['aggregations']['holders']["buckets"]
+    partial_result = {document["key"]: float(document["state"]["value"]) for document in documents}
+    final_result.update(partial_result)
+  return final_result
 
-def get_ethereum_incomes(start=None, end=None):
-  return _get_ethereum_state("to", start, end)
+def get_ethereum_incomes(block=None):
+  return _get_ethereum_state("to", block)
 
-def get_ethereum_outcomes(start=None, end=None):
-  return _get_ethereum_state("from", start, end)
+def get_ethereum_outcomes(block=None):
+  return _get_ethereum_state("from", block)
 
-def get_internal_ethereum_incomes(start=None, end=None):
-  return _get_ethereum_state("to", start, end, index="internal_transaction")
+def get_internal_ethereum_incomes(block=None):
+  return _get_ethereum_state("to", block, index="internal_transaction")
 
-def get_internal_ethereum_outcomes(start=None, end=None):
-  return _get_ethereum_state("from", start, end, index="internal_transaction")
+def get_internal_ethereum_outcomes(block=None):
+  return _get_ethereum_state("from", block, index="internal_transaction")
 
-def get_ethereum_rewards(start=None, end=None):
-  return _get_ethereum_state("author.keyword", start, end, index="miner_transaction")
+def get_ethereum_rewards(block=None):
+  return _get_ethereum_state("author.keyword", block, index="miner_transaction")
 
 def get_token_balances(token, block=None):
   incomes = get_token_incomes(token, block)
@@ -145,35 +215,27 @@ def _split_range(start, end, size):
   return ranges
 
 def get_ethereum_balances(block=None):
-  final_balances = {}
-  for start, end in tqdm(_split_range(0, block, BLOCKS_CHUNK_SIZE)):
-    incomes = get_ethereum_incomes(start, end)
-    outcomes = get_ethereum_outcomes(start, end)
-    internal_incomes = get_internal_ethereum_incomes(start, end)
-    internal_outcomes = get_internal_ethereum_outcomes(start, end)
-    rewards = get_ethereum_rewards(start, end)
-    addresses = set(
-      list(incomes.keys()) +
-      list(outcomes.keys()) +
-      list(internal_incomes.keys()) +
-      list(internal_outcomes.keys()) +
-      list(rewards.keys())
-    )
-    balances = {
-      address: incomes.get(address, 0)
-               - outcomes.get(address, 0)
-               + internal_incomes.get(address, 0)
-               - internal_outcomes.get(address, 0)
-               + rewards.get(address, 0)
-      for address in addresses
-    }
-    for address in balances.keys():
-      if address not in final_balances.keys():
-        final_balances[address] = 0
-      final_balances[address] += balances[address]
-
-  return final_balances
-
+  incomes = get_ethereum_incomes(block)
+  outcomes = get_ethereum_outcomes(block)
+  internal_incomes = get_internal_ethereum_incomes(block)
+  internal_outcomes = get_internal_ethereum_outcomes(block)
+  rewards = get_ethereum_rewards(block)
+  addresses = set(
+    list(incomes.keys()) +
+    list(outcomes.keys()) +
+    list(internal_incomes.keys()) +
+    list(internal_outcomes.keys()) +
+    list(rewards.keys())
+  )
+  balances = {
+    address: incomes.get(address, 0)
+             - outcomes.get(address, 0)
+             + internal_incomes.get(address, 0)
+             - internal_outcomes.get(address, 0)
+             + rewards.get(address, 0)
+    for address in addresses
+  }
+  return balances
 
 @app.route("/token_balances")
 def get_token_balances_api():
