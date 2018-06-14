@@ -1,16 +1,21 @@
-from web3 import Web3, HTTPProvider
+from web3 import Web3
 from custom_elastic_search import CustomElasticSearch
 from config import INDICES
 import requests
 from pyelasticsearch import bulk_chunks
 import math
 from decimal import Decimal
+import json
 
 class TokenHolders:
   def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200"):
     self.indices = elasticsearch_indices
     self.client = CustomElasticSearch(elasticsearch_host)
     self.token_decimals = {}
+    self.w3 = Web3()
+    self.address_uint_signatures = []
+    self.two_addr_signatures = []
+    self.multiple_addr_signatures = ['1e89d545']
 
   def _construct_bulk_insert_ops(self, docs):
     for doc in docs:
@@ -47,20 +52,83 @@ class TokenHolders:
     rounded = Decimal("{0:.5f}".format(rounded))
     return (str(rounded), rounded)
 
-  def _construct_tx_descr_from_input(self, tx):
+  def _extract_first_bytes(self, func):
+    return str(self.w3.toHex(self.w3.sha3(text=func)[0:4]))[2:]
+
+  def _construct_signature(self, inputs):
+    method = inputs['name']
+    params = [param['type'] for param in inputs['params']]
+    params = ','.join(params)
+    method += '(' + params + ')'
+    signature = self._extract_first_bytes(method)
+    return signature
+
+  def _process_address_uint_tx(self, tx):
     tx_input = tx['decoded_input']
-    is_valid_tx = 'error' not in tx.keys()
     decimals = self.token_decimals[tx['to']] if tx['to'] in self.token_decimals.keys() else 1
-    tx_hash = tx['transactionHash'] if 'transactionHash' in tx.keys() else tx['hash']
-    if tx_input['name'] == 'transfer':
-      value = self._convert_transfer_value(tx_input['params'][1]['value'], decimals)
-      return {'method': tx_input['name'], 'from': tx['from'], 'to': tx_input['params'][0]['value'], 'value': value[1], 'raw_value': value[0], 'block_id': tx['blockNumber'], 'valid': is_valid_tx, 'token': tx['to'], 'tx_index': self.indices[self.tx_index], 'tx_hash': tx_hash}
-    elif tx_input['name'] == 'transferFrom':
-      value = self._convert_transfer_value(tx_input['params'][2]['value'], decimals)
-      return {'method': tx_input['name'], 'from': tx_input['params'][0]['value'], 'to': tx_input['params'][1]['value'], 'value': value[1], 'raw_value': value[0], 'block_id': tx['blockNumber'], 'valid': is_valid_tx, 'token': tx['to'], 'tx_index': self.indices[self.tx_index], 'tx_hash': tx_hash}
-    elif tx_input['name'] == 'approve':
-      value = self._convert_transfer_value(tx_input['params'][1]['value'], decimals)
-      return {'method': tx_input['name'], 'from': tx['from'], 'spender': tx_input['params'][0]['value'], 'value': value[1], 'raw_value': value[0], 'block_id': tx['blockNumber'], 'valid': is_valid_tx, 'token': tx['to'], 'tx_index': self.indices[self.tx_index], 'tx_hash': tx_hash}
+    value = self._convert_transfer_value(tx_input['params'][1]['value'], decimals)
+    return [{
+      'method': tx_input['name'], 
+      'from': tx['from'], 
+      'to': tx_input['params'][0]['value'], 
+      'value': value[1], 
+      'raw_value': value[0], 
+      'block_id': tx['blockNumber'], 
+      'valid': 'error' not in tx.keys(), 
+      'token': tx['to'], 
+      'tx_index': self.indices[self.tx_index], 
+      'tx_hash': tx['transactionHash'] if 'transactionHash' in tx.keys() else tx['hash']
+    }]
+
+  def _process_two_addr_tx(self, tx):
+    tx_input = tx['decoded_input']
+    decimals = self.token_decimals[tx['to']] if tx['to'] in self.token_decimals.keys() else 1
+    value = self._convert_transfer_value(tx_input['params'][2]['value'], decimals)
+    return [{
+      'method': tx_input['name'], 
+      'from': tx_input['params'][0]['value'], 
+      'to': tx_input['params'][1]['value'], 
+      'value': value[1], 
+      'raw_value': value[0], 
+      'block_id': tx['blockNumber'], 
+      'valid': 'error' not in tx.keys(), 
+      'token': tx['to'], 
+      'tx_index': self.indices[self.tx_index], 
+      'tx_hash': tx['transactionHash'] if 'transactionHash' in tx.keys() else tx['hash']
+    }]
+
+  def _process_multiple_addr_tx(self, tx):
+    tx_input = tx['decoded_input']
+    decimals = self.token_decimals[tx['to']] if tx['to'] in self.token_decimals.keys() else 1
+    addresses = json.loads(tx_input['params'][0]['value'])
+    values = [str(value) for value in json.loads(tx_input['params'][1]['value'])]
+    params = list(zip(addresses, values))
+    descriptions = []
+    for i, param in enumerate(params):
+      value = self._convert_transfer_value(param[1], decimals)
+      descr = {
+        'method': tx_input['name'], 
+        'from': tx['from'], 
+        'to': param[0], 
+        'value': value[1], 
+        'raw_value': value[0], 
+        'block_id': tx['blockNumber'], 
+        'valid': 'error' not in tx.keys(), 
+        'token': tx['to'], 
+        'tx_index': self.indices[self.tx_index], 
+        'tx_hash': tx['transactionHash'] + '_' + str(i) if 'transactionHash' in tx.keys() else tx['hash'] + '_' + str(i)
+      }
+      descriptions.append(descr)
+    return descriptions
+    
+  def _construct_tx_descr_from_input(self, tx):
+    method_signature = self._construct_signature(tx['decoded_input'])
+    if method_signature in self.address_uint_signatures:
+      return self._process_address_uint_tx(tx)
+    elif method_signature in self.two_addr_signatures:
+      return self._process_two_addr_tx(tx)
+    elif method_signature in self.multiple_addr_signatures:
+      return self._process_multiple_addr_tx(tx)
     else:
       return
 
@@ -73,6 +141,7 @@ class TokenHolders:
   def _extract_descriptions_from_txs(self, txs):
     txs_info = [self._check_tx_input(tx) for tx in txs]
     txs_info = [tx for tx in txs_info if tx != None]
+    txs_info = [tx for txs in txs_info for tx in txs]
     self._insert_multiple_docs(txs_info, 'tx', self.indices['token_tx'])
 
   def _iterate_token_tx_descriptions(self, token_address):
@@ -87,34 +156,9 @@ class TokenHolders:
     update_docs = [{'doc': {'tx_descr_scanned': True}, 'id': address} for address in token_addresses]
     self._update_multiple_docs(update_docs, 'contract', self.indices['contract'])
 
-  def _construct_creation_descr(self, contract):
-    if 'token_owner' in contract.keys() and contract['token_owner'] != 'None':
-      to = contract['token_owner']
-    elif 'owner' in contract.keys():
-      to = contract['owner']
-    else:
-      to = contract['creator']
-    value = contract['total_supply'] if 'total_supply' in contract.keys() and contract['total_supply'] != 'None' else '0'
-    return {
-      'method': 'initial', 
-      'to': to, 
-      'raw_value': value,
-      'value': int(value), 
-      'block_id': contract['blockNumber'], 
-      'valid': True, 
-      'token': contract['address'],
-      'tx_index': self.indices['transaction'], 
-      'tx_hash': contract['parent_transaction']
-    }
-
-  def _extract_contract_creation_descr(self, contracts):
-    descriptions = [self._construct_creation_descr(contract['_source']) for contract in contracts]
-    self._insert_multiple_docs(descriptions, 'tx', self.indices['token_tx'])
-
   def get_listed_tokens_txs(self):
     for tokens in self._iterate_tokens():
       self.token_decimals = {token['_source']['address']: token['_source']['decimals'] for token in tokens if 'decimals' in token['_source'].keys()}
-      self._extract_contract_creation_descr(tokens)
       self._extract_tokens_txs([token['_source']['address'] for token in tokens])
 
   def _get_listed_tokens_addresses(self):
@@ -141,5 +185,3 @@ class ExternalTokenTransactions(TokenHolders):
 class InternalTokenTransactions(TokenHolders):
   tx_index = 'internal_transaction'
   tx_type = 'itx'
-
-
