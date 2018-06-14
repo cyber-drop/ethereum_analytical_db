@@ -98,7 +98,8 @@ class TokenHolders:
     return {
       'method': 'initial', 
       'to': to, 
-      'raw_value': value, 
+      'raw_value': value,
+      'value': int(value), 
       'block_id': contract['blockNumber'], 
       'valid': True, 
       'token': contract['address'],
