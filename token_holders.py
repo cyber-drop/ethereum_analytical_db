@@ -13,8 +13,8 @@ class TokenHolders:
     self.client = CustomElasticSearch(elasticsearch_host)
     self.token_decimals = {}
     self.w3 = Web3()
-    self.address_uint_signatures = []
-    self.two_addr_signatures = []
+    self.address_uint_signatures = ['a9059cbb', '095ea7b3']
+    self.two_addr_signatures = ['23b872dd']
     self.multiple_addr_signatures = ['1e89d545']
 
   def _construct_bulk_insert_ops(self, docs):
