@@ -5,7 +5,11 @@ from api.server import get_ethereum_incomes, \
   get_internal_ethereum_outcomes, \
   get_ethereum_balances, \
   _split_range, \
-  get_ethereum_rewards
+  get_ethereum_rewards, \
+  get_ethereum_holders_number, \
+  _get_ethereum_external_holders_number, \
+  _get_ethereum_internal_holders_number, \
+  _get_ethereum_miners_number
 import unittest
 from tests.test_utils import TestElasticSearch
 from unittest.mock import MagicMock, Mock, patch, call
@@ -25,10 +29,9 @@ class EthereumTransactionsTestCase():
       self.value_field: self._convert_value(1000)
     }, refresh=True)
     received_balances = self._get_state()
-    print(received_balances)
     self.assertSequenceEqual({"0x1": 1000}, received_balances)
 
-  def test_get_ethereum_incomes_for_range(self):
+  def test_get_ethereum_incomes_for_block(self):
     self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type=self.doc_type, doc={
       self.to_field: "0x1",
       self.from_field: "0x2",
@@ -41,14 +44,8 @@ class EthereumTransactionsTestCase():
       self.value_field: self._convert_value(200),
       "blockNumber": 2
     }, refresh=True)
-    self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type=self.doc_type, doc={
-      self.to_field: "0x1",
-      self.from_field: "0x2",
-      self.value_field: self._convert_value(300),
-      "blockNumber": 3
-    }, refresh=True)
-    received_balances = self._get_state(start=2, end=2)
-    self.assertSequenceEqual({"0x1": 200}, received_balances)
+    received_balances = self._get_state(block=1)
+    self.assertSequenceEqual({"0x1": 100}, received_balances)
 
   def test_get_ethereum_incomes_ignore_zeros(self):
     self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type=self.doc_type, doc={
@@ -146,17 +143,67 @@ class APITestCase(unittest.TestCase):
     server.app.config.update({
       "transaction": TEST_TRANSACTIONS_INDEX,
       "miner_transaction": TEST_MINER_TRANSACTIONS_INDEX,
+      "internal_transaction": TEST_INTERNAL_TRANSACTIONS_INDEX,
       "block": TEST_BLOCKS_INDEX
     })
     self.app = server.app.test_client()
 
-  def test_split_range(self):
-    ranges = _split_range(1, 1000, size=200)
-    self.assertSequenceEqual([(1, 200), (201, 400), (401, 600), (601, 800), (801, 1000)], ranges)
+  def test_ethereum_external_holders_number(self):
+    self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type="tx", doc={
+      "to": "0x1",
+      "from": "0x2",
+      "value": 0,
+      "blockNumber": 1
+    }, refresh=True)
+    self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type="tx", doc={
+      "to": "0x3",
+      "from": "0x4",
+      "value": 0,
+      "blockNumber": 2
+    }, refresh=True)
+    assert _get_ethereum_external_holders_number(1) == 2
 
-  def test_split_range_last_range(self):
-    ranges = _split_range(1, 10, size=20)
-    self.assertSequenceEqual([(1, 10)], ranges)
+  def test_ethereum_internal_holders_number(self):
+    self.client.index(index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type="itx", doc={
+      "to": "0x1",
+      "from": "0x2",
+      "value": 0,
+      "blockNumber": 1
+    }, refresh=True)
+    self.client.index(index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type="itx", doc={
+      "to": "0x3",
+      "from": "0x4",
+      "value": 0,
+      "blockNumber": 2
+    }, refresh=True)
+    assert _get_ethereum_internal_holders_number(1) == 2
+
+  def test_ethereum_miners_number(self):
+    self.client.index(index=TEST_MINER_TRANSACTIONS_INDEX, doc_type="tx", doc={
+      "author": "0x1",
+      "value": 0,
+      "blockNumber": 1
+    }, refresh=True)
+    self.client.index(index=TEST_MINER_TRANSACTIONS_INDEX, doc_type="tx", doc={
+      "author": "0x2",
+      "value": 0,
+      "blockNumber": 2
+    }, refresh=True)
+    assert _get_ethereum_miners_number(1) == 1
+
+  def test_ethereum_holders_number(self):
+    test_block = 100
+    test_external_mock = MagicMock(return_value=1)
+    test_internal_mock = MagicMock(return_value=2)
+    test_miner_mock = MagicMock(return_value=3)
+    with patch('api.server._get_ethereum_external_holders_number', test_external_mock), \
+         patch('api.server._get_ethereum_internal_holders_number', test_internal_mock), \
+         patch('api.server._get_ethereum_miners_number', test_miner_mock):
+      assert get_ethereum_holders_number(test_block) == 6
+      test_external_mock.assert_called_with(test_block)
+      test_internal_mock.assert_called_with(test_block)
+      test_miner_mock.assert_called_with(test_block)
+
 
   def test_get_ethereum_balances(self):
     test_block = 124
@@ -180,44 +227,16 @@ class APITestCase(unittest.TestCase):
          patch('api.server._split_range', test_split_range):
       get_ethereum_balances(test_block)
 
-      test_income_mock.assert_called_with(0, test_block)
-      test_outcome_mock.assert_called_with(0, test_block)
-      test_internal_income_mock.assert_called_with(0, test_block)
-      test_internal_outcome_mock.assert_called_with(0, test_block)
-      test_rewards_mock.assert_called_with(0, test_block)
+      test_income_mock.assert_called_with(test_block)
+      test_outcome_mock.assert_called_with(test_block)
+      test_internal_income_mock.assert_called_with(test_block)
+      test_internal_outcome_mock.assert_called_with(test_block)
+      test_rewards_mock.assert_called_with(test_block)
       assert get_ethereum_balances(test_block) == {
         "0x1": 100 - 1 - 2,
         "0x2": 10 - 10 + 1,
         "0x3": 1,
         "0x4": 1
-      }
-
-  def test_get_ethereum_balances_pagination(self):
-    test_block = 5
-    test_chunks = [(0, 1), (2, 3), (4, 5)]
-    test_income_mock = MagicMock(side_effect=[{"0x1": 1}, {"0x2": 1}, {"0x3": 1}])
-    test_outcome_mock = MagicMock(return_value={})
-    test_internal_income_mock = MagicMock(return_value={})
-    test_internal_outcome_mock = MagicMock(return_value={})
-    test_rewards_mock = MagicMock(return_value={})
-    test_split_range = MagicMock(return_value=test_chunks)
-
-    with patch('api.server.get_ethereum_incomes', test_income_mock), \
-         patch('api.server.get_ethereum_outcomes', test_outcome_mock), \
-         patch("api.server.get_internal_ethereum_incomes", test_internal_income_mock), \
-         patch("api.server.get_internal_ethereum_outcomes", test_internal_outcome_mock), \
-         patch("api.server.get_ethereum_rewards", test_rewards_mock), \
-         patch('api.server._split_range', test_split_range):
-      balances = get_ethereum_balances(test_block)
-
-      test_split_range.assert_called_with(0, test_block, 10000)
-      for mock in [test_rewards_mock, test_income_mock, test_outcome_mock, test_internal_income_mock, test_internal_outcome_mock]:
-        for chunk in test_chunks:
-          mock.assert_any_call(chunk[0], chunk[1])
-      assert balances == {
-        "0x1": 1,
-        "0x2": 1,
-        "0x3": 1
       }
 
   def test_get_ethereum_balances_api(self):
