@@ -4,7 +4,6 @@ from api.server import get_ethereum_incomes, \
   get_ethereum_outcomes, \
   get_internal_ethereum_outcomes, \
   get_ethereum_balances, \
-  _split_range, \
   get_ethereum_rewards, \
   get_ethereum_holders_number, \
   _get_ethereum_external_holders_number, \
@@ -28,8 +27,9 @@ class EthereumTransactionsTestCase():
       self.from_field: "0x2",
       self.value_field: self._convert_value(1000)
     }, refresh=True)
-    received_balances = self._get_state()
-    self.assertSequenceEqual({"0x1": 1000}, received_balances)
+    with patch('api.server.get_ethereum_holders_number', return_value=10000):
+      received_balances = self._get_state()
+      self.assertSequenceEqual({"0x1": 1000}, received_balances)
 
   def test_get_ethereum_incomes_for_block(self):
     self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type=self.doc_type, doc={
@@ -44,8 +44,9 @@ class EthereumTransactionsTestCase():
       self.value_field: self._convert_value(200),
       "blockNumber": 2
     }, refresh=True)
-    received_balances = self._get_state(block=1)
-    self.assertSequenceEqual({"0x1": 100}, received_balances)
+    with patch('api.server.get_ethereum_holders_number', return_value=10000):
+      received_balances = self._get_state(block=1)
+      self.assertSequenceEqual({"0x1": 100}, received_balances)
 
   def test_get_ethereum_incomes_ignore_zeros(self):
     self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type=self.doc_type, doc={
@@ -53,8 +54,9 @@ class EthereumTransactionsTestCase():
       self.from_field: "0x2",
       self.value_field: self._convert_value(0)
     }, refresh=True)
-    received_balances = self._get_state()
-    assert not received_balances
+    with patch('api.server.get_ethereum_holders_number', return_value=10000):
+      received_balances = self._get_state()
+      assert not received_balances
 
 class InEthereumExternalTransactionsTestCase(EthereumTransactionsTestCase, unittest.TestCase):
   index_key = "transaction"
@@ -81,16 +83,6 @@ class OutEthereumExternalTransactionsTestCase(EthereumTransactionsTestCase, unit
 
   def _get_state(self, *args, **kwargs):
     return get_ethereum_outcomes(*args, **kwargs)
-
-class BigHexValues():
-  def test_get_ethereum_incomes_for_big_values(self):
-    self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type=self.doc_type, doc={
-      self.to_field: "0x1",
-      self.from_field: "0x2",
-      self.value_field: "0x2b5ea42903702b000"
-    }, refresh=True)
-    received_balances = self._get_state()
-    self.assertSequenceEqual({"0x1": 50.001851}, received_balances)
 
 class InEthereumInternalTransactionsTestCase(EthereumTransactionsTestCase, unittest.TestCase):
   index_key = "internal_transaction"
@@ -204,7 +196,6 @@ class APITestCase(unittest.TestCase):
       test_internal_mock.assert_called_with(test_block)
       test_miner_mock.assert_called_with(test_block)
 
-
   def test_get_ethereum_balances(self):
     test_block = 124
     test_income = {"0x1": 100, "0x2": 10, "0x3": 1}
@@ -217,14 +208,12 @@ class APITestCase(unittest.TestCase):
     test_internal_income_mock = MagicMock(return_value=test_internal_income)
     test_rewards_mock = MagicMock(return_value=test_rewards)
     test_internal_outcome_mock = MagicMock(return_value=test_internal_outcome)
-    test_split_range = MagicMock(return_value=[(0, test_block)])
 
     with patch('api.server.get_ethereum_incomes', test_income_mock), \
          patch('api.server.get_ethereum_outcomes', test_outcome_mock), \
          patch("api.server.get_internal_ethereum_incomes", test_internal_income_mock), \
          patch("api.server.get_internal_ethereum_outcomes", test_internal_outcome_mock), \
-         patch("api.server.get_ethereum_rewards", test_rewards_mock), \
-         patch('api.server._split_range', test_split_range):
+         patch("api.server.get_ethereum_rewards", test_rewards_mock):
       get_ethereum_balances(test_block)
 
       test_income_mock.assert_called_with(test_block)

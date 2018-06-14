@@ -89,7 +89,6 @@ def _get_ethereum_miners_number(block):
   result = client.send_request("GET", [app.config["miner_transaction"], "tx", "_search"], aggregation, {})
   return result['aggregations']['miners']["value"]
 
-
 def get_ethereum_holders_number(block):
   return _get_ethereum_external_holders_number(block) \
          + _get_ethereum_internal_holders_number(block) \
@@ -186,26 +185,23 @@ def _get_ethereum_state(field, block, index="transaction"):
     result = client.send_request("GET", [app.config[index], "_search"], aggregation, {})
     documents = result['aggregations']['holders']["buckets"]
     partial_result = {document["key"]: float(document["state"]["value"]) for document in documents}
-    for address in partial_result.keys():
-      if address not in final_result.keys():
-        final_result[address] = 0
-      final_result[address] += partial_result[address]
+    final_result.update(partial_result)
   return final_result
 
 def get_ethereum_incomes(block=None):
   return _get_ethereum_state("to", block)
 
-def get_ethereum_outcomes(start=None, end=None):
-  return _get_ethereum_state("from", start, end)
+def get_ethereum_outcomes(block=None):
+  return _get_ethereum_state("from", block)
 
-def get_internal_ethereum_incomes(start=None, end=None):
-  return _get_ethereum_state("to", start, end, index="internal_transaction")
+def get_internal_ethereum_incomes(block=None):
+  return _get_ethereum_state("to", block, index="internal_transaction")
 
-def get_internal_ethereum_outcomes(start=None, end=None):
-  return _get_ethereum_state("from", start, end, index="internal_transaction")
+def get_internal_ethereum_outcomes(block=None):
+  return _get_ethereum_state("from", block, index="internal_transaction")
 
-def get_ethereum_rewards(start=None, end=None):
-  return _get_ethereum_state("author.keyword", start, end, index="miner_transaction")
+def get_ethereum_rewards(block=None):
+  return _get_ethereum_state("author.keyword", block, index="miner_transaction")
 
 def get_token_balances(token, block=None):
   incomes = get_token_incomes(token, block)
@@ -219,34 +215,27 @@ def _split_range(start, end, size):
   return ranges
 
 def get_ethereum_balances(block=None):
-  final_balances = {}
-  for start, end in tqdm(_split_range(0, block, BLOCKS_CHUNK_SIZE)):
-    incomes = get_ethereum_incomes(start, end)
-    outcomes = get_ethereum_outcomes(start, end)
-    internal_incomes = get_internal_ethereum_incomes(start, end)
-    internal_outcomes = get_internal_ethereum_outcomes(start, end)
-    rewards = get_ethereum_rewards(start, end)
-    addresses = set(
-      list(incomes.keys()) +
-      list(outcomes.keys()) +
-      list(internal_incomes.keys()) +
-      list(internal_outcomes.keys()) +
-      list(rewards.keys())
-    )
-    balances = {
-      address: incomes.get(address, 0)
-               - outcomes.get(address, 0)
-               + internal_incomes.get(address, 0)
-               - internal_outcomes.get(address, 0)
-               + rewards.get(address, 0)
-      for address in addresses
-    }
-    for address in balances.keys():
-      if address not in final_balances.keys():
-        final_balances[address] = 0
-      final_balances[address] += balances[address]
-
-  return final_balances
+  incomes = get_ethereum_incomes(block)
+  outcomes = get_ethereum_outcomes(block)
+  internal_incomes = get_internal_ethereum_incomes(block)
+  internal_outcomes = get_internal_ethereum_outcomes(block)
+  rewards = get_ethereum_rewards(block)
+  addresses = set(
+    list(incomes.keys()) +
+    list(outcomes.keys()) +
+    list(internal_incomes.keys()) +
+    list(internal_outcomes.keys()) +
+    list(rewards.keys())
+  )
+  balances = {
+    address: incomes.get(address, 0)
+             - outcomes.get(address, 0)
+             + internal_incomes.get(address, 0)
+             - internal_outcomes.get(address, 0)
+             + rewards.get(address, 0)
+    for address in addresses
+  }
+  return balances
 
 @app.route("/token_balances")
 def get_token_balances_api():
