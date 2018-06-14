@@ -7,5 +7,6 @@ INDICES = {
   "transaction": "ethereum-transaction",
   "internal_transaction": "ethereum-internal-transaction",
   "listed_token": "ethereum-listed-token",
-  "token_tx": "ethereum-token-transaction"
+  "token_tx": "ethereum-token-transaction",
+  "block": "ethereum-block"
 }
