@@ -162,3 +162,4 @@ class TokenPrices:
     prices = self._get_historical_multi_prices()
     if prices != None:
       self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
+
