@@ -135,14 +135,20 @@ class TokenPrices:
     self.btc_prices = btc_prices_dict
     self.eth_prices = eth_prices_dict
 
+  def _get_days_count(self, now, last_price_date):
+    start_date = date(int(now[0]), int(now[1]), int(now[2]))
+    end_date = date(int(last_price_date[0]), int(last_price_date[1]), int(last_price_date[2]))
+    days_count = (start_date - end_date).days + 1
+    return days_count
+
   def _get_historical_multi_prices(self):
     self._get_btc_eth_prices()
     token_syms = [token['cc_sym'] for token in self._get_cc_tokens()]
     now = datetime.datetime.now().strftime("%Y-%m-%d").split('-')
     last_price_date = self._get_last_avail_price_date()
-    start_date = date(int(now[0]), int(now[1]), int(now[2]))
-    end_date = date(int(last_price_date[0]), int(last_price_date[1]), int(last_price_date[2]))
-    days_count = (start_date - end_date).days + 1
+    if last_price_date == now:
+      return
+    days_count = self._get_days_count(now, last_price_date)
     prices = []
     for i in tqdm(range(len(token_syms))):
       price = self._make_historical_prices_req(token_syms[i], days_count)
@@ -154,4 +160,5 @@ class TokenPrices:
 
   def get_prices_within_interval(self):
     prices = self._get_historical_multi_prices()
-    self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
+    if prices != None:
+      self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
