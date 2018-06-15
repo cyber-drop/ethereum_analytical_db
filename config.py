@@ -9,5 +9,9 @@ INDICES = {
   "listed_token": "ethereum-listed-token",
   "token_tx": "ethereum-token-transaction",
   "block": "ethereum-block",
+<<<<<<< HEAD
   "token_price": "ethereum-token-price"
+=======
+  "token_prices": "ethereum-token-price"
+>>>>>>> Add search for historical prices
 }
