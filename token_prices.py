@@ -2,7 +2,10 @@ import requests
 from custom_elastic_search import CustomElasticSearch
 from config import INDICES
 import datetime
+from datetime import date
 from pyelasticsearch import bulk_chunks
+from tqdm import *
+import time
 
 class TokenPrices:
   def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host='http://localhost:9200'):
@@ -66,7 +69,7 @@ class TokenPrices:
 
   def _construct_bulk_insert_ops(self, docs):
     for doc in docs:
-      yield self.client.index_op(doc)
+      yield self.client.index_op(doc, id=doc['token']+'_'+doc['timestamp'])
 
   def _insert_multiple_docs(self, docs, doc_type, index_name):
     for chunk in bulk_chunks(self._construct_bulk_insert_ops(docs), docs_per_chunk=1000):
@@ -74,4 +77,89 @@ class TokenPrices:
 
   def get_recent_token_prices(self):
     prices = self._get_multi_prices()
-    self._insert_multiple_docs(prices, 'price', self.indices['token_prices'])
+    self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
+
+  def _process_hist_prices(self, prices):
+    points = []
+    for price in prices:
+      point = {}
+      point['BTC'] = (price['open'] + price['close']) / 2
+      point['BTC'] = float('{:0.10f}'.format(point['BTC']))
+      point['timestamp'] = datetime.datetime.fromtimestamp(price['time']).strftime("%Y-%m-%d")
+      point['token'] = price['token']
+      point['USD'] = self._to_usd(point['BTC'], self.btc_prices[point['timestamp']])
+      point['USD'] = float('{:0.10f}'.format(point['USD']))
+      if point['timestamp'] in self.eth_prices.keys():
+        point['ETH'] = self._from_usd(point['USD'], self.eth_prices[point['timestamp']])
+        point['ETH'] = float('{:0.10f}'.format(point['ETH']))
+      point['source'] = 'cryptocompare'
+      points.append(point)
+    return points
+
+  def _make_historical_prices_req(self, symbol, days_count):
+    url = 'https://min-api.cryptocompare.com/data/histoday?fsym={}&tsym=BTC&limit={}'.format(symbol, days_count)
+    try:
+      res = requests.get(url).json()
+      for point in res['Data']:
+        point['token'] = symbol
+      return res['Data']
+    except:
+      return
+
+  def _get_last_avail_price_date(self):
+    query = {
+      "from" : 0, "size" : 1,
+      'sort': {
+        'timestamp': {'order': 'desc'}
+      }
+    }
+    res = self.client.send_request('GET', [self.indices['token_price'], 'price', '_search'], query, {})['hits']['hits']
+    last_date = res[0]['_source']['timestamp'] if len(res) > 0 else '2013-01-01'
+    last_date = last_date.split('-')
+    return last_date
+
+  def _convert_btc_eth_prices(self, price):
+    point = {}
+    point['USD'] = (price['open'] + price['close']) / 2
+    point['date'] = datetime.datetime.fromtimestamp(price['time']).strftime("%Y-%m-%d")
+    return point
+
+  def _get_btc_eth_prices(self):
+    btc_prices = requests.get('https://min-api.cryptocompare.com/data/histoday?fsym=BTC&tsym=USD&allData=true').json()['Data']
+    eth_prices = requests.get('https://min-api.cryptocompare.com/data/histoday?fsym=ETH&tsym=USD&allData=true').json()['Data']
+    btc_prices = [self._convert_btc_eth_prices(price) for price in btc_prices]
+    eth_prices = [self._convert_btc_eth_prices(price) for price in eth_prices]
+    btc_prices_dict = {price['date']: price['USD'] for price in btc_prices}
+    eth_prices_dict = {price['date']: price['USD'] for price in eth_prices}
+    self.btc_prices = btc_prices_dict
+    self.eth_prices = eth_prices_dict
+
+  def _get_days_count(self, now, last_price_date):
+    start_date = date(int(now[0]), int(now[1]), int(now[2]))
+    end_date = date(int(last_price_date[0]), int(last_price_date[1]), int(last_price_date[2]))
+    days_count = (start_date - end_date).days + 1
+    return days_count
+
+  def _get_historical_multi_prices(self):
+    self._get_btc_eth_prices()
+    token_syms = [token['cc_sym'] for token in self._get_cc_tokens()]
+    now = datetime.datetime.now().strftime("%Y-%m-%d").split('-')
+    last_price_date = self._get_last_avail_price_date()
+    #if last_price_date == now:
+    #  return
+    days_count = self._get_days_count(now, last_price_date)
+    prices = []
+    for token in tqdm(token_syms):
+      price = self._make_historical_prices_req(token, days_count)
+      if price != None:
+        price = self._process_hist_prices(price) 
+        prices.append(price)
+      else:
+        continue
+    prices = [p for price in prices for p in price]
+    return prices
+
+  def get_prices_within_interval(self):
+    prices = self._get_historical_multi_prices()
+    if prices != None:
+      self._insert_multiple_docs(prices, 'price', self.indices['token_price'])

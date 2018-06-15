@@ -9,5 +9,6 @@ INDICES = {
   "listed_token": "ethereum-listed-token",
   "token_tx": "ethereum-token-transaction",
   "block": "ethereum-block",
-  "miner_transaction": "ethereum-miner-transaction"
+  "miner_transaction": "ethereum-miner-transaction",
+  "token_price": "ethereum-token-price"
 }
