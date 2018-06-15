@@ -78,16 +78,21 @@ class TokenPrices:
   def get_recent_token_prices(self):
     prices = self._get_multi_prices()
 <<<<<<< HEAD
+<<<<<<< HEAD
     self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
 =======
     self._insert_multiple_docs(prices, 'price', self.indices['token_prices'])
 >>>>>>> Add search for historical prices
+=======
+    self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
+>>>>>>> Add search for last unprocessed prices
 
   def _process_hist_prices(self, prices):
     points = []
     for price in prices:
       point = {}
       point['BTC'] = (price['open'] + price['close']) / 2
+<<<<<<< HEAD
 <<<<<<< HEAD
       point['BTC'] = float('{:0.10f}'.format(point['BTC']))
       point['timestamp'] = datetime.datetime.fromtimestamp(price['time']).strftime("%Y-%m-%d")
@@ -98,10 +103,21 @@ class TokenPrices:
         point['ETH'] = self._from_usd(point['USD'], self.eth_prices[point['timestamp']])
         point['ETH'] = float('{:0.10f}'.format(point['ETH']))
 =======
+=======
+      point['BTC'] = float('{:0.10f}'.format(point['BTC']))
+>>>>>>> Add search for last unprocessed prices
       point['timestamp'] = datetime.datetime.fromtimestamp(price['time']).strftime("%Y-%m-%d")
+      point['token'] = price['token']
       point['USD'] = self._to_usd(point['BTC'], self.btc_prices[point['timestamp']])
+<<<<<<< HEAD
       point['ETH'] = self._from_usd(point['USD'], self.eth_prices[point['timestamp']])
 >>>>>>> Add search for historical prices
+=======
+      point['USD'] = float('{:0.10f}'.format(point['USD']))
+      if point['timestamp'] in self.eth_prices.keys():
+        point['ETH'] = self._from_usd(point['USD'], self.eth_prices[point['timestamp']])
+        point['ETH'] = float('{:0.10f}'.format(point['ETH']))
+>>>>>>> Add search for last unprocessed prices
       point['source'] = 'cryptocompare'
       points.append(point)
     return points
@@ -112,10 +128,15 @@ class TokenPrices:
     try:
       res = requests.get(url).json()
 <<<<<<< HEAD
+<<<<<<< HEAD
       for point in res['Data']:
         point['token'] = symbol
 =======
 >>>>>>> Add search for historical prices
+=======
+      for point in res['Data']:
+        point['token'] = symbol
+>>>>>>> Add search for last unprocessed prices
       return res['Data']
     except:
       return
@@ -123,21 +144,29 @@ class TokenPrices:
   def _get_last_avail_price_date(self):
     query = {
 <<<<<<< HEAD
+<<<<<<< HEAD
       "from" : 0, "size" : 1,
 =======
       'query': {
         'match': {'token': '*'}
       },
 >>>>>>> Add search for historical prices
+=======
+      "from" : 0, "size" : 1,
+>>>>>>> Add search for last unprocessed prices
       'sort': {
         'timestamp': {'order': 'desc'}
       }
     }
 <<<<<<< HEAD
+<<<<<<< HEAD
     res = self.client.send_request('GET', [self.indices['token_price'], 'price', '_search'], query, {})['hits']['hits']
 =======
     res = self.client.send_request('GET', [self.indices['token_prices'], 'price', '_search'], query, {})['hits']['hits']
 >>>>>>> Add search for historical prices
+=======
+    res = self.client.send_request('GET', [self.indices['token_price'], 'price', '_search'], query, {})['hits']['hits']
+>>>>>>> Add search for last unprocessed prices
     last_date = res[0]['_source']['timestamp'] if len(res) > 0 else '2013-01-01'
     last_date = last_date.split('-')
     return last_date
@@ -177,6 +206,7 @@ class TokenPrices:
 
   def get_prices_within_interval(self):
     prices = self._get_historical_multi_prices()
+<<<<<<< HEAD
 <<<<<<< HEAD
     self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
 =======
@@ -255,3 +285,6 @@ class TokenPrices:
       None
     return point
 >>>>>>> Add search for historical prices
+=======
+    self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
+>>>>>>> Add search for last unprocessed prices
