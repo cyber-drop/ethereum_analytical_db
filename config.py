@@ -12,3 +12,5 @@ INDICES = {
   "miner_transaction": "ethereum-miner-transaction",
   "token_price": "ethereum-token-price"
 }
+
+MIN_CONSISTENT_BLOCK = 0

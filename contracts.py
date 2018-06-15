@@ -186,7 +186,7 @@ class Contracts():
         pass
 
   def decode_inputs(self):
-    max_block = utils.get_max_block()
+    max_block = utils.get_max_block(self.blocks_query)
     for contracts in self._iterate_contracts_with_abi(max_block):
       self._set_contracts_abi({contract["_source"]["address"]: contract["_source"]["abi"] for contract in contracts})
       self._decode_inputs_for_contracts(contracts, max_block)
@@ -195,6 +195,7 @@ class Contracts():
 class ExternalContracts(Contracts):
   doc_type = "tx"
   index = "transaction"
+  blocks_query = "*"
 
   def _iterate_transactions_by_targets(self, targets, max_block):
     query = {
@@ -212,6 +213,7 @@ class ExternalContracts(Contracts):
 class InternalContracts(Contracts):
   doc_type = "itx"
   index = "internal_transaction"
+  blocks_query = "trace:true"
 
   def _iterate_transactions_by_targets(self, targets, max_block):
     query = {
