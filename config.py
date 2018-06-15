@@ -10,8 +10,12 @@ INDICES = {
   "token_tx": "ethereum-token-transaction",
   "block": "ethereum-block",
 <<<<<<< HEAD
+<<<<<<< HEAD
   "token_price": "ethereum-token-price"
 =======
   "token_prices": "ethereum-token-price"
 >>>>>>> Add search for historical prices
+=======
+  "token_price": "ethereum-token-price"
+>>>>>>> Add search for last unprocessed prices
 }
