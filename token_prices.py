@@ -98,7 +98,6 @@ class TokenPrices:
 
   def _make_historical_prices_req(self, symbol, days_count):
     url = 'https://min-api.cryptocompare.com/data/histoday?fsym={}&tsym=BTC&limit={}'.format(symbol, days_count)
-    time.sleep(0.5)
     try:
       res = requests.get(url).json()
       for point in res['Data']:
@@ -146,15 +145,17 @@ class TokenPrices:
     token_syms = [token['cc_sym'] for token in self._get_cc_tokens()]
     now = datetime.datetime.now().strftime("%Y-%m-%d").split('-')
     last_price_date = self._get_last_avail_price_date()
-    if last_price_date == now:
-      return
+    #if last_price_date == now:
+    #  return
     days_count = self._get_days_count(now, last_price_date)
     prices = []
-    for i in tqdm(range(len(token_syms))):
-      price = self._make_historical_prices_req(token_syms[i], days_count)
-      prices.append(price)
-    prices = [price for price in prices if price != None]
-    prices = [self._process_hist_prices(price) for price in prices]
+    for token in tqdm(token_syms):
+      price = self._make_historical_prices_req(token, days_count)
+      if price != None:
+        price = self._process_hist_prices(price) 
+        prices.append(price)
+      else:
+        continue
     prices = [p for price in prices for p in price]
     return prices
 

@@ -54,7 +54,7 @@ def extract_token_internal_txs(host):
   token_holders = InternalTokenTransactions(INDICES, host)
   token_holders.get_listed_tokens_txs()
 
-def extract_unprocessed_prices(host):
+def extract_prices(host):
   token_prices = TokenPrices(INDICES, host)
   token_prices.get_prices_within_interval()
 
@@ -70,7 +70,7 @@ operations = {
   "search-methods": search_methods,
   "extract-token-external-txs": extract_token_external_txs,
   "extract-token-internal-txs": extract_token_internal_txs,
-  "extract-unprocessed-prices": extract_unprocessed_prices
+  "extract-prices": extract_prices
 }
 
 @click.command()
