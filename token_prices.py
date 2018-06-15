@@ -77,23 +77,14 @@ class TokenPrices:
 
   def get_recent_token_prices(self):
     prices = self._get_multi_prices()
-<<<<<<< HEAD
-<<<<<<< HEAD
     self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
-=======
-    self._insert_multiple_docs(prices, 'price', self.indices['token_prices'])
->>>>>>> Add search for historical prices
-=======
-    self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
->>>>>>> Add search for last unprocessed prices
+
 
   def _process_hist_prices(self, prices):
     points = []
     for price in prices:
       point = {}
       point['BTC'] = (price['open'] + price['close']) / 2
-<<<<<<< HEAD
-<<<<<<< HEAD
       point['BTC'] = float('{:0.10f}'.format(point['BTC']))
       point['timestamp'] = datetime.datetime.fromtimestamp(price['time']).strftime("%Y-%m-%d")
       point['token'] = price['token']
@@ -102,22 +93,6 @@ class TokenPrices:
       if point['timestamp'] in self.eth_prices.keys():
         point['ETH'] = self._from_usd(point['USD'], self.eth_prices[point['timestamp']])
         point['ETH'] = float('{:0.10f}'.format(point['ETH']))
-=======
-=======
-      point['BTC'] = float('{:0.10f}'.format(point['BTC']))
->>>>>>> Add search for last unprocessed prices
-      point['timestamp'] = datetime.datetime.fromtimestamp(price['time']).strftime("%Y-%m-%d")
-      point['token'] = price['token']
-      point['USD'] = self._to_usd(point['BTC'], self.btc_prices[point['timestamp']])
-<<<<<<< HEAD
-      point['ETH'] = self._from_usd(point['USD'], self.eth_prices[point['timestamp']])
->>>>>>> Add search for historical prices
-=======
-      point['USD'] = float('{:0.10f}'.format(point['USD']))
-      if point['timestamp'] in self.eth_prices.keys():
-        point['ETH'] = self._from_usd(point['USD'], self.eth_prices[point['timestamp']])
-        point['ETH'] = float('{:0.10f}'.format(point['ETH']))
->>>>>>> Add search for last unprocessed prices
       point['source'] = 'cryptocompare'
       points.append(point)
     return points
@@ -127,46 +102,21 @@ class TokenPrices:
     time.sleep(0.5)
     try:
       res = requests.get(url).json()
-<<<<<<< HEAD
-<<<<<<< HEAD
       for point in res['Data']:
         point['token'] = symbol
-=======
->>>>>>> Add search for historical prices
-=======
-      for point in res['Data']:
-        point['token'] = symbol
->>>>>>> Add search for last unprocessed prices
       return res['Data']
     except:
       return
 
   def _get_last_avail_price_date(self):
     query = {
-<<<<<<< HEAD
-<<<<<<< HEAD
+
       "from" : 0, "size" : 1,
-=======
-      'query': {
-        'match': {'token': '*'}
-      },
->>>>>>> Add search for historical prices
-=======
-      "from" : 0, "size" : 1,
->>>>>>> Add search for last unprocessed prices
       'sort': {
         'timestamp': {'order': 'desc'}
       }
     }
-<<<<<<< HEAD
-<<<<<<< HEAD
     res = self.client.send_request('GET', [self.indices['token_price'], 'price', '_search'], query, {})['hits']['hits']
-=======
-    res = self.client.send_request('GET', [self.indices['token_prices'], 'price', '_search'], query, {})['hits']['hits']
->>>>>>> Add search for historical prices
-=======
-    res = self.client.send_request('GET', [self.indices['token_price'], 'price', '_search'], query, {})['hits']['hits']
->>>>>>> Add search for last unprocessed prices
     last_date = res[0]['_source']['timestamp'] if len(res) > 0 else '2013-01-01'
     last_date = last_date.split('-')
     return last_date
@@ -187,14 +137,20 @@ class TokenPrices:
     self.btc_prices = btc_prices_dict
     self.eth_prices = eth_prices_dict
 
+  def _get_days_count(self, now, last_price_date):
+    start_date = date(int(now[0]), int(now[1]), int(now[2]))
+    end_date = date(int(last_price_date[0]), int(last_price_date[1]), int(last_price_date[2]))
+    days_count = (start_date - end_date).days + 1
+    return days_count
+
   def _get_historical_multi_prices(self):
     self._get_btc_eth_prices()
     token_syms = [token['cc_sym'] for token in self._get_cc_tokens()]
     now = datetime.datetime.now().strftime("%Y-%m-%d").split('-')
     last_price_date = self._get_last_avail_price_date()
-    start_date = date(int(now[0]), int(now[1]), int(now[2]))
-    end_date = date(int(last_price_date[0]), int(last_price_date[1]), int(last_price_date[2]))
-    days_count = (start_date - end_date).days + 1
+    if last_price_date == now:
+      return
+    days_count = self._get_days_count(now, last_price_date)
     prices = []
     for i in tqdm(range(len(token_syms))):
       price = self._make_historical_prices_req(token_syms[i], days_count)
@@ -206,85 +162,6 @@ class TokenPrices:
 
   def get_prices_within_interval(self):
     prices = self._get_historical_multi_prices()
-<<<<<<< HEAD
-<<<<<<< HEAD
-    self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
-=======
-    self._insert_multiple_docs(prices, 'prices', self.indices['token_price'])
+    if prices != None:
+      self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
 
-  def _get_token_historical_prices(self, token_sym, currency):
-    url = 'https://min-api.cryptocompare.com/data/histoday?fsym={}&tsym={}&allData=true'.format(token_sym, currency)
-    try:
-      res = requests.get(url).json()
-      return res['Data']
-    except:
-      return
-
-  def _get_tokens_history(self, tsym):
-    token_data = []
-    n = 0
-    for token_chunk in self._iterate_cc_tokens():
-      for token in token_chunk:
-        hist_data = self._get_token_historical_prices(token['_source']['cc_sym'], tsym)
-        if hist_data == None:
-          continue
-        if len(hist_data) == 0:
-          continue
-        for data_point in hist_data:
-          data_point['fsym'] = token['_source']['cc_sym']
-          data_point['tsym'] = tsym
-        token_data.append(hist_data)
-        time.sleep(0.5)
-    token_data = [point for points in token_data for point in points]
-    with open('./data/btc_data.json'.format(tsym, n), 'w') as outfile:
-      json.dump(token_data, outfile, indent=2)
-
-  def get_tokens_full_history(self):
-    for currency in ['BTC']:
-      self._get_tokens_history(currency)
-
-  def _convert_raw_data(self, data):
-    btc_points = []
-    for point in data:
-      btc_point = {}
-      btc_point['timestamp'] = datetime.datetime.fromtimestamp(point['time']).strftime("%Y-%m-%d")
-      btc_point['BTC'] = (point['open'] + point['close']) / 2
-      btc_point['token'] = point['fsym']
-      btc_point['source'] = 'cryptocompare'
-      btc_points.append(btc_point)
-    max_btc = sorted([p['BTC'] for p in btc_points], reverse=True)
-    return btc_points
-
-  def _to_usd(self, value, price):
-    return value * price
-
-  def _from_usd(self, value, price):
-    return value / price
-
-  def _calculate_currencies(self, data):
-    prices = pd.read_csv('btc_eth_prices.csv')
-    for point in data:
-      if point['BTC'] > 1:
-        continue
-      price = prices.loc[prices['date'] == point['timestamp']]
-      if price.empty:
-        continue
-      point['USD'] = self._to_usd(point['BTC'], price.btc_price.values[0])
-      point['ETH'] = self._from_usd(point['USD'], price.eth_price.values[0])
-    return data
-
-  def _round(self, point):
-    try:
-      point['USD'] = float('{:0.10f}'.format(point['USD']))
-    except:
-      None
-    point['BTC'] = float('{:0.10f}'.format(point['BTC']))
-    try:
-      point['ETH'] = float('{:0.10f}'.format(point['ETH']))
-    except:
-      None
-    return point
->>>>>>> Add search for historical prices
-=======
-    self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
->>>>>>> Add search for last unprocessed prices
