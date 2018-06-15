@@ -282,7 +282,7 @@ class InputParsingTestCase():
         call.save(test_contracts, ANY)
       ])
 
-  def test_decode_inputs_save_max_block(self):
+  def test_decode_inputs_save_max_block_for_query(self):
     test_max_block = 1000
     test_contracts_from_elasticsearch = [{"_source": {"abi": "contract", "address": "contract" + str(i)}} for i in range(3)]
     mockify(self.contracts, {
@@ -293,9 +293,11 @@ class InputParsingTestCase():
       decode=self.contracts._decode_inputs_for_contracts,
       save=self.contracts._save_inputs_decoded
     )
-    with patch('utils.get_max_block', side_effect=[test_max_block]):
+    test_max_block_mock = MagicMock(side_effect=[test_max_block])
+    with patch('utils.get_max_block', test_max_block_mock):
       self.contracts.decode_inputs()
 
+      test_max_block_mock.assert_called_with(self.blocks_query)
       process.assert_has_calls([
         call.iterate(test_max_block),
         call.decode(ANY, test_max_block),
@@ -325,6 +327,7 @@ class ExternalTransactionsInputParsingTestCase(InputParsingTestCase, unittest.Te
   index = "transaction"
   contracts_class = ExternalContracts
   doc = {'to': TEST_CONTRACT_ADDRESS, 'input': TEST_CONTRACT_PARAMETERS, 'blockNumber': 10}
+  blocks_query = "*"
 
   def test_iterate_transactions_by_targets_ignore_transactions_with_error(self):
     self.contracts._create_transactions_request = MagicMock(return_value={"exists": {"field": "to"}})
@@ -358,6 +361,7 @@ class InternalTransactionsInputParsingTestCase(InputParsingTestCase, unittest.Te
   index = "internal_transaction"
   contracts_class = InternalContracts
   doc = {'to': TEST_CONTRACT_ADDRESS, 'input': TEST_CONTRACT_PARAMETERS, "callType": "call", 'blockNumber': 10}
+  blocks_query = "trace:true"
 
   def test_iterate_transactions_by_targets(self):
     self.contracts._create_transactions_request = MagicMock(return_value={"exists": {"field": "to"}})

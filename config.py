@@ -10,3 +10,5 @@ INDICES = {
   "token_tx": "ethereum-token-transaction",
   "block": "ethereum-block"
 }
+
+MIN_CONSISTENT_BLOCK = 0
