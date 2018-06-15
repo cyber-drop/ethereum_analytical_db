@@ -155,3 +155,4 @@ class TokenPrices:
   def get_prices_within_interval(self):
     prices = self._get_historical_multi_prices()
     self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
+
