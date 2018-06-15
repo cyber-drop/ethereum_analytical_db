@@ -79,7 +79,6 @@ class TokenPrices:
     prices = self._get_multi_prices()
     self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
 
-
   def _process_hist_prices(self, prices):
     points = []
     for price in prices:
@@ -110,7 +109,6 @@ class TokenPrices:
 
   def _get_last_avail_price_date(self):
     query = {
-
       "from" : 0, "size" : 1,
       'sort': {
         'timestamp': {'order': 'desc'}
@@ -164,4 +162,3 @@ class TokenPrices:
     prices = self._get_historical_multi_prices()
     if prices != None:
       self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
-
