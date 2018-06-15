@@ -101,7 +101,8 @@ class TokenHolders:
   def _process_multiple_addr_tx(self, tx):
     tx_input = tx['decoded_input']
     decimals = self.token_decimals[tx['to']] if tx['to'] in self.token_decimals.keys() else 1
-    addresses = json.loads(tx_input['params'][0]['value'])
+    addresses = re.sub('\'', '\"', tx_input['params'][0]['value'])
+    addresses = json.loads(addresses)
     values = [str(value) for value in json.loads(tx_input['params'][1]['value'])]
     params = list(zip(addresses, values))
     descriptions = []
