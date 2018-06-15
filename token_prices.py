@@ -69,7 +69,7 @@ class TokenPrices:
 
   def _construct_bulk_insert_ops(self, docs):
     for doc in docs:
-      yield self.client.index_op(doc)
+      yield self.client.index_op(doc, id=doc['token']+'_'+doc['timestamp'])
 
   def _insert_multiple_docs(self, docs, doc_type, index_name):
     for chunk in bulk_chunks(self._construct_bulk_insert_ops(docs), docs_per_chunk=1000):
@@ -146,8 +146,8 @@ class TokenPrices:
     token_syms = [token['cc_sym'] for token in self._get_cc_tokens()]
     now = datetime.datetime.now().strftime("%Y-%m-%d").split('-')
     last_price_date = self._get_last_avail_price_date()
-    if last_price_date == now:
-      return
+    #if last_price_date == now:
+    #  return
     days_count = self._get_days_count(now, last_price_date)
     prices = []
     for i in tqdm(range(len(token_syms))):
