@@ -192,10 +192,21 @@ class InternalTransactions:
       except BulkError:
         pass
 
+  def _save_transactions_output(self, blocks_traces):
+    operations = [self.client.update_op(
+      doc={"output": transaction["result"]["output"]},
+      id=transaction["transactionHash"]
+    ) for transaction in blocks_traces
+      if ("result" in transaction.keys()) and (transaction["result"]) and ("output" in transaction["result"].keys()) and ("transactionHash" in transaction.keys()) and (transaction["hash"].endswith(".0"))]
+    if operations:
+      try:
+        self.client.bulk(operations, index=self.indices["transaction"], doc_type="tx", refresh=True)
+      except BulkError:
+        pass
+
   def _extract_traces_chunk(self, blocks):
     blocks_traces = self._get_traces(blocks)
     self._set_trace_hashes(blocks_traces)
-    self._set_parent_errors(blocks_traces)
     self._save_internal_transactions(blocks_traces)
     self._save_miner_transactions(blocks_traces)
     self._save_transactions_error(blocks_traces)
