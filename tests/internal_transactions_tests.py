@@ -180,6 +180,71 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.internal_transactions._set_trace_hashes(transactions)
     assert transactions[0]["hash"] == "0x1"
 
+  def test_set_parent_error_root_node(self):
+    trace = [{
+      "transactionHash": "0x1",
+      "error": "Out of gas",
+      "traceAddress": []
+    }, {
+      "transactionHash": "0x1",
+      "traceAddress": [1]
+    }, {
+      "transactionHash": "0x2",
+      "traceAddress": [1]
+    }]
+    self.internal_transactions._set_parent_errors(trace)
+    assert trace[1]["parent_error"]
+    assert "parent_error" not in trace[2].keys()
+
+  def test_set_parent_error_leaf(self):
+    trace = [{
+      "transactionHash": "0x1",
+      "traceAddress": []
+    }, {
+      "transactionHash": "0x1",
+      "error": "Out of gas",
+      "traceAddress": [1]
+    }]
+    self.internal_transactions._set_parent_errors(trace)
+    assert "parent_error" not in trace[0].keys()
+
+  def test_set_parent_error_internal_node(self):
+    trace = [{
+      "transactionHash": "0x1",
+      "traceAddress": []
+    }, {
+      "transactionHash": "0x1",
+      "error": "Out of gas",
+      "traceAddress": [1]
+    }, {
+      "transactionHash": "0x1",
+      "traceAddress": [1, 2]
+    }, {
+      "transactionHash": "0x1",
+      "traceAddress": [2]
+    }]
+    self.internal_transactions._set_parent_errors(trace)
+    assert "parent_error" in trace[2].keys()
+    assert "parent_error" not in trace[3].keys()
+    assert "parent_error" not in trace[0].keys()
+    assert "parent_error" not in trace[1].keys()
+
+  def test_set_parent_error_multiple_internal_nodes(self):
+    trace = [{
+      "transactionHash": "0x1",
+      "error": "Out of gas",
+      "traceAddress": [1, 3]
+    }, {
+      "transactionHash": "0x1",
+      "error": "Out of gas",
+      "traceAddress": [1, 2]
+    }, {
+      "transactionHash": "0x1",
+      "traceAddress": [1, 2, 3]
+    }]
+    self.internal_transactions._set_parent_errors(trace)
+    assert "parent_error" in trace[-1].keys()
+
   def test_classify_trace(self):
     trace = [{
       "transactionHash": "0x0",
@@ -300,14 +365,18 @@ class InternalTransactionsTestCase(unittest.TestCase):
 
   def test_save_transactions_error(self):
     test_traces = [{
+      "hash": "0x1.0",
       "transactionHash": "0x1",
       "error": "Out of gas"
     }, {
+      "hash": "0x2.0",
       "transactionHash": "0x2"
     }, {
+      "hash": "0x2.1",
       "transactionHash": "0x2",
       "error": "Bad instruction"
     }, {
+      "hash": "0x3",
       "transactionHash": "0x3"
     }]
     self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type="tx", doc={'hash': "0x1"}, id="0x1", refresh=True)
@@ -319,7 +388,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
     transactions = self.client.search(index=TEST_TRANSACTIONS_INDEX, doc_type="tx", query="_exists_:error")['hits']['hits']
     errors = {transaction["_id"]: transaction["_source"]["error"] for transaction in transactions}
     assert errors['0x1'] == "Out of gas"
-    assert errors['0x2'] == "Bad instruction"
+    assert '0x2' not in errors.keys()
     assert "0x3" not in errors.keys()
 
   def test_save_transactions_error_ignore_miner_transaction(self):
@@ -381,6 +450,25 @@ class InternalTransactionsTestCase(unittest.TestCase):
     calls = [
       call.save_errors(test_traces),
       call.save_traces(test_blocks)
+    ]
+    process.assert_has_calls(calls)
+
+  def test_extract_traces_chunk_set_parent_error(self):
+    test_blocks = ["0x1"]
+    test_traces = []
+    mockify(self.internal_transactions, {
+      "_get_traces": MagicMock(return_value=test_traces)
+    }, ["_extract_traces_chunk"])
+    process = Mock(
+      save_errors=self.internal_transactions._set_parent_errors,
+      save_traces=self.internal_transactions._save_internal_transactions
+    )
+
+    self.internal_transactions._extract_traces_chunk(test_blocks)
+
+    calls = [
+      call.save_errors(test_traces),
+      call.save_traces(test_traces)
     ]
     process.assert_has_calls(calls)
 
