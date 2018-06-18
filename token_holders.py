@@ -250,7 +250,7 @@ class TokenHolders:
       'valid': True, 
       'token': contract['address'],
       'tx_index': transaction_index, 
-      'tx_hash': contract['parent_transaction'] if 'parent_transaction' in contract.keys() else contract['address']
+      'tx_hash': contract['address']
     }
 
   def _extract_contract_creation_descr(self, contracts):
