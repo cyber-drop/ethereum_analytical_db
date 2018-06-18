@@ -119,6 +119,12 @@ class ExternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase)
     assert len(all_descrptions) == 101
     assert '6000000.00000' in values
 
+  def test_round_value(self):
+    values = self.token_holders._convert_transfer_value('10000000000000000', 18)
+    assert type(values[0]) is str
+    assert type(values[1]) is float
+    assert values[1] == 0.01
+
 class InternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase):
   token_holders_class = InternalTokenTransactions
 

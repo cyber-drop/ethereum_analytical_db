@@ -4,7 +4,6 @@ from config import INDICES
 import requests
 from pyelasticsearch import bulk_chunks
 import math
-from decimal import Decimal
 import json
 import re
 
@@ -50,8 +49,8 @@ class TokenHolders:
       return (value, None)
     value = int(value)
     rounded = value / math.pow(10, decimals)
-    rounded = Decimal("{0:.5f}".format(rounded))
-    return (str(rounded), rounded)
+    rounded = "{0:.5f}".format(rounded)
+    return (rounded, float(rounded))
 
   def _extract_first_bytes(self, func):
     return str(self.w3.toHex(self.w3.sha3(text=func)))[2:]
