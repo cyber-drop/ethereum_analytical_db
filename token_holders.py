@@ -71,7 +71,6 @@ class TokenHolders:
     params = [param['type'] for param in inputs['params']]
     params = ','.join(params)
     method += '(' + params + ')'
-    #signature = self._extract_first_bytes(method)
     signature = method
     return signature
 
@@ -156,7 +155,6 @@ class TokenHolders:
     addresses = json.loads(addresses)
     values = [str(value) for value in json.loads(tx_input['params'][1]['value'])]
     params = list(zip(addresses, values))
-    print(params)
     descriptions = []
     valid = self._check_is_valid(tx)
     for i, param in enumerate(params):

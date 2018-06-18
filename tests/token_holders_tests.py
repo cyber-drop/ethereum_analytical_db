@@ -115,7 +115,6 @@ class ExternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase)
     all_descrptions = self.token_holders._iterate_tx_descriptions()
     all_descrptions = [tx['_source'] for txs_list in all_descrptions for tx in txs_list]
     values = [descr['raw_value'] for descr in all_descrptions]
-    print(all_descrptions)
     assert len(all_descrptions) == 101
     assert '6000000.00000' in values
 
@@ -146,7 +145,6 @@ class InternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase)
     all_descrptions = self.token_holders._iterate_tx_descriptions()
     all_descrptions = [tx for txs_list in all_descrptions for tx in txs_list]
     hashes = [d['_source']['tx_hash'] for d in all_descrptions]
-    print(hashes)
     self.assertCountEqual(['0x8a634bd8b381c09eec084fd7df6bdce03ccbc92f247f59d4fcc22e02131c0158', '0x04692fb0a2d1a9c8b6ea8cfc643422800b81da50df1578f3494aef0ef9be6009.4', '0xce37439c6809ca9d1b1d5707c7df34ceec1e4e472f0ca07c87fa449a93b02431.4', '0x366c6344bdb4cb1bb8cfbce5770419b03f49d631d5803e5fbcf8de9b8f1a5d66.4'], hashes)
 
   def test_set_internal_transaction_index(self):
