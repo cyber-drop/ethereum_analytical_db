@@ -18,14 +18,14 @@ class TokenHolders:
       'approve(address,uint256)': self._process_address_uint_tx,
       'transferFrom(address,address,uint256)': self._process_two_addr_tx,
       'multiTransfer(address[],uint256[])': self._process_multiple_addr_tx,
-      'burnTokens': self._process_only_uint,
+      'burnTokens(uint256)': self._process_only_uint,
       'prefill(address[],uint256[])': self._process_multiple_addr_tx,
       'generateTokens(address,uint256)': self._process_address_uint_tx,
       'destroyTokens(address,uint256)': self._process_address_uint_tx,
       'claimTokens(address)': self._process_only_address,
       'mint(address,uint256)': self._process_address_uint_tx,
-      'mintToAddressesAndAmounts': self._process_multiple_addr_tx,
-      'mintToAddresses': self._process_multi_addr_one_uint
+      'mintToAddressesAndAmounts(address[],uint256[])': self._process_multiple_addr_tx,
+      'mintToAddresses(address[],uint256)': self._process_multi_addr_one_uint
     }
 
   def _construct_bulk_insert_ops(self, docs):
@@ -78,6 +78,8 @@ class TokenHolders:
     if 'error' in tx.keys():
       return False
     elif 'output' in tx.keys() and tx['output'] == '0x0000000000000000000000000000000000000000000000000000000000000000':
+      return False
+    elif 'parent_error' in tx.keys() and tx['parent_error'] == True:
       return False
     else:
       return True
