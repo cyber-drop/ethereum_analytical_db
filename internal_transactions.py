@@ -185,7 +185,7 @@ class InternalTransactions:
       doc={"error": transaction["error"]},
       id=transaction["transactionHash"]
     ) for transaction in blocks_traces
-      if ("error" in transaction.keys()) and ("transactionHash" in transaction.keys()) and (transaction["hash"].endswith(".0"))]
+      if ("error" in transaction.keys()) and ("transactionHash" in transaction.keys()) and (transaction.get("hash", "").endswith(".0"))]
     if operations:
       try:
         self.client.bulk(operations, index=self.indices["transaction"], doc_type="tx", refresh=True)
