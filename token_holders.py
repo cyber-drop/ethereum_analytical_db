@@ -17,48 +17,11 @@ class TokenHolders:
     self.token_decimals = {}
     self.w3 = Web3()
     self.signatures = {
+      # ERC-20 methods
       'transfer(address,uint256)': self._process_address_uint_tx,
-#      'approve(address,uint256)': self._process_address_uint_tx,
       'transferFrom(address,address,uint256)': self._process_two_addr_tx,
-#      'multiTransfer(address[],uint256[])': self._process_multiple_addr_tx,
-      'burnTokens(uint256)': self._process_only_uint_negative,
-#      'prefill(address[],uint256[])': self._process_multiple_addr_tx,
-#      'generateTokens(address,uint256)': self._process_address_uint_tx,
-#      'destroyTokens(address,uint256)': self._process_address_uint_tx,
-#      'claimTokens(address)': self._process_only_address,
-#      'mint(address,uint256)': self._process_address_uint_tx,
-#      'mintToAddressesAndAmounts(address[],uint256[])': self._process_multiple_addr_tx,
-#      'mintToAddresses(address[],uint256)': self._process_multi_addr_one_uint,
-#      'drop(address[],uint256)': self._process_multi_addr_one_uint_no_value_preprocess,
-#      'distributeJST(address[],uint256,uint256)': self._process_multi_addr_one_uint,
-#      'issue(address,uint256)': self._process_address_uint_tx,
-#      'manuallyAssignTokens(address,uint256)': self._process_address_uint_tx,
-#      'airdropToAddresses(address[],uint256)': self._process_multi_addr_one_uint,
-#      'mintToken(address,uint256,uint256)': self._process_address_uint_tx,
-#      'superMint(address,uint256,uint256)': self._process_address_uint_tx,
-#      'multiMint(uint256[])': self._process_multiple_encoded_addr,
-#      'distributeAirdrop(address[],uint256)': self._process_multi_addr_one_uint,
-#      'distributeBTR(address[])': self._process_multi_addr_same_value,
-#      'setBalances(address[],uint256[])': self._process_multiple_addr_tx,
-#      'emitTransferEvents(address,address[],uint256[])': self._process_multiple_addr_tx_with_sender,
-#      'transferMulti(address[],uint256[])': self._process_multiple_addr_tx,
-#      'fill(uint256[])': self._process_multiple_encoded_addr,
-#      'deliverPresaleFuelBalances(address[],uint256[])': self._process_multiple_addr_tx,
-#      'multiPartyTransferFrom(address,address[],uint256[])': self._process_multiple_addr_tx_with_sender,
-#      'transferFromCrowdfund(address,uint256)': self._process_address_uint_tx,
-#      'distributeTokens(address[],uint256[])': self._process_multiple_addr_tx,
-#      'mintTokens(address,uint256)': self._process_address_uint_tx,
-#      'mintTokens(address,uint256,string)': self._process_address_uint_tx,
-#      'reportConvertTokens(uint256,address)': self._process_uint_address_tx,
-#      'triggerTansferEvent(address,address,uint256)': self._process_two_addr_tx,
-#      'setTokens(address,uint256)': self._process_address_uint_tx,
-#      'moderatorTransferFrom(address,address,uint256)': self._process_two_addr_tx,
-#      'transferFromPrivileged(address,address,uint256)': self._process_two_addr_tx,
-#      'transferPrivileged(address,uint256)': self._process_address_uint_tx,
-#      'createToken(address,uint256)': self._process_address_uint_tx,
-#      'mintMigrationTokens(address,uint256)': self._process_address_uint_tx,
-#      'batchTransfer(address[],uint256[])': self._process_multiple_addr_tx,
       # TOP-20 contracts
+      'burnTokens(uint256)': self._process_only_uint_negative,
       'mint(address,uint256,bool,uint32)': self._process_address_uint_tx,
       'mint(uint128)': self._process_only_uint,
       'mint(uint256)': self._process_only_uint,
@@ -103,8 +66,7 @@ class TokenHolders:
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
 
   def _iterate_tokens(self):
-    query = {"terms": {"address": ACTUAL_CONTRACTS}}
-    return self.client.iterate(self.indices['contract'], 'contract', query) #'_exists_:cmc_id AND !(tx_descr_scanned:true)')
+    return self.client.iterate(self.indices['contract'], 'contract', '_exists_:cmc_id AND !(tx_descr_scanned:true)')
 
   def _iterate_tokens_txs(self, token_addresses):
     query = {
@@ -336,9 +298,6 @@ class TokenHolders:
     if method_signature in self.signatures:
       return self.signatures[method_signature](tx)
     else:
-      # =====================================================================
-      if method_signature not in ["balanceOf(address)", "allowance(address,address)", "approve(address,uint256)", "lastMintedTimestamp(address)", "lockAddress(address,bool)"]:
-        print(method_signature)
       return
 
   def _check_tx_input(self, tx):
@@ -394,7 +353,7 @@ class TokenHolders:
   def get_listed_tokens_txs(self):
     for tokens in self._iterate_tokens():
       self.token_decimals = {token['_source']['address']: token['_source']['decimals'] for token in tokens if 'decimals' in token['_source'].keys()}
-#      self._extract_contract_creation_descr(tokens)
+      self._extract_contract_creation_descr(tokens)
       self._extract_tokens_txs([token['_source']['address'] for token in tokens])
 
   def _get_listed_tokens_addresses(self):
@@ -421,5 +380,3 @@ class ExternalTokenTransactions(TokenHolders):
 class InternalTokenTransactions(TokenHolders):
   tx_index = 'internal_transaction'
   tx_type = 'itx'
-
-ACTUAL_CONTRACTS = ["0xb5a5f22694352c15b00323844ad545abb2b11028"]
