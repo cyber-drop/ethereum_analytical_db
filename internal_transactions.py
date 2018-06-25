@@ -8,6 +8,7 @@ from multiprocessing import Pool
 from functools import partial
 from itertools import repeat
 from config import PARITY_HOSTS
+import pygtrie as trie
 
 NUMBER_OF_PROCESSES = 10
 
@@ -107,6 +108,20 @@ class InternalTransactions:
       else:
         transaction["hash"] = transaction["blockHash"]
 
+  def _set_parent_errors(self, trace):
+    errors = {}
+    for transaction in trace:
+      if "error" in transaction.keys():
+        if transaction["transactionHash"] not in errors.keys():
+          errors[transaction["transactionHash"]] = trie.Trie()
+        errors[transaction["transactionHash"]][transaction["traceAddress"]] = True
+    for transaction in trace:
+      if transaction["transactionHash"] in errors.keys():
+        prefix_exists = bool(errors[transaction["transactionHash"]].shortest_prefix(transaction["traceAddress"]))
+        is_node = errors[transaction["transactionHash"]].has_key(transaction["traceAddress"])
+        if prefix_exists and not is_node:
+          transaction["parent_error"] = True
+
   # TODO get rid of this method
   def _classify_trace(self, trace):
     transactions_dict = {
@@ -170,7 +185,7 @@ class InternalTransactions:
       doc={"error": transaction["error"]},
       id=transaction["transactionHash"]
     ) for transaction in blocks_traces
-      if ("error" in transaction.keys()) and ("transactionHash" in transaction.keys())]
+      if ("error" in transaction.keys()) and ("transactionHash" in transaction.keys()) and (transaction.get("hash", "").endswith(".0"))]
     if operations:
       try:
         self.client.bulk(operations, index=self.indices["transaction"], doc_type="tx", refresh=True)
@@ -180,6 +195,7 @@ class InternalTransactions:
   def _extract_traces_chunk(self, blocks):
     blocks_traces = self._get_traces(blocks)
     self._set_trace_hashes(blocks_traces)
+    self._set_parent_errors(blocks_traces)
     self._save_internal_transactions(blocks_traces)
     self._save_miner_transactions(blocks_traces)
     self._save_transactions_error(blocks_traces)
