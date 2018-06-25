@@ -211,9 +211,10 @@ class InternalTransactions:
   def _extract_traces_chunk(self, blocks):
     blocks_traces = self._get_traces(blocks)
     self._set_trace_hashes(blocks_traces)
-#    self._save_internal_transactions(blocks_traces)
-#    self._save_miner_transactions(blocks_traces)
-#    self._save_transactions_error(blocks_traces)
+    self._set_parent_errors(blocks_traces)
+    self._save_internal_transactions(blocks_traces)
+    self._save_miner_transactions(blocks_traces)
+    self._save_transactions_error(blocks_traces)
     self._save_transactions_output(blocks_traces)
     self._save_traces(blocks)
 
