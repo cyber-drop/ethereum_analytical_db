@@ -6,6 +6,9 @@ from pyelasticsearch import bulk_chunks
 import math
 import json
 import re
+import pdb
+
+ADDRESS_ENCODING_CONSTANT = 0x0010000000000000000000000000000000000000000
 
 class TokenHolders:
   def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200"):
@@ -14,19 +17,37 @@ class TokenHolders:
     self.token_decimals = {}
     self.w3 = Web3()
     self.signatures = {
+      # ERC-20 methods
       'transfer(address,uint256)': self._process_address_uint_tx,
-      'approve(address,uint256)': self._process_address_uint_tx,
       'transferFrom(address,address,uint256)': self._process_two_addr_tx,
-      'multiTransfer(address[],uint256[])': self._process_multiple_addr_tx,
-      'burnTokens(uint256)': self._process_only_uint,
-      'prefill(address[],uint256[])': self._process_multiple_addr_tx,
-      'generateTokens(address,uint256)': self._process_address_uint_tx,
-      'destroyTokens(address,uint256)': self._process_address_uint_tx,
-      'claimTokens(address)': self._process_only_address,
-      'mint(address,uint256)': self._process_address_uint_tx,
-      'mintToAddressesAndAmounts(address[],uint256[])': self._process_multiple_addr_tx,
-      'mintToAddresses(address[],uint256)': self._process_multi_addr_one_uint
-    }
+      # TOP-20 contracts
+      'burnTokens(uint256)': self._process_only_uint_negative,
+      'mint(address,uint256,bool,uint32)': self._process_address_uint_tx,
+      'mint(uint128)': self._process_only_uint,
+      'mint(uint256)': self._process_only_uint,
+      'unfreeze(uint256)': self._process_only_uint,
+      'burn(uint128)': self._process_only_uint_negative,
+      'burn(uint256)': self._process_only_uint_negative,
+      'freeze(uint256)': self._process_only_uint_negative,
+      'push(address,uint256)': self._process_address_uint_tx,
+      'push(address,uint128)': self._process_address_uint_tx,
+      'pull(address,uint256)': self._process_address_uint_reversed_tx,
+      'pull(address,uint128)': self._process_address_uint_reversed_tx,
+      'move(address,address,uint256)': self._process_two_addr_tx,
+      # TOP-50 contracts
+      'transferForMultiAddresses(address[],unit256[])': self._process_multiple_addr_tx,
+      'mintTokensWithinTime(address,uint256)': self._process_address_uint_tx,
+      'issue(address,uint256)': self._process_address_uint_tx,
+      'destroy(address,uint256)': self._process_address_uint_negative_tx,
+      'controllerTransfer(address,address,uint256)': self._process_two_addr_tx,
+      'mintBIX(address,uint256,uint256,uint256)': self._process_address_uint_tx,
+      'mintToken(address,uint256)': self._process_address_uint_tx,
+      'anailNathrachOrthaBhaisIsBeathaDoChealDeanaimh(address[],uint256[])': self._process_multiple_addr_tx,
+      'transfers(address[],uint256[])': self._process_multiple_addr_tx,
+      'mintTokens(address,uint256)': self._process_address_uint_tx,
+      'sell(uint256)': self._process_only_uint_negative,
+      'sellDentacoinsAgainstEther(uint256)': self._process_only_uint_negative,
+  }
 
   def _construct_bulk_insert_ops(self, docs):
     for doc in docs:
@@ -113,7 +134,16 @@ class TokenHolders:
       'tx_index': self.indices[self.tx_index], 
       'tx_hash': tx['id']
     }]
-    
+
+  def _process_only_uint_negative(self, tx):
+    transaction = self._process_only_uint(tx)[0]
+    try:
+      transaction["value"] = -transaction["value"]
+    except:
+      print("Exception!")
+    transaction["raw_value"] = "-" + transaction["raw_value"]
+    return [transaction]
+
   def _process_address_uint_tx(self, tx):
     tx_input = tx['decoded_input']
     decimals = self.token_decimals[tx['to']] if tx['to'] in self.token_decimals.keys() else 1
@@ -131,6 +161,19 @@ class TokenHolders:
       'tx_index': self.indices[self.tx_index], 
       'tx_hash': tx['id']
     }]
+
+  def _process_address_uint_negative_tx(self, tx):
+    transaction = self._process_address_uint_tx(tx)[0]
+    try:
+      transaction["value"] = -transaction["value"]
+    except:
+      print("Exception!")
+    transaction["raw_value"] = "-" + transaction["raw_value"]
+    return [transaction]
+
+  def _process_uint_address_tx(self, tx):
+    tx['decoded_input']['params'] = list(reversed(tx['decoded_input']['params']))
+    return self._process_address_uint_tx(tx)
 
   def _process_two_addr_tx(self, tx):
     tx_input = tx['decoded_input']
@@ -201,7 +244,55 @@ class TokenHolders:
       }
       descriptions.append(descr)
     return descriptions
-    
+
+  def _process_multi_addr_one_uint_no_value_preprocess(self, tx):
+    decimals = self.token_decimals[tx['to']] if tx['to'] in self.token_decimals.keys() else 1
+    if decimals > 1:
+      tx['decoded_input']['params'][1]['value'] = str(int(float(tx['decoded_input']['params'][1]['value']) * math.pow(10, decimals)))
+    return self._process_multi_addr_one_uint(tx)
+  
+  def _process_multi_addr_same_value(self, tx):
+    decimals = self.token_decimals[tx['to']] if tx['to'] in self.token_decimals.keys() else 1
+    tx['decoded_input']['params'].append({"value": int(2000 * math.pow(10, decimals))})
+    return self._process_multi_addr_one_uint(tx)
+
+  def _process_multiple_addr_tx_with_sender(self, tx):
+    tx["from"] = tx["decoded_input"]['params'][0]['value']
+    tx['decoded_input']['params'] = tx['decoded_input']['params'][1:]
+    return self._process_multiple_addr_tx(tx)
+  
+  def _process_multiple_encoded_addr(self, tx):
+    decimals = self.token_decimals[tx['to']] if tx['to'] in self.token_decimals.keys() else 1
+    value_addresses = json.loads(tx['decoded_input']['params'][0]['value'].replace("'", '"'))
+    transactions = []
+    tx_input = tx["decoded_input"]
+    valid = self._check_is_valid(tx)
+    for index, value_address in enumerate(value_addresses):
+      address = hex(value_address & (ADDRESS_ENCODING_CONSTANT - 1))
+      value = int(value_address / ADDRESS_ENCODING_CONSTANT)
+      transaction = {
+        'method': tx_input['name'],
+        'from': tx["from"], 
+        'to': address, 
+        'value': value, 
+        'raw_value': str(value), 
+        'block_id': tx['blockNumber'], 
+        'valid': valid, 
+        'token': tx['to'], 
+        'tx_index': self.indices[self.tx_index], 
+        'tx_hash': tx['id'] + '_' + str(index)
+      }
+      transactions.append(transaction)
+    return transactions
+
+  def _process_address_uint_reversed_tx(self, tx):
+    tx["decoded_input"]['params'] = [
+      tx["decoded_input"]['params'][0], 
+      {"value": tx["from"]},
+      tx["decoded_input"]['params'][1]
+    ]
+    return self._process_two_addr_tx(tx)
+
   def _construct_tx_descr_from_input(self, tx):
     method_signature = self._construct_signature(tx['decoded_input'])
     if method_signature in self.signatures:
