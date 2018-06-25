@@ -397,9 +397,43 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert True
 
   def test_save_transactions_error_ignore_missing_transaction(self):
-    test_traces = [{"transactionHash": "0x1", "error": "Bad instruction"}]
+    test_traces = [{"hash": "0x1.0", "transactionHash": "0x1", "error": "Bad instruction"}]
     self.internal_transactions._save_transactions_error(test_traces)
     assert True
+
+  def test_save_transactions_output(self):
+    test_traces = [{
+      "transactionHash": "0x1",
+      "hash": "0x1.0",
+      "result": {
+        "output": "0x1"
+      }
+    }, {
+      "hash": "0x2.0",
+      "transactionHash": "0x2",
+      "result": {
+      }
+    }, {
+      "hash": "0x2.1",
+      "transactionHash": "0x2",
+      "result": {
+        "output": "0x2"
+      }
+    }, {
+      "hash": "0x3",
+      "transactionHash": None,
+      "result": None
+    }]
+    self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type="tx", doc={'hash': "0x1"}, id="0x1", refresh=True)
+    self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type="tx", doc={'hash': "0x2"}, id="0x2", refresh=True)
+
+    self.internal_transactions._save_transactions_output(test_traces)
+
+    transactions = self.client.search(index=TEST_TRANSACTIONS_INDEX, doc_type="tx", query="_exists_:output")['hits']['hits']
+    outputs = {transaction["_id"]: transaction["_source"]["output"] for transaction in transactions}
+    assert outputs['0x1'] == "0x1"
+    assert "0x2" not in outputs.keys()
+    assert "0x3" not in outputs.keys()
 
   def test_save_miner_transaction(self):
     trace = [{"transactionHash": None, "hash": "0x1"}, {"transactionHash": "0x1"}]
@@ -469,6 +503,25 @@ class InternalTransactionsTestCase(unittest.TestCase):
     calls = [
       call.save_errors(test_traces),
       call.save_traces(test_traces)
+    ]
+    process.assert_has_calls(calls)
+
+  def test_extract_traces_chunk_save_transaction_output(self):
+    test_blocks = ["0x1"]
+    test_traces = []
+    mockify(self.internal_transactions, {
+      "_get_traces": MagicMock(return_value=test_traces)
+    }, ["_extract_traces_chunk"])
+    process = Mock(
+      save_traces=self.internal_transactions._save_traces,
+      save_outputs=self.internal_transactions._save_transactions_output
+    )
+
+    self.internal_transactions._extract_traces_chunk(test_blocks)
+
+    calls = [
+      call.save_outputs(test_traces),
+      call.save_traces(test_blocks)
     ]
     process.assert_has_calls(calls)
 
