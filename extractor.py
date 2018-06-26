@@ -16,7 +16,7 @@ def prepare_indices(host):
   elasticsearch.prepare_fast_index(INDICES["internal_transaction"], 'itx')
 
 def prepare_blocks(host):
-  blocks = Blocks()
+  blocks = Blocks(INDICES, host)
   blocks.create_blocks()
 
 def detect_contracts(host):

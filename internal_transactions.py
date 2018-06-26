@@ -82,14 +82,6 @@ class InternalTransactions:
     }
     return self.client.iterate(self.indices["block"], "b", query)
 
-  def _iterate_transactions(self, blocks):
-    query = {
-      "terms": {
-        "blockNumber": blocks
-      }
-    }
-    return self.client.iterate(self.indices["transaction"], 'tx', query)
-
   def _get_traces(self, blocks):
     chunks = self._split_on_chunks(blocks, NUMBER_OF_PROCESSES)
     arguments = list(zip(repeat(self.parity_hosts), chunks))
@@ -170,7 +162,7 @@ class InternalTransactions:
     docs = [
       self._preprocess_internal_transaction(transaction)
       for transaction in blocks_traces
-      if transaction["transactionHash"] and not (transaction["hash"].endswith(".0"))
+      if transaction["transactionHash"]
     ]
     if docs:
       self.client.bulk_index(docs=docs, index=self.indices["internal_transaction"], doc_type="itx", id_field="hash", refresh=True)
@@ -214,8 +206,6 @@ class InternalTransactions:
     self._set_parent_errors(blocks_traces)
     self._save_internal_transactions(blocks_traces)
     self._save_miner_transactions(blocks_traces)
-    self._save_transactions_error(blocks_traces)
-    self._save_transactions_output(blocks_traces)
     self._save_traces(blocks)
 
   def extract_traces(self):

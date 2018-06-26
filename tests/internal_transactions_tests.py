@@ -43,16 +43,6 @@ class InternalTransactionsTestCase(unittest.TestCase):
     blocks = [block["_source"]["number"] for block in blocks]
     self.assertCountEqual(blocks, [1, 2, 5])
 
-  def test_iterate_transactions(self):
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 1}, id=1, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 3}, id=2, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'blockNumber': 2}, id=3, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'blockNumber': 1}, id=4, refresh=True)
-    iterator = self.internal_transactions._iterate_transactions([1, 3])
-    transactions = next(iterator)
-    transactions = [transaction["_id"] for transaction in transactions]
-    self.assertCountEqual(transactions, ['1', '2'])
-
   def test_get_parity_url_by_block(self):
     parity_hosts = [
       (0, 100, "url1"),
@@ -245,72 +235,6 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.internal_transactions._set_parent_errors(trace)
     assert "parent_error" in trace[-1].keys()
 
-  def test_classify_trace(self):
-    trace = [{
-      "transactionHash": "0x0",
-      "hash": "0x0.0",
-      "action": {
-        "from": "0x0",
-        "to": "0x1"
-      }
-    }, {
-      "transactionHash": "0x0",
-      "hash": "0x0.1",
-      "action": {
-        "from": "0x1",
-        "to": "0x0"
-      }
-    }, {
-      "transactionHash": "0x0",
-      "hash": "0x0.2",
-      "action": {
-        "from": "0x0",
-        "to": "0x3"
-      }
-    }, {
-      "transactionHash": "0x0",
-      "hash": "0x0.3",
-      "action": {
-        "from": "0x0",
-        "to": "0x0"
-      }
-    }, {
-      "transactionHash": "0x0",
-      "hash": "0x0.4",
-      "action": {
-        "from": "0x0"
-      }
-    }]
-    self.internal_transactions._classify_trace(trace)
-    # assert trace[0]["class"] == INPUT_TRANSACTION
-    assert trace[1]["class"] == INTERNAL_TRANSACTION
-    assert trace[2]["class"] == OUTPUT_TRANSACTION
-    assert trace[3]["class"] == OTHER_TRANSACTION
-    assert trace[4]["class"] == OTHER_TRANSACTION
-
-  def test_classify_reward(self):
-    trace = [{
-      "hash": "0x0",
-      "transactionHash": None
-    }, {
-      "transactionHash": "0x1",
-      "hash": "0x1.0",
-      "action": {
-        "from": "0x0",
-        "to": "0x0"
-      }
-    }, {
-      "transactionHash": "0x1",
-      "hash": "0x1.1",
-      "action": {
-        "from": "0x0",
-        "to": "0x0"
-      }
-    }]
-    self.internal_transactions._classify_trace(trace)
-    assert "class" not in trace[0].keys()
-    assert "class" in trace[1].keys()
-
   def test_save_traces(self):
     self.client.index(TEST_BLOCKS_INDEX, 'b', {"number": 123}, id=1, refresh=True)
     self.internal_transactions._save_traces([123])
@@ -330,9 +254,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert transaction["value"] == 0
 
   def test_save_internal_transactions(self):
-    test_trace = [{"transactionHash": "0x0", "hash": "0x0.{}".format(i + 1)} for i in range(10)]
+    test_trace = [{"transactionHash": "0x0", "hash": "0x0.{}".format(i)} for i in range(10)]
     test_preprocessed_trace = [{
-      "hash": "0x{}".format(i + 1),
+      "hash": "0x{}".format(i),
       "transactionHash": '0x0'
     } for i in range(10)]
     test_transactions_ids = [transaction["hash"] for transaction in test_preprocessed_trace]
@@ -355,85 +279,6 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.internal_transactions._save_internal_transactions(trace)
     internal_transactions = self.client.search(index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type="itx", query="*")["hits"]["hits"]
     assert not len(internal_transactions)
-
-  def test_save_internal_transactions_ignore_first_in_trace(self):
-    trace = [{"transactionHash": "0x0", "hash": "0x0.0"}, {"transactionHash": "0x0", "hash": "0x0.10"}]
-    self.internal_transactions._save_internal_transactions(trace)
-    internal_transactions = self.client.search(index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type="itx", query="*")["hits"]["hits"]
-    assert len(internal_transactions) == 1
-    assert internal_transactions[0]["_id"] == "0x0.10"
-
-  def test_save_transactions_error(self):
-    test_traces = [{
-      "hash": "0x1.0",
-      "transactionHash": "0x1",
-      "error": "Out of gas"
-    }, {
-      "hash": "0x2.0",
-      "transactionHash": "0x2"
-    }, {
-      "hash": "0x2.1",
-      "transactionHash": "0x2",
-      "error": "Bad instruction"
-    }, {
-      "hash": "0x3",
-      "transactionHash": "0x3"
-    }]
-    self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type="tx", doc={'hash': "0x1"}, id="0x1", refresh=True)
-    self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type="tx", doc={'hash': "0x2"}, id="0x2", refresh=True)
-    self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type="tx", doc={'hash': "0x3"}, id="0x3", refresh=True)
-
-    self.internal_transactions._save_transactions_error(test_traces)
-
-    transactions = self.client.search(index=TEST_TRANSACTIONS_INDEX, doc_type="tx", query="_exists_:error")['hits']['hits']
-    errors = {transaction["_id"]: transaction["_source"]["error"] for transaction in transactions}
-    assert errors['0x1'] == "Out of gas"
-    assert '0x2' not in errors.keys()
-    assert "0x3" not in errors.keys()
-
-  def test_save_transactions_error_ignore_miner_transaction(self):
-    test_traces = [{"transactionHash": None}]
-    self.internal_transactions._save_transactions_error(test_traces)
-    assert True
-
-  def test_save_transactions_error_ignore_missing_transaction(self):
-    test_traces = [{"hash": "0x1.0", "transactionHash": "0x1", "error": "Bad instruction"}]
-    self.internal_transactions._save_transactions_error(test_traces)
-    assert True
-
-  def test_save_transactions_output(self):
-    test_traces = [{
-      "transactionHash": "0x1",
-      "hash": "0x1.0",
-      "result": {
-        "output": "0x1"
-      }
-    }, {
-      "hash": "0x2.0",
-      "transactionHash": "0x2",
-      "result": {
-      }
-    }, {
-      "hash": "0x2.1",
-      "transactionHash": "0x2",
-      "result": {
-        "output": "0x2"
-      }
-    }, {
-      "hash": "0x3",
-      "transactionHash": None,
-      "result": None
-    }]
-    self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type="tx", doc={'hash': "0x1"}, id="0x1", refresh=True)
-    self.client.index(index=TEST_TRANSACTIONS_INDEX, doc_type="tx", doc={'hash': "0x2"}, id="0x2", refresh=True)
-
-    self.internal_transactions._save_transactions_output(test_traces)
-
-    transactions = self.client.search(index=TEST_TRANSACTIONS_INDEX, doc_type="tx", query="_exists_:output")['hits']['hits']
-    outputs = {transaction["_id"]: transaction["_source"]["output"] for transaction in transactions}
-    assert outputs['0x1'] == "0x1"
-    assert "0x2" not in outputs.keys()
-    assert "0x3" not in outputs.keys()
 
   def test_save_miner_transaction(self):
     trace = [{"transactionHash": None, "hash": "0x1"}, {"transactionHash": "0x1"}]
@@ -468,25 +313,6 @@ class InternalTransactionsTestCase(unittest.TestCase):
     ]
     process.assert_has_calls(calls)
 
-  def test_extract_traces_chunk_save_transaction_error(self):
-    test_blocks = ["0x1"]
-    test_traces = []
-    mockify(self.internal_transactions, {
-      "_get_traces": MagicMock(return_value=test_traces)
-    }, ["_extract_traces_chunk"])
-    process = Mock(
-      save_traces=self.internal_transactions._save_traces,
-      save_errors=self.internal_transactions._save_transactions_error
-    )
-
-    self.internal_transactions._extract_traces_chunk(test_blocks)
-
-    calls = [
-      call.save_errors(test_traces),
-      call.save_traces(test_blocks)
-    ]
-    process.assert_has_calls(calls)
-
   def test_extract_traces_chunk_set_parent_error(self):
     test_blocks = ["0x1"]
     test_traces = []
@@ -503,25 +329,6 @@ class InternalTransactionsTestCase(unittest.TestCase):
     calls = [
       call.save_errors(test_traces),
       call.save_traces(test_traces)
-    ]
-    process.assert_has_calls(calls)
-
-  def test_extract_traces_chunk_save_transaction_output(self):
-    test_blocks = ["0x1"]
-    test_traces = []
-    mockify(self.internal_transactions, {
-      "_get_traces": MagicMock(return_value=test_traces)
-    }, ["_extract_traces_chunk"])
-    process = Mock(
-      save_traces=self.internal_transactions._save_traces,
-      save_outputs=self.internal_transactions._save_transactions_output
-    )
-
-    self.internal_transactions._extract_traces_chunk(test_blocks)
-
-    calls = [
-      call.save_outputs(test_traces),
-      call.save_traces(test_blocks)
     ]
     process.assert_has_calls(calls)
 
