@@ -14,7 +14,7 @@ class Blocks:
     self.parity_host = parity_host
 
   def _get_max_parity_block(self):
-    response = requests.get(self.parity_host, data=json.dumps({
+    response = requests.post(self.parity_host, data=json.dumps({
       "id": 1,
       "jsonrpc": "2.0",
       "method": "eth_blockNumber",
@@ -36,7 +36,11 @@ class Blocks:
       }
     }
     result = self.client.send_request("GET", [self.indices["block"], "_search"], aggregation, {})
-    return int(result["aggregations"]["max_block"]["value"])
+    max_block = result["aggregations"]["max_block"]["value"]
+    if max_block:
+      return int(max_block)
+    else:
+      return 0
 
   def _create_blocks(self, start, end):
     docs = [{"number": i, 'id': i} for i in range(start, end + 1)]

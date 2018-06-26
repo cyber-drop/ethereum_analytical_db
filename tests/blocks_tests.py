@@ -15,7 +15,7 @@ class BlocksTestCase(unittest.TestCase):
   def test_get_max_parity_block(self):
     test_block = 100
     httpretty.register_uri(
-      httpretty.GET,
+      httpretty.POST,
       "http://localhost:8545/",
       body=json.dumps({
         "id": 1,
@@ -43,6 +43,10 @@ class BlocksTestCase(unittest.TestCase):
     }, refresh=True)
     max_block = self.blocks._get_max_elasticsearch_block()
     assert max_block == 2
+
+  def test_get_max_elasticsearch_block_empty_index(self):
+    max_block = self.blocks._get_max_elasticsearch_block()
+    assert max_block == 0
 
   def test_create_blocks_by_range(self):
     self.blocks._create_blocks(1, 3)
