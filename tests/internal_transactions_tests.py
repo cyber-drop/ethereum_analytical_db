@@ -28,9 +28,14 @@ class InternalTransactionsTestCase(unittest.TestCase):
     }, parity_hosts=self.parity_hosts)
 
   def test_split_on_chunks(self):
-    test_list = list(range(10))
-    test_chunks = list(self.internal_transactions._split_on_chunks(test_list, 3))
-    self.assertSequenceEqual(test_chunks, [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]])
+    test_list = []
+    test_chunks_number = 10
+    test_chunks = []
+    split_mock = MagicMock(return_value=test_chunks)
+    with patch('utils.split_on_chunks', split_mock):
+      chunks = self.internal_transactions._split_on_chunks(test_list, test_chunks_number)
+      split_mock.assert_called_with(test_list, test_chunks_number)
+      assert chunks == test_chunks
 
   def test_iterate_blocks(self):
     self.internal_transactions.parity_hosts = [(0, 4, "http://localhost:8545"), (5, None, "http://localhost:8545")]

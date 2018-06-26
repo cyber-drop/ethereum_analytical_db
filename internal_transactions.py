@@ -9,6 +9,7 @@ from functools import partial
 from itertools import repeat
 from config import PARITY_HOSTS
 import pygtrie as trie
+import utils
 
 NUMBER_OF_PROCESSES = 10
 
@@ -61,15 +62,7 @@ class InternalTransactions:
     self.parity_hosts = parity_hosts
 
   def _split_on_chunks(self, iterable, size):
-    iterable = iter(iterable)
-    for element in iterable:
-      elements = [element]
-      try:
-        for i in range(size - 1):
-          elements.append(next(iterable))
-      except StopIteration:
-        pass
-      yield elements
+    return utils.split_on_chunks(iterable, size)
 
   def _iterate_blocks(self):
 

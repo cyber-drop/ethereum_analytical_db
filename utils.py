@@ -6,6 +6,17 @@ client = CustomElasticSearch("http://localhost:9200")
 def get_elasticsearch_connection():
   return client
 
+def split_on_chunks(iterable, size):
+  iterable = iter(iterable)
+  for element in iterable:
+    elements = [element]
+    try:
+      for i in range(size - 1):
+        elements.append(next(iterable))
+    except StopIteration:
+      pass
+    yield elements
+
 def get_max_block(query="*", max_block=None, min_consistent_block=MIN_CONSISTENT_BLOCK):
   client = get_elasticsearch_connection()
   aggregation = {
