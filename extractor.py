@@ -12,6 +12,7 @@ from blocks import Blocks
 
 def prepare_indices(host):
   elasticsearch = CustomElasticSearch(host)
+  elasticsearch.create_index(INDICES["block"])
   elasticsearch.prepare_fast_index(INDICES["transaction"], 'tx')
   elasticsearch.prepare_fast_index(INDICES["internal_transaction"], 'itx')
 
