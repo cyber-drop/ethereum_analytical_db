@@ -10,7 +10,9 @@ from itertools import repeat
 from config import PARITY_HOSTS
 import pygtrie as trie
 import utils
+from pyelasticsearch import bulk_chunks
 
+BYTES_PER_CHUNK = 1000000
 NUMBER_OF_PROCESSES = 10
 
 INPUT_TRANSACTION = 0
@@ -158,7 +160,8 @@ class InternalTransactions:
       if transaction["transactionHash"]
     ]
     if docs:
-      self.client.bulk_index(docs=docs, index=self.indices["internal_transaction"], doc_type="itx", id_field="hash", refresh=True)
+      for chunk in bulk_chunks(docs, None, BYTES_PER_CHUNK):
+        self.client.bulk_index(docs=chunk, index=self.indices["internal_transaction"], doc_type="itx", id_field="hash", refresh=True)
 
   def _save_miner_transactions(self, blocks_traces):
     docs = [self._preprocess_internal_transaction(transaction) for transaction in blocks_traces if not transaction["transactionHash"]]
