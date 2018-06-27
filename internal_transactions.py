@@ -109,29 +109,6 @@ class InternalTransactions:
         if prefix_exists and not is_node:
           transaction["parent_error"] = True
 
-  # TODO get rid of this method
-  def _classify_trace(self, trace):
-    transactions_dict = {
-      transaction["hash"][:-2]: transaction for transaction in trace if transaction["hash"].endswith(".0")
-    }
-    for internal_transaction in trace:
-      transaction_hash = internal_transaction["transactionHash"]
-      if not transaction_hash or (transaction_hash not in transactions_dict.keys()) or (transaction_hash.endswith(".0")):
-        continue
-      transaction = transactions_dict[transaction_hash]["action"]
-      action = internal_transaction["action"]
-      if ("from" not in action.keys()) or ("to" not in action.keys()):
-        internal_transaction["class"] = OTHER_TRANSACTION
-        continue
-      if (action["from"] == transaction["from"]) and (action["to"] == transaction["to"]):
-        internal_transaction["class"] = INPUT_TRANSACTION
-      elif (action["from"] == transaction["to"]) and (action["to"] == transaction["from"]):
-        internal_transaction["class"] = INTERNAL_TRANSACTION
-      elif (action["from"] == transaction["from"]) and (action["to"] != action["from"]):
-        internal_transaction["class"] = OUTPUT_TRANSACTION
-      else:
-        internal_transaction["class"] = OTHER_TRANSACTION
-
   def _save_traces(self, blocks):
     query = {
       "terms": {
@@ -167,34 +144,6 @@ class InternalTransactions:
     docs = [self._preprocess_internal_transaction(transaction) for transaction in blocks_traces if not transaction["transactionHash"]]
     self.client.bulk_index(docs=docs, index=self.indices["miner_transaction"], doc_type="tx", id_field="hash",
                            refresh=True)
-
-  def _save_transactions_error(self, blocks_traces):
-    operations = [self.client.update_op(
-      doc={"error": transaction["error"]},
-      id=transaction["transactionHash"]
-    ) for transaction in blocks_traces
-      if ("error" in transaction.keys()) and ("transactionHash" in transaction.keys()) and (transaction.get("hash", "").endswith(".0"))]
-    if operations:
-      try:
-        self.client.bulk(operations, index=self.indices["transaction"], doc_type="tx", refresh=True)
-      except BulkError:
-        pass
-
-  def _save_transactions_output(self, blocks_traces):
-    operations = [self.client.update_op(
-      doc={"output": transaction["result"]["output"]},
-      id=transaction["transactionHash"]
-    ) for transaction in blocks_traces
-      if ("result" in transaction.keys())
-         and (transaction["result"])
-         and ("output" in transaction["result"].keys())
-         and ("transactionHash" in transaction.keys())
-         and (transaction["hash"].endswith(".0"))]
-    if operations:
-      try:
-        self.client.bulk(operations, index=self.indices["transaction"], doc_type="tx", refresh=True)
-      except BulkError:
-        pass
 
   def _extract_traces_chunk(self, blocks):
     blocks_traces = self._get_traces(blocks)
