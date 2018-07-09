@@ -3,6 +3,7 @@ from custom_elastic_search import CustomElasticSearch
 import requests
 import json
 import utils
+from tqdm import tqdm
 
 BLOCKS_PER_CHUNK = 10000
 
@@ -48,7 +49,7 @@ class Blocks:
   def _create_blocks(self, start, end):
     docs = [{"number": i, 'id': i} for i in range(start, end + 1)]
     if docs:
-      for chunk in utils.split_on_chunks(docs, BLOCKS_PER_CHUNK):
+      for chunk in tqdm(list(utils.split_on_chunks(docs, BLOCKS_PER_CHUNK))):
         self.client.bulk_index(docs=chunk, index=self.indices["block"], doc_type="b", refresh=True)
 
   def create_blocks(self):
