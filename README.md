@@ -11,16 +11,13 @@ To run internal transactions parsing, you can use command
 $ python3 ./extractor.py --index ELASTICSEARCH_INDEX --operation CHOSEN_OPERATION
 ```
 Operation type can be selected from list below:
-- detect-contracts
+- detect-contracts, detect-internal-contracts
 
 Runs a process of contract addresses detection for saved transactions. All transactions to contracts will be highlighted with 'to_contract' flag, each contract address will be extracted to a 'contract' collection of a selected index
 - extract-traces
 
 Starts traces extraction. Each transaction highlighted with 'to_contract' flag will get a field 'trace' with a trace extracted from parity
-- index-traces
-
-Moves all transactions from 'trace' field to an 'itx' index.
-- parse-inputs
+- parse-inputs, parse-internal-inputs
 
 Starts input parsing. Each transaction highlighted with 'to_contract' flag will get a field 'decoded_input' with name of method called in contract and arguments for it.
 
@@ -28,25 +25,19 @@ Starts input parsing. Each transaction highlighted with 'to_contract' flag will 
 
 Downloads contract bytecode and check does it contain signatures of token standards-specific methods. The list of standards then stored in 'standards' field. It also saves contract bytecode in 'bytecode' field. 
 
-- extract-tokens-txs
+- extract-token-external-txs, extract-token-internal-txs
 
 Downloads list of tokens from Coinmarketcap API and tries to find contracts with corresponding names in ES and then saves matching contracts into separate index. After finishing this process finds all transactions that have 'to' field equal to token contract address and also saves these transaction to separate index.
 
-## Operations speed
+### Synchronization process
 
-| Operation                                  | Maximum allowed batch size | Speed               | Starts from stop point |
-|--------------------------------------------|----------------------------|---------------------|------------------------|
-| detect-contracts (Find contract addresses) | 10000                      | 1000 transactions/s | No                     |
-| detect-contracts (Set to_contract flag)    | 1000                       | 16 contracts/s      | Yes                    |
-| extract-traces                             | 1000                       | 75 transactions/s   | Yes                    |
-| index-traces                               | 1000                       | 3000 transactions/s | No                     |
-| parse-inputs                               | 1000                       | 3 transactions/s    | No                     |
-
-## Current status
-Current status of parsing can be seen on kibana dashboard:
-http://localhost:5601/app/kibana#/dashboard/4e400ef0-47af-11e8-a68a-cdcd3cdf86f2?embed=true&_g=()
-
-Don't forget to forward 5061 port from mercury.cyber.fund:
 ```bash
-ssh -p 33325 -L 5601:localhost:5601 cyberanalytics@mercury.cyber.fund
+$ python3 ./extractor.py --operation prepare-indices # Prepare and optimize elasticsearch indices, run only once
+$ python3 ./extractor.py --operation prepare-blocks # Prepare blocks index in elasticsearch (stub to run without ethdrain)
+$ python3 ./extractor.py --operation extract-traces
+$ python3 ./extractor.py --operation detect-internal-contracts
+$ python3 ./extractor.py --operation extract-contracts-abi
+$ python3 ./extractor.py --operation search-methods
+$ python3 ./extractor.py --operation parse-internal-inputs
+$ python3 ./extractor.py --operation extract-token-internal-txs
 ```
