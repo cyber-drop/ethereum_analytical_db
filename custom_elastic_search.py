@@ -24,7 +24,7 @@ TEXT_PROPERTIES = {
   "itx": ["code", "input", "init", "error", "output"]
 }
 
-NUMBER_OF_JOBS = 10
+NUMBER_OF_JOBS = 1000
 
 class CustomElasticSearch(ElasticSearch):
   def __init__(self, *args, **kwargs):

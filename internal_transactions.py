@@ -9,7 +9,10 @@ from functools import partial
 from itertools import repeat
 from config import PARITY_HOSTS
 import pygtrie as trie
+import utils
+from pyelasticsearch import bulk_chunks
 
+BYTES_PER_CHUNK = 1000000
 NUMBER_OF_PROCESSES = 10
 
 INPUT_TRANSACTION = 0
@@ -61,15 +64,7 @@ class InternalTransactions:
     self.parity_hosts = parity_hosts
 
   def _split_on_chunks(self, iterable, size):
-    iterable = iter(iterable)
-    for element in iterable:
-      elements = [element]
-      try:
-        for i in range(size - 1):
-          elements.append(next(iterable))
-      except StopIteration:
-        pass
-      yield elements
+    return utils.split_on_chunks(iterable, size)
 
   def _iterate_blocks(self):
 
@@ -81,14 +76,6 @@ class InternalTransactions:
       }
     }
     return self.client.iterate(self.indices["block"], "b", query)
-
-  def _iterate_transactions(self, blocks):
-    query = {
-      "terms": {
-        "blockNumber": blocks
-      }
-    }
-    return self.client.iterate(self.indices["transaction"], 'tx', query)
 
   def _get_traces(self, blocks):
     chunks = self._split_on_chunks(blocks, NUMBER_OF_PROCESSES)
@@ -122,29 +109,6 @@ class InternalTransactions:
         if prefix_exists and not is_node:
           transaction["parent_error"] = True
 
-  # TODO get rid of this method
-  def _classify_trace(self, trace):
-    transactions_dict = {
-      transaction["hash"][:-2]: transaction for transaction in trace if transaction["hash"].endswith(".0")
-    }
-    for internal_transaction in trace:
-      transaction_hash = internal_transaction["transactionHash"]
-      if not transaction_hash or (transaction_hash not in transactions_dict.keys()) or (transaction_hash.endswith(".0")):
-        continue
-      transaction = transactions_dict[transaction_hash]["action"]
-      action = internal_transaction["action"]
-      if ("from" not in action.keys()) or ("to" not in action.keys()):
-        internal_transaction["class"] = OTHER_TRANSACTION
-        continue
-      if (action["from"] == transaction["from"]) and (action["to"] == transaction["to"]):
-        internal_transaction["class"] = INPUT_TRANSACTION
-      elif (action["from"] == transaction["to"]) and (action["to"] == transaction["from"]):
-        internal_transaction["class"] = INTERNAL_TRANSACTION
-      elif (action["from"] == transaction["from"]) and (action["to"] != action["from"]):
-        internal_transaction["class"] = OUTPUT_TRANSACTION
-      else:
-        internal_transaction["class"] = OTHER_TRANSACTION
-
   def _save_traces(self, blocks):
     query = {
       "terms": {
@@ -170,43 +134,16 @@ class InternalTransactions:
     docs = [
       self._preprocess_internal_transaction(transaction)
       for transaction in blocks_traces
-      if transaction["transactionHash"] and not (transaction["hash"].endswith(".0"))
+      if transaction["transactionHash"]
     ]
     if docs:
-      self.client.bulk_index(docs=docs, index=self.indices["internal_transaction"], doc_type="itx", id_field="hash", refresh=True)
+      for chunk in bulk_chunks(docs, None, BYTES_PER_CHUNK):
+        self.client.bulk_index(docs=chunk, index=self.indices["internal_transaction"], doc_type="itx", id_field="hash", refresh=True)
 
   def _save_miner_transactions(self, blocks_traces):
     docs = [self._preprocess_internal_transaction(transaction) for transaction in blocks_traces if not transaction["transactionHash"]]
     self.client.bulk_index(docs=docs, index=self.indices["miner_transaction"], doc_type="tx", id_field="hash",
                            refresh=True)
-
-  def _save_transactions_error(self, blocks_traces):
-    operations = [self.client.update_op(
-      doc={"error": transaction["error"]},
-      id=transaction["transactionHash"]
-    ) for transaction in blocks_traces
-      if ("error" in transaction.keys()) and ("transactionHash" in transaction.keys()) and (transaction.get("hash", "").endswith(".0"))]
-    if operations:
-      try:
-        self.client.bulk(operations, index=self.indices["transaction"], doc_type="tx", refresh=True)
-      except BulkError:
-        pass
-
-  def _save_transactions_output(self, blocks_traces):
-    operations = [self.client.update_op(
-      doc={"output": transaction["result"]["output"]},
-      id=transaction["transactionHash"]
-    ) for transaction in blocks_traces
-      if ("result" in transaction.keys())
-         and (transaction["result"])
-         and ("output" in transaction["result"].keys())
-         and ("transactionHash" in transaction.keys())
-         and (transaction["hash"].endswith(".0"))]
-    if operations:
-      try:
-        self.client.bulk(operations, index=self.indices["transaction"], doc_type="tx", refresh=True)
-      except BulkError:
-        pass
 
   def _extract_traces_chunk(self, blocks):
     blocks_traces = self._get_traces(blocks)
@@ -214,8 +151,6 @@ class InternalTransactions:
     self._set_parent_errors(blocks_traces)
     self._save_internal_transactions(blocks_traces)
     self._save_miner_transactions(blocks_traces)
-    self._save_transactions_error(blocks_traces)
-    self._save_transactions_output(blocks_traces)
     self._save_traces(blocks)
 
   def extract_traces(self):

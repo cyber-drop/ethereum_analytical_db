@@ -1,5 +1,5 @@
 import unittest
-from utils import get_max_block
+from utils import get_max_block, split_on_chunks
 from tests.test_utils import TestElasticSearch
 import config
 
@@ -18,6 +18,11 @@ class UtilsTestCase(unittest.TestCase):
     max_block = get_max_block()
     assert max_block == 1
     assert type(max_block) == int
+
+  def test_split_on_chunks(self):
+    test_list = list(range(10))
+    test_chunks = list(split_on_chunks(test_list, 3))
+    self.assertSequenceEqual(test_chunks, [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]])
 
   def test_get_max_block_by_a_query(self):
     self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={

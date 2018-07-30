@@ -28,7 +28,7 @@ class ContractTransactions:
 
   def extract_contract_addresses(self):
     for contract_transactions in self._iterate_contract_transactions():
-      docs = [self._extract_contract_from_transactions(transaction) for transaction in contract_transactions]
+      docs = [self._extract_contract_from_transactions(transaction) for transaction in contract_transactions if "error" not in transaction["_source"].keys()]
       self.client.bulk_index(docs=docs, doc_type='contract', index=self.indices["contract"], refresh=True)
       self._save_contract_created(contract_transactions)
 

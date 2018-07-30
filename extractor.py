@@ -8,11 +8,17 @@ from contract_methods import ContractMethods
 from token_holders import ExternalTokenTransactions, InternalTokenTransactions
 from config import INDICES
 from token_prices import TokenPrices
+from blocks import Blocks
 
 def prepare_indices(host):
   elasticsearch = CustomElasticSearch(host)
+  elasticsearch.create_index(INDICES["block"])
   elasticsearch.prepare_fast_index(INDICES["transaction"], 'tx')
   elasticsearch.prepare_fast_index(INDICES["internal_transaction"], 'itx')
+
+def prepare_blocks(host):
+  blocks = Blocks(INDICES, host)
+  blocks.create_blocks()
 
 def detect_contracts(host):
   contract_transactions = ExternalContractTransactions(INDICES, host)
@@ -60,6 +66,7 @@ def extract_prices(host):
 
 operations = {
   "prepare-indices": prepare_indices,
+  "prepare-blocks": prepare_blocks,
   "detect-contracts": detect_contracts,
   "detect-internal-contracts": detect_internal_contracts,
   "detect-contract-transactions": detect_contract_transactions,
@@ -70,7 +77,7 @@ operations = {
   "search-methods": search_methods,
   "extract-token-external-txs": extract_token_external_txs,
   "extract-token-internal-txs": extract_token_internal_txs,
-  "extract-prices": extract_prices
+  "extract-prices": extract_prices,
 }
 
 @click.command()
