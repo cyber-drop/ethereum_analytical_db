@@ -21,15 +21,11 @@ def prepare_blocks(host):
   blocks.create_blocks()
 
 def detect_contracts(host):
-  contract_transactions = ExternalContractTransactions(INDICES, host)
-  contract_transactions.extract_contract_addresses()
-
-def detect_internal_contracts(host):
   contract_transactions = InternalContractTransactions(INDICES, host)
   contract_transactions.extract_contract_addresses()
 
 def detect_contract_transactions(host):
-  contract_transactions = ContractTransactions(INDICES, host)
+  contract_transactions = InternalContractTransactions(INDICES, host)
   contract_transactions.detect_contract_transactions()
 
 def extract_traces(host):
@@ -41,10 +37,6 @@ def extract_contracts_abi(host):
   contracts.save_contracts_abi()
 
 def parse_inputs(host):
-  contracts = ExternalContracts(INDICES, host)
-  contracts.decode_inputs()
-
-def parse_internal_inputs(host):
   internal_transactions = InternalContracts(INDICES, host)
   internal_transactions.decode_inputs()
 
@@ -52,11 +44,7 @@ def search_methods(host):
   contract_methods = ContractMethods(INDICES, host)
   contract_methods.search_methods()
 
-def extract_token_external_txs(host):
-  token_holders = ExternalTokenTransactions(INDICES, host)
-  token_holders.get_listed_tokens_txs()
-
-def extract_token_internal_txs(host):
+def extract_token_transactions(host):
   token_holders = InternalTokenTransactions(INDICES, host)
   token_holders.get_listed_tokens_txs()
 
@@ -68,15 +56,12 @@ operations = {
   "prepare-indices": prepare_indices,
   "prepare-blocks": prepare_blocks,
   "detect-contracts": detect_contracts,
-  "detect-internal-contracts": detect_internal_contracts,
   "detect-contract-transactions": detect_contract_transactions,
   "extract-traces": extract_traces,
   "extract-contracts-abi": extract_contracts_abi,
   "parse-inputs": parse_inputs,
-  "parse-internal-inputs": parse_internal_inputs,
   "search-methods": search_methods,
-  "extract-token-external-txs": extract_token_external_txs,
-  "extract-token-internal-txs": extract_token_internal_txs,
+  "extract-token-transactions": extract_token_transactions,
   "extract-prices": extract_prices,
 }
 

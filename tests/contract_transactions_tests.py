@@ -15,8 +15,8 @@ class ContractTransactionsTestCase():
 
   def test_extract_contract_addresses(self):
     transactions_list = [
-      [{"_source": "transaction" + str(i)} for i in range(10)],
-      [{"_source": "transaction" + str(i)} for i in range(10, 11)]
+      [{"_source": {"hash": "transaction" + str(i)}} for i in range(10)],
+      [{"_source": {"hash": "transaction" + str(i)}} for i in range(10, 11)]
     ]
     self.contract_transactions._iterate_contract_transactions = MagicMock(return_value=transactions_list)
     self.contract_transactions._extract_contract_from_transactions = MagicMock(return_value="contract")
@@ -69,6 +69,52 @@ class ContractTransactionsTestCase():
       query="_exists_:contract_created"
     )["count"]
     assert transactions_count == 10
+
+  def test_iterate_contracts(self):
+    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_TRANSACTION_TO}, id=1, refresh=True)
+    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_TRANSACTION_TO_CONTRACT}, id=2, refresh=True)
+    self.client.index(TEST_CONTRACTS_INDEX, 'contract',
+                      {'address': TEST_TRANSACTION_TO_CONTRACT, 'transactions_detected': True}, id=3, refresh=True)
+    iterator = self.contract_transactions._iterate_contracts()
+    contracts = [c for contracts_list in iterator for c in contracts_list]
+    contracts = [contract['_id'] for contract in contracts]
+    self.assertCountEqual(["1", "2"], contracts)
+
+  def test_detect_transactions_by_contracts(self):
+    self.contract_transactions.client.update_by_query = MagicMock()
+    contracts = [TEST_TRANSACTION_TO, TEST_TRANSACTION_TO_CONTRACT]
+    self.contract_transactions._detect_transactions_by_contracts(contracts)
+    self.contract_transactions.client.update_by_query.assert_any_call(
+      TEST_TRANSACTIONS_INDEX,
+      self.doc_type,
+      {
+        "terms": {
+          "to": contracts
+        }
+      },
+      "ctx._source.to_contract = true"
+    )
+
+  def test_detect_contract_transactions(self):
+    contracts_list = [[TEST_TRANSACTION_TO + str(j * 10 + i) for i in range(10)] for j in range(5)]
+    contracts_from_es_list = [[{"_source": {"address": contract}} for contract in contracts] for contracts in
+                              contracts_list]
+    self.contract_transactions._extract_contract_addresses = MagicMock()
+    self.contract_transactions._iterate_contracts = MagicMock(return_value=contracts_from_es_list)
+    self.contract_transactions._detect_transactions_by_contracts = MagicMock()
+    process = Mock()
+    process.configure_mock(
+      extract=self.contract_transactions._extract_contract_addresses,
+      iterate=self.contract_transactions._iterate_contracts,
+      detect=self.contract_transactions._detect_transactions_by_contracts
+    )
+
+    self.contract_transactions.detect_contract_transactions()
+
+    process.assert_has_calls([
+                               call.extract(),
+                               call.iterate()
+                             ] + [call.detect(contracts) for contracts in contracts_list])
 
 class InternalContractTransactionsTestCase(ContractTransactionsTestCase, unittest.TestCase):
   contract_transactions_class = InternalContractTransactions

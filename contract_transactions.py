@@ -35,6 +35,24 @@ class ContractTransactions:
   def _extract_contract_from_transactions(self):
     raise Exception
 
+  def _iterate_contracts(self):
+    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(_exists_:transactions_detected)')
+
+  def _detect_transactions_by_contracts(self, contracts):
+    transactions_query = {
+      "terms": {
+        "to": contracts
+      }
+    }
+    self.client.update_by_query(self.indices[self.index], self.doc_type, transactions_query,
+                                "ctx._source.to_contract = true")
+
+  def detect_contract_transactions(self):
+    self._extract_contract_addresses()
+    for contracts in self._iterate_contracts():
+      contracts = [contract["_source"]["address"] for contract in contracts]
+      self._detect_transactions_by_contracts(contracts)
+
 class ExternalContractTransactions(ContractTransactions):
   index = "transaction"
   doc_type = "tx"
