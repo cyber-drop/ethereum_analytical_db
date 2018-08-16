@@ -50,12 +50,14 @@ class BlocksTestCase(unittest.TestCase):
     assert max_block == 0
 
   def test_create_blocks_by_range(self):
+    mockify(self.blocks, {}, "_create_blocks")
     self.blocks._create_blocks(1, 3)
     blocks = self.client.search(index=TEST_BLOCKS_INDEX, doc_type="b", query="*")['hits']['hits']
     blocks = [block["_source"]["number"] for block in blocks]
     self.assertCountEqual(blocks, [1, 2, 3])
 
   def test_create_unique_blocks(self):
+    mockify(self.blocks, {}, "_create_blocks")
     self.blocks._create_blocks(1, 1)
     self.blocks._create_blocks(1, 1)
     blocks_number = self.client.count(index=TEST_BLOCKS_INDEX, doc_type="b", query="*")['count']
