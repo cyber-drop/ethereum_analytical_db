@@ -59,10 +59,11 @@ class Blocks:
     docs = [{
       "number": i,
       'id': i,
-      'timestamp': self._extract_block_timestamp(i)
     } for i in range(start, end + 1)]
     if docs:
       for chunk in tqdm(list(utils.split_on_chunks(docs, BLOCKS_PER_CHUNK))):
+        for doc in chunk:
+          doc.update({'timestamp': self._extract_block_timestamp(doc['number'])})
         self.client.bulk_index(docs=chunk, index=self.indices["block"], doc_type="b", refresh=True)
 
   def create_blocks(self):
