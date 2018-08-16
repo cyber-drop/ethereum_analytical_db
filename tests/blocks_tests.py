@@ -4,6 +4,7 @@ from tests.test_utils import TestElasticSearch, mockify
 import httpretty
 import json
 from unittest.mock import MagicMock, Mock, call
+from datetime import datetime
 
 class BlocksTestCase(unittest.TestCase):
   def setUp(self):
@@ -49,16 +50,42 @@ class BlocksTestCase(unittest.TestCase):
     assert max_block == 0
 
   def test_create_blocks_by_range(self):
+    mockify(self.blocks, {}, "_create_blocks")
     self.blocks._create_blocks(1, 3)
     blocks = self.client.search(index=TEST_BLOCKS_INDEX, doc_type="b", query="*")['hits']['hits']
     blocks = [block["_source"]["number"] for block in blocks]
     self.assertCountEqual(blocks, [1, 2, 3])
 
   def test_create_unique_blocks(self):
+    mockify(self.blocks, {}, "_create_blocks")
     self.blocks._create_blocks(1, 1)
     self.blocks._create_blocks(1, 1)
     blocks_number = self.client.count(index=TEST_BLOCKS_INDEX, doc_type="b", query="*")['count']
     assert blocks_number == 1
+
+  def test_create_blocks_with_timestamp(self):
+    mockify(self.blocks, {
+      "_extract_block_timestamp": MagicMock(side_effect=[1, 2, 3])
+    }, "_create_blocks")
+
+    self.blocks._create_blocks(1, 3)
+
+    blocks = self.client.search(index=TEST_BLOCKS_INDEX, doc_type="b", query="_exists_:timestamp")['hits']['hits']
+    for block in [1, 2, 3]:
+      self.blocks._extract_block_timestamp.assert_any_call(block)
+    blocks = [block["_source"]["timestamp"] for block in blocks]
+    self.assertCountEqual(blocks, [1, 2, 3])
+
+  def test_extract_block_timestamp(self):
+    # https://etherscan.io/block/10
+    block_time = self.blocks._extract_block_timestamp(10)
+    print(block_time)
+    assert block_time < datetime(2015, 7, 31)
+    assert block_time > datetime(2015, 7, 30)
+
+  def test_extract_block_timestamp_no_such_block(self):
+    block_time = self.blocks._extract_block_timestamp(9999999)
+    assert not block_time
 
   def test_create_no_blocks(self):
     self.blocks._create_blocks(1, 0)
