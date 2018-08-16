@@ -49,9 +49,11 @@ class Blocks:
     else:
       return 0
 
-  def _extract_block_timestamp(self, block):
-    timestamp = self.w3.eth.getBlock(block).timestamp
-    return datetime.datetime.fromtimestamp(timestamp)
+  def _extract_block_timestamp(self, block_number):
+    block = self.w3.eth.getBlock(block_number)
+    if block != None:
+      timestamp = block.timestamp
+      return datetime.datetime.fromtimestamp(timestamp)
 
   def _create_blocks(self, start, end):
     docs = [{

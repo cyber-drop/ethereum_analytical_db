@@ -83,6 +83,10 @@ class BlocksTestCase(unittest.TestCase):
     assert block_time < datetime(2015, 7, 31)
     assert block_time > datetime(2015, 7, 30)
 
+  def test_extract_block_timestamp_no_such_block(self):
+    block_time = self.blocks._extract_block_timestamp(9999999)
+    assert not block_time
+
   def test_create_no_blocks(self):
     self.blocks._create_blocks(1, 0)
     assert True
