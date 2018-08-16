@@ -4,6 +4,8 @@ import requests
 import json
 import utils
 from tqdm import tqdm
+from web3 import Web3, HTTPProvider
+import datetime
 
 BLOCKS_PER_CHUNK = 10000
 
@@ -16,6 +18,7 @@ class Blocks:
     self.indices = indices
     self.client = CustomElasticSearch(elasticsearch_host)
     self.parity_host = parity_host
+    self.w3 = Web3(HTTPProvider('http://localhost:8550'))
 
   def _get_max_parity_block(self):
     response = requests.post(self.parity_host, data=json.dumps({
@@ -46,8 +49,16 @@ class Blocks:
     else:
       return 0
 
+  def _extract_block_timestamp(self, block):
+    timestamp = self.w3.eth.getBlock(block).timestamp
+    return datetime.datetime.fromtimestamp(timestamp)
+
   def _create_blocks(self, start, end):
-    docs = [{"number": i, 'id': i} for i in range(start, end + 1)]
+    docs = [{
+      "number": i,
+      'id': i,
+      'timestamp': self._extract_block_timestamp(i)
+    } for i in range(start, end + 1)]
     if docs:
       for chunk in tqdm(list(utils.split_on_chunks(docs, BLOCKS_PER_CHUNK))):
         self.client.bulk_index(docs=chunk, index=self.indices["block"], doc_type="b", refresh=True)
