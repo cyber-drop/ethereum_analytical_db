@@ -66,7 +66,7 @@ class TokenHolders:
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
 
   def _iterate_tokens(self):
-    return self.client.iterate(self.indices['contract'], 'contract', '_exists_:cmc_id AND !(tx_descr_scanned:true)')
+    return self.client.iterate(self.indices['contract'], 'contract', '_exists_:cmc_id')
 
   def _iterate_tokens_txs(self, token_addresses):
     query = {
@@ -322,8 +322,6 @@ class TokenHolders:
   def _extract_tokens_txs(self, token_addresses):
     for txs_chunk in self._iterate_tokens_txs(token_addresses):
       self._extract_descriptions_from_txs(txs_chunk)
-    update_docs = [{'doc': {'tx_descr_scanned': True}, 'id': address} for address in token_addresses]
-    self._update_multiple_docs(update_docs, 'contract', self.indices['contract'])
 
   def _construct_creation_descr(self, contract):
     if 'token_owner' in contract.keys() and contract['token_owner'] != 'None':
@@ -372,10 +370,6 @@ class TokenHolders:
         tx_descr = self._construct_tx_descr_from_input(tx)
         transfers.append(tx_descr)
     self._insert_multiple_docs(transfers, 'tx', self.indices['token_tx'])
-
-class ExternalTokenTransactions(TokenHolders):
-  tx_index = 'transaction'
-  tx_type = 'tx'
 
 class InternalTokenTransactions(TokenHolders):
   tx_index = 'internal_transaction'
