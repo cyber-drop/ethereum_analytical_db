@@ -21,7 +21,7 @@ class InputParsingTestCase(unittest.TestCase):
   index = "internal_transaction"
   contracts_class = InternalContracts
   doc = {'to': TEST_CONTRACT_ADDRESS, 'input': TEST_CONTRACT_PARAMETERS, "callType": "call", 'blockNumber': 10}
-  blocks_query = "trace:true"
+  blocks_query = "traces_extracted:true"
 
   def setUp(self):
     self.contracts = self.contracts_class(
