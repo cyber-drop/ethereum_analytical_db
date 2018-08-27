@@ -35,6 +35,10 @@ class UtilsTestCase(unittest.TestCase):
     max_block = get_max_block("trace:true")
     assert max_block == 0
 
+  def test_get_max_block_in_empty_index(self):
+    max_block = get_max_block("*", 1)
+    assert max_block == 1
+
   def xtest_get_max_consistent_block(self):
     self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
       "number": 0,

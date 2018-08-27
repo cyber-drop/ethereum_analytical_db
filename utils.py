@@ -37,4 +37,7 @@ def get_max_block(query="*", min_consistent_block=MIN_CONSISTENT_BLOCK):
     }
   }
   result = client.send_request("GET", [INDICES["block"], "b", "_search"], aggregation, {})
-  return int(result["aggregations"]["max_block"]["value"])
+  if result["aggregations"]["max_block"]["value"]:
+    return int(result["aggregations"]["max_block"]["value"])
+  else:
+    return min_consistent_block
