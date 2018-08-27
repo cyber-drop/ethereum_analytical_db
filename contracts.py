@@ -195,7 +195,7 @@ class Contracts():
 class InternalContracts(Contracts):
   doc_type = "itx"
   index = "internal_transaction"
-  blocks_query = "trace:true"
+  blocks_query = "traces_extracted:true"
 
   def _iterate_transactions_by_targets(self, targets, max_block):
     query = {
