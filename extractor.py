@@ -3,7 +3,7 @@ import click
 from custom_elastic_search import CustomElasticSearch
 from contract_transactions import InternalContractTransactions, ExternalContractTransactions, ContractTransactions
 from internal_transactions import InternalTransactions
-from contracts import InternalContracts, ExternalContracts, Contracts
+from contracts import InternalContracts, Contracts
 from contract_methods import ContractMethods
 from token_holders import ExternalTokenTransactions, InternalTokenTransactions
 from config import INDICES
