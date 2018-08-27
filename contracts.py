@@ -192,24 +192,6 @@ class Contracts():
       self._decode_inputs_for_contracts(contracts, max_block)
       self._save_inputs_decoded([contract["_source"]["address"] for contract in contracts], max_block)
 
-class ExternalContracts(Contracts):
-  doc_type = "tx"
-  index = "transaction"
-  blocks_query = "*"
-
-  def _iterate_transactions_by_targets(self, targets, max_block):
-    query = {
-      "bool": {
-        "must": [
-          self._create_transactions_request(targets, max_block)
-        ],
-        "must_not": [
-          {"exists": {"field": "error"}}
-        ]
-      }
-    }
-    return self.client.iterate(self.indices[self.index], self.doc_type, query)
-
 class InternalContracts(Contracts):
   doc_type = "itx"
   index = "internal_transaction"
