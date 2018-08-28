@@ -63,9 +63,11 @@ class ContractTransactionsIterator():
     }
     return self.client.iterate(self.indices["contract"], 'contract', query)
 
-  def _create_transactions_request(self, contracts_max_blocks, max_block):
+  def _create_transactions_request(self, contracts, max_block):
     max_blocks_contracts = {}
-    for contract, block in contracts_max_blocks.items():
+    for contract_dict in contracts:
+      block = contract_dict["_source"].get(self._get_flag_name(), 0)
+      contract = contract_dict["_source"]["address"]
       if block not in max_blocks_contracts.keys():
         max_blocks_contracts[block] = []
       max_blocks_contracts[block].append(contract)
@@ -81,15 +83,11 @@ class ContractTransactionsIterator():
     return {"bool": {"should": filters}}
 
   def _iterate_transactions(self, contracts, max_block, partial_query):
-    targets = {
-      contract['_source']['address']: contract['_source'].get(self._get_flag_name(), 0)
-      for contract in contracts
-    }
     query = {
       "bool": {
         "must": [
           partial_query,
-          self._create_transactions_request(targets, max_block)
+          self._create_transactions_request(contracts, max_block)
         ]
       }
     }

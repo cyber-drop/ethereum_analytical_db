@@ -24,12 +24,12 @@ class UtilsTestCase(unittest.TestCase):
 
   def test_create_transactions_request(self):
     test_max_block = 40
-    test_max_blocks_for_contracts = {
-      "0x1": 10,
-      "0x2": 30
-    }
+    test_contracts = [
+      {"_source": {"address": "0x1", "tx_test_block": 10}},
+      {"_source": {"address": "0x2", "tx_test_block": 30}},
+    ]
     transactions_request = self.contracts_iterator._create_transactions_request(
-      test_max_blocks_for_contracts,
+      test_contracts,
       test_max_block
     )
     self.assertCountEqual([
@@ -43,14 +43,25 @@ class UtilsTestCase(unittest.TestCase):
       ]}},
     ], transactions_request["bool"]["should"])
 
+  def test_create_transactions_request_empty_block(self):
+    test_max_block = 40
+    test_contracts = [
+      {"_source": {"address": "0x1"}},
+    ]
+    transactions_request = self.contracts_iterator._create_transactions_request(
+      test_contracts,
+      test_max_block
+    )
+    self.assertCountEqual(["0x1"], transactions_request["bool"]["should"][0]["bool"]["must"][0]["terms"]["to"])
+
   def test_create_transactions_request_multiple_blocks(self):
     test_max_block = 40
-    test_max_blocks_for_contracts = {
-      "0x1": 10,
-      "0x2": 10
-    }
+    test_contracts = [
+      {"_source": {"address": "0x1", "tx_test_block": 10}},
+      {"_source": {"address": "0x2", "tx_test_block": 10}},
+    ]
     transactions_request = self.contracts_iterator._create_transactions_request(
-      test_max_blocks_for_contracts,
+      test_contracts,
       test_max_block
     )
     self.assertCountEqual(["0x1", "0x2"], transactions_request["bool"]["should"][0]["bool"]["must"][0]["terms"]["to"])
@@ -141,6 +152,7 @@ class UtilsTestCase(unittest.TestCase):
     }
     transactions = [c for c in self.contracts_iterator._iterate_transactions(targets, 2, test_query)]
     transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
+    print(transactions)
     self.assertCountEqual(transactions, ['2'])
 
   def test_split_on_chunks(self):
