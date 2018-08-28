@@ -81,7 +81,6 @@ class TokenHolders:
     return dec
 
   def _convert_transfer_value(self, value, decimals):
-    print(decimals)
     value = int(value)
     rounded = value / math.pow(10, decimals)
     rounded = "{0:.5f}".format(rounded)
