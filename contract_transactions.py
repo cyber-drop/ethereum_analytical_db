@@ -60,7 +60,7 @@ class ContractTransactions(utils.ContractTransactionsIterator):
 
   def detect_contract_transactions(self):
     max_block = utils.get_max_block()
-    for contracts in self._iterate_contracts(max_block):
+    for contracts in self._iterate_contracts_without_detected_transactions(max_block):
       self._detect_transactions_by_contracts(contracts, max_block)
 
 class ExternalContractTransactions(ContractTransactions):

@@ -152,14 +152,14 @@ class InternalContractTransactionsTestCase(unittest.TestCase):
     contracts_from_es_list = [[{"_source": {"address": contract}} for contract in contracts] for contracts in
                               contracts_list]
     self.contract_transactions.extract_contract_addresses = MagicMock()
-    self.contract_transactions._iterate_contracts = MagicMock(return_value=contracts_from_es_list)
+    self.contract_transactions._iterate_contracts_without_detected_transactions = MagicMock(return_value=contracts_from_es_list)
     self.contract_transactions._detect_transactions_by_contracts = MagicMock()
     test_max_block_mock = MagicMock(side_effect=[test_max_block])
     with patch('utils.get_max_block', test_max_block_mock):
       process = Mock()
       process.configure_mock(
         get_max_block=test_max_block_mock,
-        iterate=self.contract_transactions._iterate_contracts,
+        iterate=self.contract_transactions._iterate_contracts_without_detected_transactions,
         detect=self.contract_transactions._detect_transactions_by_contracts
       )
 
