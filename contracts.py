@@ -64,7 +64,7 @@ def _decode_inputs_batch_sync(encoded_params):
     for hash, (contract_abi, call_data) in encoded_params.items()
   }
 
-class Contracts():
+class Contracts(utils.ContractTransactionsIterator):
   _contracts_abi = {}
 
   def __init__(self, indices, host="http://localhost:9200", parity_hosts=PARITY_HOSTS):
@@ -72,23 +72,6 @@ class Contracts():
     self.client = CustomElasticSearch(host)
     self.pool = Pool(processes=NUMBER_OF_PROCESSES)
     self.parity_hosts = parity_hosts
-
-  def _create_transactions_request(self, contracts_max_blocks, max_block):
-    max_blocks_contracts = {}
-    for contract, block in contracts_max_blocks.items():
-      if block not in max_blocks_contracts.keys():
-        max_blocks_contracts[block] = []
-      max_blocks_contracts[block].append(contract)
-
-    filters = [{
-      "bool": {
-        "must": [
-          {"terms": {"to": contracts}},
-          {"range": {"blockNumber": {"gt": max_synced_block, "lte": max_block}}}
-        ]
-      }
-    } for max_synced_block, contracts in max_blocks_contracts.items()]
-    return {"bool": {"should": filters}}
 
   def _set_contracts_abi(self, abis):
     self._contracts_abi = abis
@@ -137,39 +120,15 @@ class Contracts():
           {"exists": {"field": "address"}},
           {"exists": {"field": "abi"}},
           {"query_string": {"query": self._get_range_query()}},
-          {"bool": {
-            "should": [
-              {"range": {
-                self.doc_type + "_inputs_decoded_block": {
-                  "lt": max_block
-                }
-              }},
-              {"bool": {"must_not": [{"exists": {"field": self.doc_type + "_inputs_decoded_block"}}]}},
-            ]
-          }}
         ]
       }
     }
-    return self.client.iterate(self.indices["contract"], 'contract', query)
+    return self._iterate_contracts(max_block, query)
 
   def _save_inputs_decoded(self, contracts, max_block):
-    query = {
-      "terms": {
-        "address": contracts
-      }
-    }
-    self.client.update_by_query(
-      index=self.indices["contract"],
-      doc_type='contract',
-      query=query,
-      script='ctx._source.' + self.doc_type + '_inputs_decoded_block = ' + str(max_block)
-    )
+    self._save_max_block(contracts, max_block)
 
   def _decode_inputs_for_contracts(self, contracts, max_block):
-    contracts = {
-      contract['_source']['address']: contract['_source'].get(self.doc_type + '_inputs_decoded_block', 0)
-      for contract in contracts
-    }
     for transactions in self._iterate_transactions_by_targets(contracts, max_block):
       try:
         inputs = {
@@ -196,8 +155,9 @@ class InternalContracts(Contracts):
   doc_type = "itx"
   index = "internal_transaction"
   blocks_query = "traces_extracted:true"
+  block_prefix = "inputs_decoded"
 
-  def _iterate_transactions_by_targets(self, targets, max_block):
+  def _iterate_transactions_by_targets(self, contracts, max_block):
     query = {
       "bool": {
         "must": [
@@ -208,5 +168,4 @@ class InternalContracts(Contracts):
         ]
       }
     }
-    query["bool"]["must"].append(self._create_transactions_request(targets, max_block))
-    return self.client.iterate(self.indices[self.index], self.doc_type, query)
+    return self._iterate_transactions(contracts, max_block, query)

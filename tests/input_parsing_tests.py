@@ -235,8 +235,6 @@ class InputParsingTestCase(unittest.TestCase):
       for i in range(10)
     ]
     test_contracts.append({"_source": {"address": "0xa"}})
-    test_contracts_preprocessed = {"0x" + str(i): i for i in range(10)}
-    test_contracts_preprocessed["0xa"] = 0
     test_block = 100
     mock_iterate = MagicMock(return_value=[])
     mockify(self.contracts, {
@@ -245,7 +243,7 @@ class InputParsingTestCase(unittest.TestCase):
 
     self.contracts._decode_inputs_for_contracts(test_contracts, test_block)
 
-    mock_iterate.assert_called_with(test_contracts_preprocessed, test_block)
+    mock_iterate.assert_called_with(test_contracts, test_block)
 
   def test_decode_inputs_for_contracts_exception(self):
     def exception_on_seven(inputs):
@@ -338,7 +336,7 @@ class InputParsingTestCase(unittest.TestCase):
     self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {'to': TEST_CONTRACT_ADDRESS, "callType": "delegatecall"}, id=1, refresh=True)
     self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {'to': TEST_CONTRACT_ADDRESS, 'callType': 'call'}, id=2, refresh=True)
     self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {'to': "0x"}, id=3, refresh=True)
-    targets = {TEST_CONTRACT_ADDRESS: 0}
+    targets = [{"_source": {"address": TEST_CONTRACT_ADDRESS, self.doc_type + "_inputs_decoded_block": 0}}]
     transactions = [c for c in self.contracts._iterate_transactions_by_targets(targets, 10)]
     transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
     self.assertCountEqual(transactions, ['2'])
@@ -350,7 +348,7 @@ class InputParsingTestCase(unittest.TestCase):
       'callType': 'call',
       "error": "Out of gas",
     }, id=1, refresh=True)
-    targets = {TEST_CONTRACT_ADDRESS: 0}
+    targets = [{"_source": {"address": TEST_CONTRACT_ADDRESS, self.doc_type + "_inputs_decoded_block": 0}}]
     transactions = [c for c in self.contracts._iterate_transactions_by_targets(targets, 10)]
     assert not transactions
 
@@ -370,7 +368,7 @@ class InputParsingTestCase(unittest.TestCase):
       'callType': 'call',
       "blockNumber": 3
     }, id=3, refresh=True)
-    targets = {TEST_CONTRACT_ADDRESS: 1}
+    targets = [{"_source": {"address": TEST_CONTRACT_ADDRESS, self.doc_type + "_inputs_decoded_block": 1}}]
     transactions = [c for c in self.contracts._iterate_transactions_by_targets(targets, 2)]
     transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
     self.assertCountEqual(transactions, ['2'])
