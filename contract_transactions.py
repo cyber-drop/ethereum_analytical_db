@@ -48,7 +48,7 @@ class ContractTransactions:
                                 "ctx._source.to_contract = true")
 
   def detect_contract_transactions(self):
-    self._extract_contract_addresses()
+    self.extract_contract_addresses()
     for contracts in self._iterate_contracts():
       contracts = [contract["_source"]["address"] for contract in contracts]
       self._detect_transactions_by_contracts(contracts)
