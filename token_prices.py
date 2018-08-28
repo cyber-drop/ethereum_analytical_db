@@ -145,8 +145,6 @@ class TokenPrices:
     token_syms = [token['cc_sym'] for token in self._get_cc_tokens()]
     now = datetime.datetime.now().strftime("%Y-%m-%d").split('-')
     last_price_date = self._get_last_avail_price_date()
-    #if last_price_date == now:
-    #  return
     days_count = self._get_days_count(now, last_price_date)
     prices = []
     for token in tqdm(token_syms):
