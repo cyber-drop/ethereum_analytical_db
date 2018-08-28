@@ -54,7 +54,7 @@ class ExternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase)
     all_descrptions = [tx for txs_list in all_descrptions for tx in txs_list]
     tokens = set([descr['_source']['token'] for descr in all_descrptions])
     amounts = [tx['_source']['value'] for tx in all_descrptions]
-    self.assertCountEqual([2266.0, 356.24568, 356.24568, 2352.0, 100000000], amounts)
+    self.assertCountEqual([2266.0, 356.24568, 2352.0, 100000000, 100000000], amounts)
     self.assertCountEqual(['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', '0xa74476443119a942de498590fe1f2454d7d4ac0d'], tokens)
     assert len(all_descrptions) == 5
 
@@ -96,17 +96,6 @@ class ExternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase)
     self.assertCountEqual(['100000000', '200000000'], values)
     self.assertCountEqual(['0x1554aa0026292d03cfc8a2769df8dd4d169d590a', '0x17Bc58b788808DaB201a9A90817fF3C168BF3d61'], owners)
 
-  def test_find_multitransfer(self):
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0], 'decimals': 4, 'total_supply': '100000000', 'blockNumber': 5000000, 'owner': '0x1554aa0026292d03cfc8a2769df8dd4d169d590a', 'parent_transaction': TEST_PARENT_TXS[0], 'cmc_id': str(1234), 'token_name': TEST_TOKEN_NAMES[0], 'token_symbol': TEST_TOKEN_SYMBOLS[0], 'abi': ['mock_abi']}, id=TEST_TOKEN_ADDRESSES[0], refresh=True)
-    self.client.index(TEST_TX_INDEX, 'tx', TEST_MULTITRANSFER['_source'], refresh=True)
-    self.token_holders.get_listed_tokens_txs()
-    
-    all_descrptions = self.token_holders._iterate_tx_descriptions()
-    all_descrptions = [tx['_source'] for txs_list in all_descrptions for tx in txs_list]
-    values = [descr['raw_value'] for descr in all_descrptions]
-    assert len(all_descrptions) == 101
-    assert '6000000.00000' in values
-
   def test_round_value(self):
     values = self.token_holders._convert_transfer_value('10000000000000000', 18)
     assert type(values[0]) is str
@@ -134,7 +123,7 @@ class InternalTokenTransactionsTestCase(TokenHoldersTestCase, unittest.TestCase)
     all_descrptions = self.token_holders._iterate_tx_descriptions()
     all_descrptions = [tx for txs_list in all_descrptions for tx in txs_list]
     hashes = [d['_source']['tx_hash'] for d in all_descrptions]
-    self.assertCountEqual(['0x8a634bd8b381c09eec084fd7df6bdce03ccbc92f247f59d4fcc22e02131c0158', '0x04692fb0a2d1a9c8b6ea8cfc643422800b81da50df1578f3494aef0ef9be6009.4', '0xce37439c6809ca9d1b1d5707c7df34ceec1e4e472f0ca07c87fa449a93b02431.4', '0x366c6344bdb4cb1bb8cfbce5770419b03f49d631d5803e5fbcf8de9b8f1a5d66.4'], hashes)
+    self.assertCountEqual(['0x04692fb0a2d1a9c8b6ea8cfc643422800b81da50df1578f3494aef0ef9be6009.4', '0xce37439c6809ca9d1b1d5707c7df34ceec1e4e472f0ca07c87fa449a93b02431.4', '0x366c6344bdb4cb1bb8cfbce5770419b03f49d631d5803e5fbcf8de9b8f1a5d66.4', '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', '0xa74476443119a942de498590fe1f2454d7d4ac0d'], hashes)
 
   def test_set_internal_transaction_index(self):
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0], 'cmc_id': '1234', 'token_name': TEST_TOKEN_NAMES[0], 'token_symbol': TEST_TOKEN_SYMBOLS[0], 'abi': ['mock_abi'], 'decimals': 18}, id=TEST_TOKEN_ADDRESSES[0], refresh=True)
