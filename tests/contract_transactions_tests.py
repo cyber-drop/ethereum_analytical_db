@@ -154,21 +154,27 @@ class InternalContractTransactionsTestCase(unittest.TestCase):
     self.contract_transactions.extract_contract_addresses = MagicMock()
     self.contract_transactions._iterate_contracts_without_detected_transactions = MagicMock(return_value=contracts_from_es_list)
     self.contract_transactions._detect_transactions_by_contracts = MagicMock()
+    self.contract_transactions._save_max_block = MagicMock()
     test_max_block_mock = MagicMock(side_effect=[test_max_block])
     with patch('utils.get_max_block', test_max_block_mock):
       process = Mock()
       process.configure_mock(
         get_max_block=test_max_block_mock,
         iterate=self.contract_transactions._iterate_contracts_without_detected_transactions,
-        detect=self.contract_transactions._detect_transactions_by_contracts
+        detect=self.contract_transactions._detect_transactions_by_contracts,
+        save=self.contract_transactions._save_max_block
       )
 
       self.contract_transactions.detect_contract_transactions()
 
+      call_part = []
+      for index, contracts in enumerate(contracts_from_es_list):
+        call_part.append(call.detect(contracts, test_max_block))
+        call_part.append(call.save(contracts_list[index], test_max_block))
       process.assert_has_calls([
                                  call.get_max_block(),
                                  call.iterate(test_max_block)
-                               ] + [call.detect(contracts, test_max_block) for contracts in contracts_from_es_list])
+                               ] + call_part)
 
 TEST_TRANSACTIONS_INDEX = 'test-ethereum-transactions'
 TEST_CONTRACTS_INDEX = 'test-ethereum-contracts'

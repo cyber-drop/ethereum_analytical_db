@@ -62,6 +62,7 @@ class ContractTransactions(utils.ContractTransactionsIterator):
     max_block = utils.get_max_block()
     for contracts in self._iterate_contracts_without_detected_transactions(max_block):
       self._detect_transactions_by_contracts(contracts, max_block)
+      self._save_max_block([contract["_source"]["address"] for contract in contracts], max_block)
 
 class ExternalContractTransactions(ContractTransactions):
   index = "transaction"
