@@ -125,9 +125,6 @@ class Contracts(utils.ContractTransactionsIterator):
     }
     return self._iterate_contracts(max_block, query)
 
-  def _save_inputs_decoded(self, contracts, max_block):
-    self._save_max_block(contracts, max_block)
-
   def _decode_inputs_for_contracts(self, contracts, max_block):
     for transactions in self._iterate_transactions_by_targets(contracts, max_block):
       try:
@@ -149,7 +146,7 @@ class Contracts(utils.ContractTransactionsIterator):
     for contracts in self._iterate_contracts_with_abi(max_block):
       self._set_contracts_abi({contract["_source"]["address"]: contract["_source"]["abi"] for contract in contracts})
       self._decode_inputs_for_contracts(contracts, max_block)
-      self._save_inputs_decoded([contract["_source"]["address"] for contract in contracts], max_block)
+      self._save_max_block([contract["_source"]["address"] for contract in contracts], max_block)
 
 class InternalContracts(Contracts):
   doc_type = "itx"

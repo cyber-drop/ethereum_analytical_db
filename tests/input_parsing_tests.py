@@ -156,66 +156,43 @@ class InputParsingTestCase(unittest.TestCase):
     contracts = [c["_id"] for contracts_list in contracts for c in contracts_list]
     self.assertCountEqual(contracts, [str(i) for i in range(21, 25)])
 
-  def test_iterate_contracts_with_abi_skip_max_block(self):
+  def test_iterate_contracts_with_abi_call_iterate_contracts(self):
     test_max_block = 2
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
-      self.doc_type + "_inputs_decoded_block": 1,
-      "address": "0x1",
-      "abi": {"test": 1},
-      "blockNumber": 1,
-    }, refresh=True, id=1)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
-      self.doc_type + "_inputs_decoded_block": 2,
-      "address": "0x2",
-      "abi": {"test": 1},
-      "blockNumber": 1
-    }, refresh=True, id=2)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
-      self.doc_type + "_inputs_decoded_block": 3,
-      "address": "0x3",
-      "abi": {"test": 1},
-      "blockNumber": 1
-    }, refresh=True, id=3)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
-      "address": "0x4",
-      "abi": {"test": 1},
-      "blockNumber": 1
-    }, refresh=True, id=4)
-    contracts = [c["_id"] for contracts in self.contracts._iterate_contracts_with_abi(test_max_block) for c in contracts]
-    self.assertCountEqual(contracts, ['1', '4'])
+    test_iterator = "iterator"
+    self.contracts._iterate_contracts = MagicMock(return_value=test_iterator)
 
-  def test_create_transactions_request(self):
-    test_max_block = 40
-    test_max_blocks_for_contracts = {
-      "0x1": 10,
-      "0x2": 30
-    }
-    transactions_request = self.contracts._create_transactions_request(
-      test_max_blocks_for_contracts,
-      test_max_block
-    )
-    self.assertCountEqual([
-      {"bool": {"must": [
-        {"terms": {"to": ["0x1"]}},
-        {"range": {"blockNumber": {"gt": 10, "lte": 40}}}
-      ]}},
-      {"bool": {"must": [
-        {"terms": {"to": ["0x2"]}},
-        {"range": {"blockNumber": {"gt": 30, "lte": 40}}}
-      ]}},
-    ], transactions_request["bool"]["should"])
+    contracts = self.contracts._iterate_contracts_with_abi(test_max_block)
 
-  def test_create_transactions_request_multiple_blocks(self):
-    test_max_block = 40
-    test_max_blocks_for_contracts = {
-      "0x1": 10,
-      "0x2": 10
-    }
-    transactions_request = self.contracts._create_transactions_request(
-      test_max_blocks_for_contracts,
-      test_max_block
-    )
-    self.assertCountEqual(["0x1", "0x2"], transactions_request["bool"]["should"][0]["bool"]["must"][0]["terms"]["to"])
+    self.contracts._iterate_contracts.assert_any_call(test_max_block, ANY)
+    assert contracts == test_iterator
+
+  def test_iterate_transactions_by_targets_ignore_transactions_with_error(self):
+    self.contracts._create_transactions_request = MagicMock(return_value={"query_string": {"query": "*"}})
+    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
+      'callType': 'call',
+    }, id=1, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
+      'callType': 'delegatecall',
+    }, id=2, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
+      'callType': 'call',
+      "error": "Out of gas",
+    }, id=3, refresh=True)
+    targets = [{"_source": {"address": TEST_CONTRACT_ADDRESS}}]
+    transactions = self.contracts._iterate_transactions_by_targets(targets, 0)
+    transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
+    self.assertCountEqual(transactions, ['1'])
+
+  def test_iterate_transactions_by_targets_select_unprocessed_transactions(self):
+    test_iterator = "iterator"
+    test_max_block = 0
+    test_contracts = ["contract"]
+    self.contracts._iterate_transactions = MagicMock(return_value=test_iterator)
+
+    transactions = self.contracts._iterate_transactions_by_targets(test_contracts, test_max_block)
+
+    self.contracts._iterate_transactions.assert_any_call(test_contracts, test_max_block, ANY)
+    assert transactions == test_iterator
 
   def test_decode_inputs_for_contracts(self):
     test_max_block = 1000
@@ -268,17 +245,6 @@ class InputParsingTestCase(unittest.TestCase):
 
     assert self.contracts.client.bulk.call_count == 9
 
-  def test_save_inputs_decoded(self):
-    test_max_block = 100
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS + str(1)}, id=1, refresh=True)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS + str(2)}, id=2, refresh=True)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS + str(3)}, id=3, refresh=True)
-    self.contracts._save_inputs_decoded([TEST_CONTRACT_ADDRESS + str(1), TEST_CONTRACT_ADDRESS + str(3)], test_max_block)
-
-    contracts = self.client.search(index=TEST_CONTRACTS_INDEX, doc_type='contract', query=self.doc_type + "_inputs_decoded_block:" + str(test_max_block))['hits']['hits']
-    contracts = [contract["_source"]["address"] for contract in contracts]
-    self.assertCountEqual(contracts, [TEST_CONTRACT_ADDRESS + str(1), TEST_CONTRACT_ADDRESS + str(3)])
-
   def test_decode_inputs_save_inputs_decoded(self):
     test_contracts = ["contract1", "contract2", "contract3"]
     test_contracts_from_elasticsearch = [{"_source": {"abi": contract, "address": contract}} for contract in test_contracts]
@@ -287,7 +253,7 @@ class InputParsingTestCase(unittest.TestCase):
     }, ["decode_inputs"])
     process = Mock(
       decode=self.contracts._decode_inputs_for_contracts,
-      save=self.contracts._save_inputs_decoded
+      save=self.contracts._save_max_block
     )
 
     with patch('utils.get_max_block'):
@@ -307,7 +273,7 @@ class InputParsingTestCase(unittest.TestCase):
     process = Mock(
       iterate=self.contracts._iterate_contracts_with_abi,
       decode=self.contracts._decode_inputs_for_contracts,
-      save=self.contracts._save_inputs_decoded
+      save=self.contracts._save_max_block
     )
     test_max_block_mock = MagicMock(side_effect=[test_max_block])
     with patch('utils.get_max_block', test_max_block_mock):
@@ -331,44 +297,3 @@ class InputParsingTestCase(unittest.TestCase):
       transactions = self.client.search(index=TEST_TRANSACTIONS_INDEX, doc_type=self.doc_type, query="*")['hits']['hits']
       assert len([transaction["_source"]["decoded_input"] for transaction in transactions]) == 10
 
-  def test_iterate_transactions_by_targets(self):
-    self.contracts._create_transactions_request = MagicMock(return_value={"exists": {"field": "to"}})
-    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {'to': TEST_CONTRACT_ADDRESS, "callType": "delegatecall"}, id=1, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {'to': TEST_CONTRACT_ADDRESS, 'callType': 'call'}, id=2, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {'to': "0x"}, id=3, refresh=True)
-    targets = [{"_source": {"address": TEST_CONTRACT_ADDRESS, self.doc_type + "_inputs_decoded_block": 0}}]
-    transactions = [c for c in self.contracts._iterate_transactions_by_targets(targets, 10)]
-    transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
-    self.assertCountEqual(transactions, ['2'])
-
-  def test_iterate_transactions_by_targets_ignore_transactions_with_error(self):
-    self.contracts._create_transactions_request = MagicMock(return_value={"exists": {"field": "to"}})
-    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
-      'to': TEST_CONTRACT_ADDRESS,
-      'callType': 'call',
-      "error": "Out of gas",
-    }, id=1, refresh=True)
-    targets = [{"_source": {"address": TEST_CONTRACT_ADDRESS, self.doc_type + "_inputs_decoded_block": 0}}]
-    transactions = [c for c in self.contracts._iterate_transactions_by_targets(targets, 10)]
-    assert not transactions
-
-  def test_iterate_transactions_by_targets_select_unprocessed_transactions(self):
-    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
-      'to': TEST_CONTRACT_ADDRESS,
-      'callType': 'call',
-      "blockNumber": 1
-    }, id=1, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
-      'to': TEST_CONTRACT_ADDRESS,
-      'callType': 'call',
-      "blockNumber": 2
-    }, id=2, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
-      'to': TEST_CONTRACT_ADDRESS,
-      'callType': 'call',
-      "blockNumber": 3
-    }, id=3, refresh=True)
-    targets = [{"_source": {"address": TEST_CONTRACT_ADDRESS, self.doc_type + "_inputs_decoded_block": 1}}]
-    transactions = [c for c in self.contracts._iterate_transactions_by_targets(targets, 2)]
-    transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
-    self.assertCountEqual(transactions, ['2'])
