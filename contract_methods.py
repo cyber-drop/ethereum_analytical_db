@@ -76,7 +76,7 @@ class ContractMethods:
     return {
       'name': {'func': contract_instance.functions.name(), 'placeholder': 'None'},
       'symbol': {'func': contract_instance.functions.symbol(), 'placeholder': 'None'},
-      'decimals': {'func': contract_instance.functions.decimals(),'placeholder': 18},
+      'decimals': {'func': contract_instance.functions.decimals(),'placeholder': 1},
       'total_supply': {'func': contract_instance.functions.totalSupply(),'placeholder': '0'},
       'owner': {'func': contract_instance.functions.owner(), 'placeholder': 'None'}
     }
