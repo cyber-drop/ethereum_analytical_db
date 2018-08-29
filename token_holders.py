@@ -333,7 +333,7 @@ class TokenHolders:
     else:
       to = contract['creator']
     value = contract['total_supply'] if 'total_supply' in contract.keys() and contract['total_supply'] != 'None' else '0'
-    transaction_index = self.indices['transaction'] if re.search(r'\.', contract['parent_transaction']) == None else self.indices['internal_transaction']
+    transaction_index = self.indices['internal_transaction']
     return {
       'method': 'initial', 
       'to': to, 
