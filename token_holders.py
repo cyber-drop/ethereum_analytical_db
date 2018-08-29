@@ -246,12 +246,6 @@ class TokenHolders:
       }
       descriptions.append(descr)
     return descriptions
-
-  def _process_multi_addr_one_uint_no_value_preprocess(self, tx):
-    decimals = self._check_decimals(tx['to'])
-    if decimals > 1:
-      tx['decoded_input']['params'][1]['value'] = str(int(float(tx['decoded_input']['params'][1]['value']) * math.pow(10, decimals)))
-    return self._process_multi_addr_one_uint(tx)
   
   def _process_multi_addr_same_value(self, tx):
     decimals = self._check_decimals(tx['to'])
