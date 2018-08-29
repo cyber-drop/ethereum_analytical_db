@@ -7,10 +7,11 @@ import math
 import json
 import re
 import pdb
+import utils
 
 ADDRESS_ENCODING_CONSTANT = 0x0010000000000000000000000000000000000000000
 
-class TokenHolders:
+class TokenHolders(utils.ContractTransactionsIterator):
   def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200"):
     self.indices = elasticsearch_indices
     self.client = CustomElasticSearch(elasticsearch_host)
@@ -65,16 +66,21 @@ class TokenHolders:
     for chunk in bulk_chunks(self._construct_bulk_update_ops(docs), docs_per_chunk=1000):
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
 
-  def _iterate_tokens(self):
-    return self.client.iterate(self.indices['contract'], 'contract', '_exists_:cmc_id')
-
-  def _iterate_tokens_txs(self, token_addresses):
+  def _iterate_tokens(self, max_block):
     query = {
-      "terms": {
-        "to": token_addresses
+      "query_string": {
+        "query": '_exists_:cmc_id'
       }
     }
-    return self.client.iterate(self.indices[self.tx_index], self.tx_type, query)
+    return self._iterate_contracts(max_block, query)
+
+  def _iterate_tokens_txs(self, tokens, max_block):
+    query = {
+      "query_string": {
+        "query": "*"
+      }
+    }
+    return self._iterate_transactions(tokens, max_block, query)
 
   def _check_decimals(self, token):
     dec = self.token_decimals[token] if token in self.token_decimals.keys() else 18
@@ -315,8 +321,8 @@ class TokenHolders:
   def _iterate_tx_descriptions(self):
     return self.client.iterate(self.indices['token_tx'], 'tx', 'token:*')
 
-  def _extract_tokens_txs(self, token_addresses):
-    for txs_chunk in self._iterate_tokens_txs(token_addresses):
+  def _extract_tokens_txs(self, tokens, max_block):
+    for txs_chunk in self._iterate_tokens_txs(tokens, max_block):
       self._extract_descriptions_from_txs(txs_chunk)
 
   def _construct_creation_descr(self, contract):
@@ -345,10 +351,11 @@ class TokenHolders:
     self._insert_multiple_docs(descriptions, 'tx', self.indices['token_tx'])
 
   def get_listed_tokens_txs(self):
-    for tokens in self._iterate_tokens():
+    max_block = utils.get_max_block()
+    for tokens in self._iterate_tokens(max_block):
       self.token_decimals = {token['_source']['address']: token['_source']['decimals'] for token in tokens if 'decimals' in token['_source'].keys()}
       self._extract_contract_creation_descr(tokens)
-      self._extract_tokens_txs([token['_source']['address'] for token in tokens])
+      self._extract_tokens_txs(tokens, max_block)
 
   def _get_listed_tokens_addresses(self):
     addresses = []
@@ -369,4 +376,7 @@ class TokenHolders:
 
 class InternalTokenTransactions(TokenHolders):
   tx_index = 'internal_transaction'
+  index = 'internal_transaction'
   tx_type = 'itx'
+  doc_type = 'itx'
+  block_prefix = 'token_transactions_extracted'
