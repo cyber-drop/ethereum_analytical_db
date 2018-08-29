@@ -57,18 +57,6 @@ class TokenHoldersTestCase(unittest.TestCase):
     self.assertCountEqual(['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', '0xa74476443119a942de498590fe1f2454d7d4ac0d'], tokens)
     assert len(all_descrptions) == 5
 
-  def test_set_scanned_flags(self):
-    for i, address in enumerate(TEST_TOKEN_ADDRESSES):
-      self.client.index(TEST_CONTRACT_INDEX, 'contract', {'address': address, 'total_supply': '100000000', 'blockNumber': 5000000, 'owner': '0x1554aa0026292d03cfc8a2769df8dd4d169d590a', 'parent_transaction': TEST_PARENT_TXS[0], 'cmc_id': str(1234+i), 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi'], 'decimals': 18}, id=address, refresh=True)
-    for tx in TEST_TOKEN_TXS:
-      self.client.index(TEST_ITX_INDEX, 'itx', tx, refresh=True)
-    self.token_holders.get_listed_tokens_txs()
-    
-    tokens = self.iterate_processed()
-    tokens = [t for token in tokens for t in token]
-    flags = [token['_source']['tx_descr_scanned'] for token in tokens]
-    self.assertCountEqual([True, True], flags)
-
   def test_set_transaction_index(self):
     self.client.index(TEST_CONTRACT_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0], 'cmc_id': '1234', 'token_name': TEST_TOKEN_NAMES[0], 'token_symbol': TEST_TOKEN_SYMBOLS[0], 'abi': ['mock_abi'], 'decimals': 18}, id=TEST_TOKEN_ADDRESSES[0], refresh=True)
     for tx in TEST_TOKEN_TXS:
