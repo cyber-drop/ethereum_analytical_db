@@ -1,6 +1,7 @@
 import unittest
 from token_holders import TokenHolders, InternalTokenTransactions
 from tests.test_utils import TestElasticSearch
+from unittest.mock import MagicMock, ANY, patch
 
 class TokenHoldersTestCase(unittest.TestCase):
   def setUp(self):
@@ -20,10 +21,17 @@ class TokenHoldersTestCase(unittest.TestCase):
     return self.token_holders.client.iterate(TEST_TOKEN_TX_INDEX, 'tx', 'method:initial')
 
   def test_extract_token_txs(self):
+    self.token_holders._create_transactions_request = MagicMock(return_value={
+      "query_string": {
+        "query": "*"
+      }
+    })
+    test_max_block = 10
+    test_tokens = [{"_source": {"address": '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'}}]
     self.client.index(TEST_CONTRACT_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0], 'total_supply': '100000000', 'blockNumber': 5000000, 'owner': '0x1554aa0026292d03cfc8a2769df8dd4d169d590a', 'parent_transaction': TEST_PARENT_TXS[0], 'cmc_id': '1234', 'token_name': TEST_TOKEN_NAMES[0], 'token_symbol': TEST_TOKEN_SYMBOLS[0], 'abi': ['mock_abi'], 'decimals': 18}, id=TEST_TOKEN_ADDRESSES[0], refresh=True)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_ITX_INDEX, 'itx', tx, refresh=True)
-    self.token_holders._extract_tokens_txs(['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'])
+    self.token_holders._extract_tokens_txs(test_tokens, test_max_block)
     
     token_txs = self.token_holders._iterate_token_tx_descriptions('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d')
     token_txs = [tx for txs_list in token_txs for tx in txs_list]
@@ -35,33 +43,50 @@ class TokenHoldersTestCase(unittest.TestCase):
     self.assertCountEqual([356.24568, 2266.0], amounts)
     assert len(with_error) == 1
 
-  def test_iterate_unprocessed_tokens(self):
+  def test_iterate_tokens_with_cmc_id(self):
+    test_max_block = 10
     self.client.index(TEST_CONTRACT_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0], 'total_supply': '100000000', 'blockNumber': 5000000, 'owner': '0x1554aa0026292d03cfc8a2769df8dd4d169d590a', 'parent_transaction': TEST_PARENT_TXS[0], 'cmc_id': '1234', 'token_name': TEST_TOKEN_NAMES[0], 'token_symbol': TEST_TOKEN_SYMBOLS[0], 'abi': ['mock_abi'], 'decimals': 18}, id=TEST_TOKEN_ADDRESSES[0], refresh=True)
     self.client.index(TEST_CONTRACT_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[1], 'total_supply': '100000000', 'blockNumber': 5000000, 'owner': '0x1554aa0026292d03cfc8a2769df8dd4d169d590a', 'parent_transaction': TEST_PARENT_TXS[0], 'cmc_id': '1235', 'tx_descr_scanned': True, 'token_name': TEST_TOKEN_NAMES[0], 'token_symbol': TEST_TOKEN_SYMBOLS[0], 'abi': ['mock_abi'], 'decimals': 18}, id=TEST_TOKEN_ADDRESSES[1], refresh=True)
-    tokens = self.token_holders._iterate_tokens()
+    tokens = self.token_holders._iterate_tokens(test_max_block)
     tokens = [t['_source'] for token in tokens for t in token]
     assert tokens[0]['cmc_id'] == '1234'
 
   def test_get_listed_tokens_txs(self):
+    self.token_holders._create_transactions_request = MagicMock(return_value={
+      "terms": {
+        "to": TEST_TOKEN_ADDRESSES
+      }
+    })
+    test_max_block = 6000000
+    test_max_block_mock = MagicMock(return_value=test_max_block)
     for i, address in enumerate(TEST_TOKEN_ADDRESSES):
       self.client.index(TEST_CONTRACT_INDEX, 'contract', {'address': address, 'total_supply': '100000000', 'blockNumber': 5000000, 'owner': '0x1554aa0026292d03cfc8a2769df8dd4d169d590a', 'parent_transaction': TEST_PARENT_TXS[0], 'cmc_id': str(1234+i), 'token_name': TEST_TOKEN_NAMES[i], 'token_symbol': TEST_TOKEN_SYMBOLS[i], 'abi': ['mock_abi'], 'decimals': 18}, id=address, refresh=True)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_ITX_INDEX, 'itx', tx, refresh=True)
-    self.token_holders.get_listed_tokens_txs()
-    
-    all_descrptions = self.token_holders._iterate_tx_descriptions()
-    all_descrptions = [tx for txs_list in all_descrptions for tx in txs_list]
-    tokens = set([descr['_source']['token'] for descr in all_descrptions])
-    amounts = [tx['_source']['value'] for tx in all_descrptions]
-    self.assertCountEqual([2266.0, 356.24568, 2352.0, 100000000, 100000000], amounts)
-    self.assertCountEqual(['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', '0xa74476443119a942de498590fe1f2454d7d4ac0d'], tokens)
-    assert len(all_descrptions) == 5
+    with patch('utils.get_max_block', test_max_block_mock):
+      self.token_holders.get_listed_tokens_txs()
+      all_descrptions = self.token_holders._iterate_tx_descriptions()
+      all_descrptions = [tx for txs_list in all_descrptions for tx in txs_list]
+      tokens = set([descr['_source']['token'] for descr in all_descrptions])
+      amounts = [tx['_source']['value'] for tx in all_descrptions]
+
+      test_max_block_mock.assert_any_call()
+      self.assertCountEqual([2266.0, 356.24568, 2352.0, 100000000, 100000000], amounts)
+      self.assertCountEqual(['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', '0xa74476443119a942de498590fe1f2454d7d4ac0d'], tokens)
+      assert len(all_descrptions) == 5
 
   def test_set_transaction_index(self):
+    self.token_holders._create_transactions_request = MagicMock(return_value={
+      "query_string": {
+        "query": "*"
+      }
+    })
+    test_max_block = 10
+    test_tokens = [{"_source": {"address": '0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'}}]
     self.client.index(TEST_CONTRACT_INDEX, 'contract', {'address': TEST_TOKEN_ADDRESSES[0], 'cmc_id': '1234', 'token_name': TEST_TOKEN_NAMES[0], 'token_symbol': TEST_TOKEN_SYMBOLS[0], 'abi': ['mock_abi'], 'decimals': 18}, id=TEST_TOKEN_ADDRESSES[0], refresh=True)
     for tx in TEST_TOKEN_TXS:
       self.client.index(TEST_ITX_INDEX, 'itx', tx, refresh=True)
-    self.token_holders._extract_tokens_txs(['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d'])
+    self.token_holders._extract_tokens_txs(test_tokens, test_max_block)
     
     token_txs = self.token_holders._iterate_token_tx_descriptions('0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d')
     token_txs = [tx for txs_list in token_txs for tx in txs_list]
@@ -112,6 +137,27 @@ class TokenHoldersTestCase(unittest.TestCase):
     assert len(values) == 1
     assert '0x36230df54a0265a96af387dd23bacc2a58cfbd9a' in addresses
     assert len(descriptions) == 150
+
+  def test_iterate_unprocessed_tokens(self):
+    test_iterator = "iterator"
+    test_max_block = 10
+    self.token_holders._iterate_contracts = MagicMock(return_value=test_iterator)
+
+    iterator = self.token_holders._iterate_tokens(test_max_block)
+
+    self.token_holders._iterate_contracts.assert_any_call(test_max_block, ANY)
+    assert iterator == test_iterator
+
+  def test_iterate_unprocessed_transactions(self):
+    test_iterator = "iterator"
+    test_max_block = 10
+    test_contracts = ["contract"]
+    self.token_holders._iterate_transactions = MagicMock(return_value=test_iterator)
+
+    iterator = self.token_holders._iterate_tokens_txs(test_contracts, test_max_block)
+
+    self.token_holders._iterate_transactions.assert_any_call(test_contracts, test_max_block, ANY)
+    assert iterator == test_iterator
 
 TEST_CONTRACT_INDEX = 'test-ethereum-contracts'
 TEST_ITX_INDEX = 'test-ethereum-internal-txs'
