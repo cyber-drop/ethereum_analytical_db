@@ -1,5 +1,5 @@
 import unittest
-from token_holders import TokenHolders, ExternalTokenTransactions, InternalTokenTransactions
+from token_holders import TokenHolders, InternalTokenTransactions
 from tests.test_utils import TestElasticSearch
 
 class TokenHoldersTestCase(unittest.TestCase):
