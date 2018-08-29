@@ -1,6 +1,6 @@
 import unittest
 from contract_methods import ContractMethods
-from test_utils import TestElasticSearch
+from tests.test_utils import TestElasticSearch
 
 class ContractMethodsTestCase(unittest.TestCase):
   def setUp(self):
@@ -63,7 +63,17 @@ class ContractMethodsTestCase(unittest.TestCase):
     contracts = contracts = [c for contracts_list in iterator for c in contracts_list]
     tokens = [contract['_source']['token_name'] for contract in contracts if contract['_source']['is_token'] == True]
     self.assertCountEqual(['RUN COIN', 'bangbeipay', 'YNOTCoin', 'Josh Bucks'], tokens)
+
+  def test_default_decimals(self):
+    self.client.index(TEST_INDEX, 'contract', {'address': '0xa0e89120768bf166d228988627e4ac8af350220a', 'blockNumber': 5748807, 'bytecode': TEST_BYTECODES[0]}, refresh=True)
+    self.client.index(TEST_INDEX, 'contract', {'address': '0xc569a08db1a5f2cd3ef9c2c3bfbc4f42f74de51b', 'blockNumber': 5748807, 'bytecode': TEST_BYTECODES[1]}, refresh=True)
+
+    dec_exists = self.contract_methods._get_constants('0xa0e89120768bf166d228988627e4ac8af350220a')
+    dec_non_exists = self.contract_methods._get_constants('0xc569a08db1a5f2cd3ef9c2c3bfbc4f42f74de51b')
     
+    assert dec_exists[2] == 0
+    assert dec_non_exists[2] == 18
+
 TEST_INDEX = 'test-ethereum-contracts'
 TEST_EMPTY_CONTRACT = '0xd3857e9ab037454e47281e51e42fc3e32677337f'
 TEST_CONTRACT_ADDRESSES = ['0xa0e89120768bf166d228988627e4ac8af350220a', '0x6d6fb0951b769a6246f0246472856b2f70049c53', '0xaff9f95b455662c893bf3bb752557faa962d8355', '0x6Dabe61eD0212141951292e47d866cf0b3F2bfBD', '0x7681ac00c991852ad683d235377e8557256d769f']

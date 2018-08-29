@@ -76,9 +76,11 @@ class TokenHolders:
     }
     return self.client.iterate(self.indices[self.tx_index], self.tx_type, query)
 
+  def _check_decimals(self, token):
+    dec = self.token_decimals[token] if token in self.token_decimals.keys() else 18
+    return dec
+
   def _convert_transfer_value(self, value, decimals):
-    if decimals == 1:
-      return (value, None)
     value = int(value)
     rounded = value / math.pow(10, decimals)
     rounded = "{0:.5f}".format(rounded)
@@ -120,7 +122,7 @@ class TokenHolders:
 
   def _process_only_uint(self, tx):
     tx_input = tx['decoded_input']
-    decimals = self.token_decimals[tx['to']] if tx['to'] in self.token_decimals.keys() else 1
+    decimals = self._check_decimals(tx['to'])
     value = self._convert_transfer_value(tx_input['params'][0]['value'], decimals)
     valid = self._check_is_valid(tx)
     return [{
@@ -146,7 +148,7 @@ class TokenHolders:
 
   def _process_address_uint_tx(self, tx):
     tx_input = tx['decoded_input']
-    decimals = self.token_decimals[tx['to']] if tx['to'] in self.token_decimals.keys() else 1
+    decimals = self._check_decimals(tx['to'])
     value = self._convert_transfer_value(tx_input['params'][1]['value'], decimals)
     valid = self._check_is_valid(tx)
     return [{
@@ -177,7 +179,7 @@ class TokenHolders:
 
   def _process_two_addr_tx(self, tx):
     tx_input = tx['decoded_input']
-    decimals = self.token_decimals[tx['to']] if tx['to'] in self.token_decimals.keys() else 1
+    decimals = self._check_decimals(tx['to'])
     value = self._convert_transfer_value(tx_input['params'][2]['value'], decimals)
     valid = self._check_is_valid(tx)
     return [{
@@ -195,7 +197,7 @@ class TokenHolders:
 
   def _process_multiple_addr_tx(self, tx):
     tx_input = tx['decoded_input']
-    decimals = self.token_decimals[tx['to']] if tx['to'] in self.token_decimals.keys() else 1
+    decimals = self._check_decimals(tx['to'])
     addresses = re.sub('\'', '\"', tx_input['params'][0]['value'])
     addresses = json.loads(addresses)
     values = [str(value) for value in json.loads(tx_input['params'][1]['value'])]
@@ -221,7 +223,7 @@ class TokenHolders:
 
   def _process_multi_addr_one_uint(self, tx):
     tx_input = tx['decoded_input']
-    decimals = self.token_decimals[tx['to']] if tx['to'] in self.token_decimals.keys() else 1
+    decimals = self._check_decimals(tx['to'])
     addresses = re.sub('\'', '\"', tx_input['params'][0]['value'])
     addresses = json.loads(addresses)
     values = [str(tx_input['params'][1]['value']) for i in range(len(addresses))]
@@ -244,15 +246,9 @@ class TokenHolders:
       }
       descriptions.append(descr)
     return descriptions
-
-  def _process_multi_addr_one_uint_no_value_preprocess(self, tx):
-    decimals = self.token_decimals[tx['to']] if tx['to'] in self.token_decimals.keys() else 1
-    if decimals > 1:
-      tx['decoded_input']['params'][1]['value'] = str(int(float(tx['decoded_input']['params'][1]['value']) * math.pow(10, decimals)))
-    return self._process_multi_addr_one_uint(tx)
   
   def _process_multi_addr_same_value(self, tx):
-    decimals = self.token_decimals[tx['to']] if tx['to'] in self.token_decimals.keys() else 1
+    decimals = self._check_decimals(tx['to'])
     tx['decoded_input']['params'].append({"value": int(2000 * math.pow(10, decimals))})
     return self._process_multi_addr_one_uint(tx)
 
@@ -262,7 +258,7 @@ class TokenHolders:
     return self._process_multiple_addr_tx(tx)
   
   def _process_multiple_encoded_addr(self, tx):
-    decimals = self.token_decimals[tx['to']] if tx['to'] in self.token_decimals.keys() else 1
+    decimals = self._check_decimals(tx['to'])
     value_addresses = json.loads(tx['decoded_input']['params'][0]['value'].replace("'", '"'))
     transactions = []
     tx_input = tx["decoded_input"]
@@ -331,7 +327,7 @@ class TokenHolders:
     else:
       to = contract['creator']
     value = contract['total_supply'] if 'total_supply' in contract.keys() and contract['total_supply'] != 'None' else '0'
-    transaction_index = self.indices['transaction'] if re.search(r'\.', contract['parent_transaction']) == None else self.indices['internal_transaction']
+    transaction_index = self.indices['internal_transaction']
     return {
       'method': 'initial', 
       'to': to, 
