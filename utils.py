@@ -18,46 +18,93 @@ def split_on_chunks(iterable, size):
     yield elements
 
 def get_max_block(query="*", min_consistent_block=MIN_CONSISTENT_BLOCK):
-  client = get_elasticsearch_connection()
-  query += " AND number:[{} TO *]".format(min_consistent_block)
-  all_blocks = [block["_source"]["number"] for blocks in client.iterate(INDICES["block"], "b", query) for block in blocks]
-  all_blocks.sort()
-  for index, block in enumerate(all_blocks[1:]):
-    if block - all_blocks[index] > 1:
-      return all_blocks[index]
-  return all_blocks[-1]
+  aggregation = {
+    "size": 0,
+    "query": {
+      "bool": {
+        "must": [
+          {"query_string": {"query": query}},
+          {"range": {"number": {"gte": min_consistent_block}}}
+        ]
+      }
+    },
+    "aggs": {
+      "max_block": {
+        "max": {
+          "field": "number"
+        }
+      }
+    }
+  }
+  result = client.send_request("GET", [INDICES["block"], "b", "_search"], aggregation, {})
+  if result["aggregations"]["max_block"]["value"]:
+    return int(result["aggregations"]["max_block"]["value"])
+  else:
+    return min_consistent_block
 
-  # aggregation = {
-  #   "size": 0,
-  #   "query": {
-  #     "bool": {
-  #       "must": [
-  #         {"query_string": {"query": query}},
-  #         {"range": {"number": {"gte": min_consistent_block}}}
-  #       ]
-  #     }
-  #   },
-  #   "aggs": {
-  #     "max_block": {
-  #       "max": {
-  #         "field": "number"
-  #       }
-  #     },
-  #     "blocks_count": {
-  #       "value_count": {
-  #         "field": "number"
-  #       }
-  #     }
-  #   }
-  # }
-  # if max_block:
-  #   aggregation["query"]["bool"]["must"][1]["range"]["number"]["lt"] = max_block
-  # result = client.send_request("GET", [INDICES["block"], "b", "_search"], aggregation, {})
-  # if not result['aggregations']['blocks_count']["value"]:
-  #   return min_consistent_block
-  # blocks_count = int(result['aggregations']['blocks_count']["value"])
-  # max_block = int(result['aggregations']['max_block']["value"])
-  # if (max_block - min_consistent_block + 1 == blocks_count):
-  #   return max_block
-  # else:
-  #   return get_max_block(query, max_block, min_consistent_block)
+class ContractTransactionsIterator():
+  def _iterate_contracts(self, max_block, partial_query):
+    query = {
+      "bool": {
+        "must": [
+          partial_query,
+          {"bool": {
+            "should": [
+              {"range": {
+                self._get_flag_name(): {
+                  "lt": max_block
+                }
+              }},
+              {"bool": {"must_not": [{"exists": {"field": self._get_flag_name()}}]}},
+            ]
+          }}
+        ]
+      }
+    }
+    return self.client.iterate(self.indices["contract"], 'contract', query)
+
+  def _create_transactions_request(self, contracts, max_block):
+    max_blocks_contracts = {}
+    for contract_dict in contracts:
+      block = contract_dict["_source"].get(self._get_flag_name(), 0)
+      contract = contract_dict["_source"]["address"]
+      if block not in max_blocks_contracts.keys():
+        max_blocks_contracts[block] = []
+      max_blocks_contracts[block].append(contract)
+
+    filters = [{
+      "bool": {
+        "must": [
+          {"terms": {"to": contracts}},
+          {"range": {"blockNumber": {"gt": max_synced_block, "lte": max_block}}}
+        ]
+      }
+    } for max_synced_block, contracts in max_blocks_contracts.items()]
+    return {"bool": {"should": filters}}
+
+  def _iterate_transactions(self, contracts, max_block, partial_query):
+    query = {
+      "bool": {
+        "must": [
+          partial_query,
+          self._create_transactions_request(contracts, max_block)
+        ]
+      }
+    }
+    return self.client.iterate(self.indices[self.index], self.doc_type, query)
+
+  def _save_max_block(self, contracts, max_block):
+    query = {
+      "terms": {
+        "address": contracts
+      }
+    }
+    self.client.update_by_query(
+      index=self.indices["contract"],
+      doc_type='contract',
+      query=query,
+      script='ctx._source.' + self._get_flag_name() + ' = ' + str(max_block)
+    )
+
+  def _get_flag_name(self):
+    return "{}_{}_block".format(self.doc_type, self.block_prefix)

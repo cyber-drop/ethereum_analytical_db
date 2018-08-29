@@ -1,15 +1,28 @@
-from contracts import ExternalContracts, InternalContracts, _get_contracts_abi_sync
+from contracts import InternalContracts, _get_contracts_abi_sync
 import contracts
 import os
 import unittest
 from tests.test_utils import TestElasticSearch, mockify
 from tqdm import *
-import json
 from unittest.mock import MagicMock, call, Mock, patch, ANY
 from time import sleep
 import multiprocessing
+import json
 
-class InputParsingTestCase():
+TEST_CONTRACT_ABI = json.loads('[{"constant":true,"inputs":[],"name":"name","outputs":[{"name":"","type":"bytes32"}],"payable":false,"type":"function"},{"constant":false,"inputs":[],"name":"stop","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"guy","type":"address"},{"name":"wad","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"owner_","type":"address"}],"name":"setOwner","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"src","type":"address"},{"name":"dst","type":"address"},{"name":"wad","type":"uint256"}],"name":"transferFrom","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"dst","type":"address"},{"name":"wad","type":"uint128"}],"name":"push","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"name_","type":"bytes32"}],"name":"setName","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"wad","type":"uint128"}],"name":"mint","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"src","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"stopped","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"authority_","type":"address"}],"name":"setAuthority","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"src","type":"address"},{"name":"wad","type":"uint128"}],"name":"pull","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"owner","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"wad","type":"uint128"}],"name":"burn","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"bytes32"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"dst","type":"address"},{"name":"wad","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":false,"inputs":[],"name":"start","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"authority","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"src","type":"address"},{"name":"guy","type":"address"}],"name":"allowance","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"inputs":[{"name":"symbol_","type":"bytes32"}],"payable":false,"type":"constructor"},{"anonymous":true,"inputs":[{"indexed":true,"name":"sig","type":"bytes4"},{"indexed":true,"name":"guy","type":"address"},{"indexed":true,"name":"foo","type":"bytes32"},{"indexed":true,"name":"bar","type":"bytes32"},{"indexed":false,"name":"wad","type":"uint256"},{"indexed":false,"name":"fax","type":"bytes"}],"name":"LogNote","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"authority","type":"address"}],"name":"LogSetAuthority","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"owner","type":"address"}],"name":"LogSetOwner","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"from","type":"address"},{"indexed":true,"name":"to","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Transfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"owner","type":"address"},{"indexed":true,"name":"spender","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Approval","type":"event"}]')
+TEST_CONTRACT_ADDRESS = '0x86fa049857e0209aa7d9e616f7eb3b3b78ecfdb0'
+TEST_CONTRACT_PARAMETERS = '0xa9059cbb000000000000000000000000d11b80088ce2623a9c017b93008405511cd951d200000000000000000000000000000000000000000000000d343b16da9c1a4000'
+TEST_CONTRACT_DECODED_PARAMETERS = {'name': 'transfer', 'params': [{'type': 'address', 'value': '0xd11b80088ce2623a9c017b93008405511cd951d2'}, {'type': 'uint256', 'value': '243571300000000000000'}]}
+TEST_TRANSACTIONS_INDEX = 'test-ethereum-transactions'
+TEST_CONTRACTS_INDEX = 'test-ethereum-contracts'
+
+class InputParsingTestCase(unittest.TestCase):
+  doc_type = "itx"
+  index = "internal_transaction"
+  contracts_class = InternalContracts
+  doc = {'to': TEST_CONTRACT_ADDRESS, 'input': TEST_CONTRACT_PARAMETERS, "callType": "call", 'blockNumber': 10}
+  blocks_query = "traces_extracted:true"
+
   def setUp(self):
     self.contracts = self.contracts_class(
       {"contract": TEST_CONTRACTS_INDEX, self.index: TEST_TRANSACTIONS_INDEX},
@@ -143,61 +156,43 @@ class InputParsingTestCase():
     contracts = [c["_id"] for contracts_list in contracts for c in contracts_list]
     self.assertCountEqual(contracts, [str(i) for i in range(21, 25)])
 
-  def test_iterate_contracts_with_abi_skip_max_block(self):
+  def test_iterate_contracts_with_abi_call_iterate_contracts(self):
     test_max_block = 2
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
-      self.doc_type + "_inputs_decoded_block": 1,
-      "address": "0x1",
-      "abi": {"test": 1},
-      "blockNumber": 1,
-    }, refresh=True, id=1)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
-      self.doc_type + "_inputs_decoded_block": 2,
-      "address": "0x2",
-      "abi": {"test": 1},
-      "blockNumber": 1
-    }, refresh=True, id=2)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
-      self.doc_type + "_inputs_decoded_block": 3,
-      "address": "0x3",
-      "abi": {"test": 1},
-      "blockNumber": 1
-    }, refresh=True, id=3)
-    contracts = [c["_id"] for contracts in self.contracts._iterate_contracts_with_abi(test_max_block) for c in contracts]
-    self.assertCountEqual(contracts, ['1'])
+    test_iterator = "iterator"
+    self.contracts._iterate_contracts = MagicMock(return_value=test_iterator)
 
-  def test_create_transactions_request(self):
-    test_max_block = 40
-    test_max_blocks_for_contracts = {
-      "0x1": 10,
-      "0x2": 30
-    }
-    transactions_request = self.contracts._create_transactions_request(
-      test_max_blocks_for_contracts,
-      test_max_block
-    )
-    self.assertCountEqual([
-      {"bool": {"must": [
-        {"terms": {"to": ["0x1"]}},
-        {"range": {"blockNumber": {"gt": 10, "lte": 40}}}
-      ]}},
-      {"bool": {"must": [
-        {"terms": {"to": ["0x2"]}},
-        {"range": {"blockNumber": {"gt": 30, "lte": 40}}}
-      ]}},
-    ], transactions_request["bool"]["should"])
+    contracts = self.contracts._iterate_contracts_with_abi(test_max_block)
 
-  def test_create_transactions_request_multiple_blocks(self):
-    test_max_block = 40
-    test_max_blocks_for_contracts = {
-      "0x1": 10,
-      "0x2": 10
-    }
-    transactions_request = self.contracts._create_transactions_request(
-      test_max_blocks_for_contracts,
-      test_max_block
-    )
-    self.assertCountEqual(["0x1", "0x2"], transactions_request["bool"]["should"][0]["bool"]["must"][0]["terms"]["to"])
+    self.contracts._iterate_contracts.assert_any_call(test_max_block, ANY)
+    assert contracts == test_iterator
+
+  def test_iterate_transactions_by_targets_ignore_transactions_with_error(self):
+    self.contracts._create_transactions_request = MagicMock(return_value={"query_string": {"query": "*"}})
+    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
+      'callType': 'call',
+    }, id=1, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
+      'callType': 'delegatecall',
+    }, id=2, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
+      'callType': 'call',
+      "error": "Out of gas",
+    }, id=3, refresh=True)
+    targets = [{"_source": {"address": TEST_CONTRACT_ADDRESS}}]
+    transactions = self.contracts._iterate_transactions_by_targets(targets, 0)
+    transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
+    self.assertCountEqual(transactions, ['1'])
+
+  def test_iterate_transactions_by_targets_select_unprocessed_transactions(self):
+    test_iterator = "iterator"
+    test_max_block = 0
+    test_contracts = ["contract"]
+    self.contracts._iterate_transactions = MagicMock(return_value=test_iterator)
+
+    transactions = self.contracts._iterate_transactions_by_targets(test_contracts, test_max_block)
+
+    self.contracts._iterate_transactions.assert_any_call(test_contracts, test_max_block, ANY)
+    assert transactions == test_iterator
 
   def test_decode_inputs_for_contracts(self):
     test_max_block = 1000
@@ -217,8 +212,6 @@ class InputParsingTestCase():
       for i in range(10)
     ]
     test_contracts.append({"_source": {"address": "0xa"}})
-    test_contracts_preprocessed = {"0x" + str(i): i for i in range(10)}
-    test_contracts_preprocessed["0xa"] = 0
     test_block = 100
     mock_iterate = MagicMock(return_value=[])
     mockify(self.contracts, {
@@ -227,7 +220,7 @@ class InputParsingTestCase():
 
     self.contracts._decode_inputs_for_contracts(test_contracts, test_block)
 
-    mock_iterate.assert_called_with(test_contracts_preprocessed, test_block)
+    mock_iterate.assert_called_with(test_contracts, test_block)
 
   def test_decode_inputs_for_contracts_exception(self):
     def exception_on_seven(inputs):
@@ -252,17 +245,6 @@ class InputParsingTestCase():
 
     assert self.contracts.client.bulk.call_count == 9
 
-  def test_save_inputs_decoded(self):
-    test_max_block = 100
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS + str(1)}, id=1, refresh=True)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS + str(2)}, id=2, refresh=True)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS + str(3)}, id=3, refresh=True)
-    self.contracts._save_inputs_decoded([TEST_CONTRACT_ADDRESS + str(1), TEST_CONTRACT_ADDRESS + str(3)], test_max_block)
-
-    contracts = self.client.search(index=TEST_CONTRACTS_INDEX, doc_type='contract', query=self.doc_type + "_inputs_decoded_block:" + str(test_max_block))['hits']['hits']
-    contracts = [contract["_source"]["address"] for contract in contracts]
-    self.assertCountEqual(contracts, [TEST_CONTRACT_ADDRESS + str(1), TEST_CONTRACT_ADDRESS + str(3)])
-
   def test_decode_inputs_save_inputs_decoded(self):
     test_contracts = ["contract1", "contract2", "contract3"]
     test_contracts_from_elasticsearch = [{"_source": {"abi": contract, "address": contract}} for contract in test_contracts]
@@ -271,7 +253,7 @@ class InputParsingTestCase():
     }, ["decode_inputs"])
     process = Mock(
       decode=self.contracts._decode_inputs_for_contracts,
-      save=self.contracts._save_inputs_decoded
+      save=self.contracts._save_max_block
     )
 
     with patch('utils.get_max_block'):
@@ -291,7 +273,7 @@ class InputParsingTestCase():
     process = Mock(
       iterate=self.contracts._iterate_contracts_with_abi,
       decode=self.contracts._decode_inputs_for_contracts,
-      save=self.contracts._save_inputs_decoded
+      save=self.contracts._save_max_block
     )
     test_max_block_mock = MagicMock(side_effect=[test_max_block])
     with patch('utils.get_max_block', test_max_block_mock):
@@ -315,92 +297,3 @@ class InputParsingTestCase():
       transactions = self.client.search(index=TEST_TRANSACTIONS_INDEX, doc_type=self.doc_type, query="*")['hits']['hits']
       assert len([transaction["_source"]["decoded_input"] for transaction in transactions]) == 10
 
-TEST_CONTRACT_ABI = json.loads('[{"constant":true,"inputs":[],"name":"name","outputs":[{"name":"","type":"bytes32"}],"payable":false,"type":"function"},{"constant":false,"inputs":[],"name":"stop","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"guy","type":"address"},{"name":"wad","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"owner_","type":"address"}],"name":"setOwner","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"src","type":"address"},{"name":"dst","type":"address"},{"name":"wad","type":"uint256"}],"name":"transferFrom","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"dst","type":"address"},{"name":"wad","type":"uint128"}],"name":"push","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"name_","type":"bytes32"}],"name":"setName","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"wad","type":"uint128"}],"name":"mint","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"src","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"stopped","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"authority_","type":"address"}],"name":"setAuthority","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"src","type":"address"},{"name":"wad","type":"uint128"}],"name":"pull","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"owner","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"wad","type":"uint128"}],"name":"burn","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"bytes32"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"dst","type":"address"},{"name":"wad","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":false,"inputs":[],"name":"start","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"authority","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"src","type":"address"},{"name":"guy","type":"address"}],"name":"allowance","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"inputs":[{"name":"symbol_","type":"bytes32"}],"payable":false,"type":"constructor"},{"anonymous":true,"inputs":[{"indexed":true,"name":"sig","type":"bytes4"},{"indexed":true,"name":"guy","type":"address"},{"indexed":true,"name":"foo","type":"bytes32"},{"indexed":true,"name":"bar","type":"bytes32"},{"indexed":false,"name":"wad","type":"uint256"},{"indexed":false,"name":"fax","type":"bytes"}],"name":"LogNote","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"authority","type":"address"}],"name":"LogSetAuthority","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"owner","type":"address"}],"name":"LogSetOwner","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"from","type":"address"},{"indexed":true,"name":"to","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Transfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"owner","type":"address"},{"indexed":true,"name":"spender","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Approval","type":"event"}]')
-TEST_CONTRACT_ADDRESS = '0x86fa049857e0209aa7d9e616f7eb3b3b78ecfdb0'
-TEST_CONTRACT_PARAMETERS = '0xa9059cbb000000000000000000000000d11b80088ce2623a9c017b93008405511cd951d200000000000000000000000000000000000000000000000d343b16da9c1a4000'
-TEST_CONTRACT_DECODED_PARAMETERS = {'name': 'transfer', 'params': [{'type': 'address', 'value': '0xd11b80088ce2623a9c017b93008405511cd951d2'}, {'type': 'uint256', 'value': '243571300000000000000'}]}
-TEST_TRANSACTIONS_INDEX = 'test-ethereum-transactions'
-TEST_CONTRACTS_INDEX = 'test-ethereum-contracts'
-
-class ExternalTransactionsInputParsingTestCase(InputParsingTestCase, unittest.TestCase):
-  doc_type = "tx"
-  index = "transaction"
-  contracts_class = ExternalContracts
-  doc = {'to': TEST_CONTRACT_ADDRESS, 'input': TEST_CONTRACT_PARAMETERS, 'blockNumber': 10}
-  blocks_query = "*"
-
-  def test_iterate_transactions_by_targets_ignore_transactions_with_error(self):
-    self.contracts._create_transactions_request = MagicMock(return_value={"exists": {"field": "to"}})
-    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
-      'to': TEST_CONTRACT_ADDRESS,
-      "error": "Out of gas",
-    }, id=1, refresh=True)
-    targets = {TEST_CONTRACT_ADDRESS: 0}
-    transactions = [c for c in self.contracts._iterate_transactions_by_targets(targets, 10)]
-    assert not transactions
-
-  def test_iterate_transactions_by_targets(self):
-    test_max_block = 15
-    for i in tqdm(range(test_max_block)):
-      self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
-        'to': TEST_CONTRACT_ADDRESS,
-        "blockNumber": i + 1
-      }, id=i + 1, refresh=True)
-    for i in tqdm(range(test_max_block)):
-      self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
-        'to': "0x",
-        "blockNumber": i + 1
-      }, id=i + test_max_block + 1, refresh=True)
-    targets = {TEST_CONTRACT_ADDRESS: 10}
-    transactions = [c for c in self.contracts._iterate_transactions_by_targets(targets, test_max_block)]
-    transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
-    self.assertCountEqual(transactions, [str(i) for i in range(11, 16)])
-
-class InternalTransactionsInputParsingTestCase(InputParsingTestCase, unittest.TestCase):
-  doc_type = "itx"
-  index = "internal_transaction"
-  contracts_class = InternalContracts
-  doc = {'to': TEST_CONTRACT_ADDRESS, 'input': TEST_CONTRACT_PARAMETERS, "callType": "call", 'blockNumber': 10}
-  blocks_query = "trace:true"
-
-  def test_iterate_transactions_by_targets(self):
-    self.contracts._create_transactions_request = MagicMock(return_value={"exists": {"field": "to"}})
-    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {'to': TEST_CONTRACT_ADDRESS, "callType": "delegatecall"}, id=1, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {'to': TEST_CONTRACT_ADDRESS, 'callType': 'call'}, id=2, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {'to': "0x"}, id=3, refresh=True)
-    targets = {TEST_CONTRACT_ADDRESS: 0}
-    transactions = [c for c in self.contracts._iterate_transactions_by_targets(targets, 10)]
-    transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
-    self.assertCountEqual(transactions, ['2'])
-
-  def test_iterate_transactions_by_targets_ignore_transactions_with_error(self):
-    self.contracts._create_transactions_request = MagicMock(return_value={"exists": {"field": "to"}})
-    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
-      'to': TEST_CONTRACT_ADDRESS,
-      'callType': 'call',
-      "error": "Out of gas",
-    }, id=1, refresh=True)
-    targets = {TEST_CONTRACT_ADDRESS: 0}
-    transactions = [c for c in self.contracts._iterate_transactions_by_targets(targets, 10)]
-    assert not transactions
-
-  def test_iterate_transactions_by_targets_select_unprocessed_transactions(self):
-    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
-      'to': TEST_CONTRACT_ADDRESS,
-      'callType': 'call',
-      "blockNumber": 1
-    }, id=1, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
-      'to': TEST_CONTRACT_ADDRESS,
-      'callType': 'call',
-      "blockNumber": 2
-    }, id=2, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
-      'to': TEST_CONTRACT_ADDRESS,
-      'callType': 'call',
-      "blockNumber": 3
-    }, id=3, refresh=True)
-    targets = {TEST_CONTRACT_ADDRESS: 1}
-    transactions = [c for c in self.contracts._iterate_transactions_by_targets(targets, 2)]
-    transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
-    self.assertCountEqual(transactions, ['2'])

@@ -1,7 +1,9 @@
 from custom_elastic_search import CustomElasticSearch
 from config import INDICES
+import utils
 
-class ContractTransactions:
+class ContractTransactions(utils.ContractTransactionsIterator):
+  block_prefix = "transactions_detected"
   def __init__(self, indices=INDICES, elasticsearch_host="http://localhost:9200", ethereum_api_host="http://localhost:8545"):
     self.indices = indices
     self.client = CustomElasticSearch(elasticsearch_host)
@@ -35,23 +37,32 @@ class ContractTransactions:
   def _extract_contract_from_transactions(self):
     raise Exception
 
-  def _iterate_contracts(self):
-    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(_exists_:transactions_detected)')
-
-  def _detect_transactions_by_contracts(self, contracts):
-    transactions_query = {
-      "terms": {
-        "to": contracts
+  def _iterate_contracts_without_detected_transactions(self, max_block):
+    query = {
+      "query_string": {
+        "query": 'address:*'
       }
+    }
+    return self._iterate_contracts(max_block, query)
+
+  def _detect_transactions_by_contracts(self, contracts, max_block):
+    transactions_query = {
+      "bool": {
+        "must": [
+          {"terms": {"to": [contract["_source"]["address"] for contract in contracts]}},
+          self._create_transactions_request(contracts, max_block)
+        ]
+      }
+
     }
     self.client.update_by_query(self.indices[self.index], self.doc_type, transactions_query,
                                 "ctx._source.to_contract = true")
 
   def detect_contract_transactions(self):
-    self._extract_contract_addresses()
-    for contracts in self._iterate_contracts():
-      contracts = [contract["_source"]["address"] for contract in contracts]
-      self._detect_transactions_by_contracts(contracts)
+    max_block = utils.get_max_block()
+    for contracts in self._iterate_contracts_without_detected_transactions(max_block):
+      self._detect_transactions_by_contracts(contracts, max_block)
+      self._save_max_block([contract["_source"]["address"] for contract in contracts], max_block)
 
 class ExternalContractTransactions(ContractTransactions):
   index = "transaction"

@@ -4,14 +4,49 @@ from pyelasticsearch import ElasticSearch
 from time import sleep
 from tqdm import *
 from test_utils import TestElasticSearch
-from unittest.mock import MagicMock, Mock, call
+from unittest.mock import MagicMock, Mock, call, ANY, patch
 
-class ContractTransactionsTestCase():
+class InternalContractTransactionsTestCase(unittest.TestCase):
+  contract_transactions_class = InternalContractTransactions
+  index = "internal_transaction"
+  doc_type = "itx"
+
   def setUp(self):
     self.client = TestElasticSearch()
     self.client.recreate_fast_index(TEST_TRANSACTIONS_INDEX)
     self.client.recreate_index(TEST_CONTRACTS_INDEX)
     self.contract_transactions = self.contract_transactions_class({"contract": TEST_CONTRACTS_INDEX, self.index: TEST_TRANSACTIONS_INDEX})
+
+  def test_iterate_contract_transactions(self):
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "call"}, id=1, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create"}, id=2, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create", "error": "Out of gas"}, id=3, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'type': "create"}, id=4, refresh=True)
+    self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create", "contract_created": True}, id=5, refresh=True)
+    iterator = self.contract_transactions._iterate_contract_transactions()
+    transactions = next(iterator)
+    transactions = [transaction['_id'] for transaction in transactions]
+    self.assertCountEqual(['2'], transactions)
+
+  def test_extract_contract_from_internal_transaction(self):
+    transaction = {
+      "from": "0x0",
+      "input": "0x1",
+      "address": "0x2",
+      "code": "0x3",
+      "blockNumber": 100
+    }
+    transaction_id = "0x10"
+    contract = self.contract_transactions._extract_contract_from_transactions({
+      "_source": transaction,
+      "_id": transaction_id
+    })
+    assert contract["owner"] == transaction["from"]
+    assert contract["blockNumber"] == transaction["blockNumber"]
+    assert contract["parent_transaction"] == transaction_id
+    assert contract["address"] == transaction["address"]
+    assert contract["id"] == transaction["address"]
+    assert contract["bytecode"] == transaction["code"]
 
   def test_extract_contract_addresses(self):
     transactions_list = [
@@ -73,121 +108,73 @@ class ContractTransactionsTestCase():
   def test_iterate_contracts(self):
     self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_TRANSACTION_TO}, id=1, refresh=True)
     self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_TRANSACTION_TO_CONTRACT}, id=2, refresh=True)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract',
-                      {'address': TEST_TRANSACTION_TO_CONTRACT, 'transactions_detected': True}, id=3, refresh=True)
-    iterator = self.contract_transactions._iterate_contracts()
+    iterator = self.contract_transactions._iterate_contracts_without_detected_transactions(0)
     contracts = [c for contracts_list in iterator for c in contracts_list]
     contracts = [contract['_id'] for contract in contracts]
     self.assertCountEqual(["1", "2"], contracts)
 
+  def test_iterate_unprocessed_contracts(self):
+    test_iterator = "iterator"
+    test_max_block = 0
+    self.contract_transactions._iterate_contracts = MagicMock(return_value=test_iterator)
+
+    contracts = self.contract_transactions._iterate_contracts_without_detected_transactions(test_max_block)
+    self.contract_transactions._iterate_contracts.assert_any_call(test_max_block, ANY)
+    assert contracts == test_iterator
+
   def test_detect_transactions_by_contracts(self):
+    test_query = {"test": "query"}
+    test_max_block = 0
     self.contract_transactions.client.update_by_query = MagicMock()
-    contracts = [TEST_TRANSACTION_TO, TEST_TRANSACTION_TO_CONTRACT]
-    self.contract_transactions._detect_transactions_by_contracts(contracts)
+    self.contract_transactions._create_transactions_request = MagicMock(return_value=test_query)
+    contracts = [{"_source": {"address": "0x1"}}, {"_source": {"address": "0x2"}}]
+    contracts_addresses = ["0x1", "0x2"]
+    self.contract_transactions._detect_transactions_by_contracts(contracts, test_max_block)
+
+    self.contract_transactions._create_transactions_request.assert_any_call(ANY, test_max_block)
     self.contract_transactions.client.update_by_query.assert_any_call(
       TEST_TRANSACTIONS_INDEX,
       self.doc_type,
       {
-        "terms": {
-          "to": contracts
+        "bool": {
+          "must": [
+            {"terms": {"to": contracts_addresses}},
+            test_query
+          ]
         }
       },
       "ctx._source.to_contract = true"
     )
 
   def test_detect_contract_transactions(self):
+    test_max_block = 10
     contracts_list = [[TEST_TRANSACTION_TO + str(j * 10 + i) for i in range(10)] for j in range(5)]
     contracts_from_es_list = [[{"_source": {"address": contract}} for contract in contracts] for contracts in
                               contracts_list]
-    self.contract_transactions._extract_contract_addresses = MagicMock()
-    self.contract_transactions._iterate_contracts = MagicMock(return_value=contracts_from_es_list)
+    self.contract_transactions.extract_contract_addresses = MagicMock()
+    self.contract_transactions._iterate_contracts_without_detected_transactions = MagicMock(return_value=contracts_from_es_list)
     self.contract_transactions._detect_transactions_by_contracts = MagicMock()
-    process = Mock()
-    process.configure_mock(
-      extract=self.contract_transactions._extract_contract_addresses,
-      iterate=self.contract_transactions._iterate_contracts,
-      detect=self.contract_transactions._detect_transactions_by_contracts
-    )
+    self.contract_transactions._save_max_block = MagicMock()
+    test_max_block_mock = MagicMock(side_effect=[test_max_block])
+    with patch('utils.get_max_block', test_max_block_mock):
+      process = Mock()
+      process.configure_mock(
+        get_max_block=test_max_block_mock,
+        iterate=self.contract_transactions._iterate_contracts_without_detected_transactions,
+        detect=self.contract_transactions._detect_transactions_by_contracts,
+        save=self.contract_transactions._save_max_block
+      )
 
-    self.contract_transactions.detect_contract_transactions()
+      self.contract_transactions.detect_contract_transactions()
 
-    process.assert_has_calls([
-                               call.extract(),
-                               call.iterate()
-                             ] + [call.detect(contracts) for contracts in contracts_list])
-
-class InternalContractTransactionsTestCase(ContractTransactionsTestCase, unittest.TestCase):
-  contract_transactions_class = InternalContractTransactions
-  index = "internal_transaction"
-  doc_type = "itx"
-
-  def test_iterate_internal_contract_transactions(self):
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "call"}, id=1, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create"}, id=2, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create", "error": "Out of gas"}, id=3, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'type': "create"}, id=4, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create", "contract_created": True}, id=5, refresh=True)
-    iterator = self.contract_transactions._iterate_contract_transactions()
-    transactions = next(iterator)
-    transactions = [transaction['_id'] for transaction in transactions]
-    self.assertCountEqual(['2'], transactions)
-
-  def test_extract_contract_from_internal_transaction(self):
-    transaction = {
-      "from": "0x0",
-      "input": "0x1",
-      "address": "0x2",
-      "code": "0x3",
-      "blockNumber": 100
-    }
-    transaction_id = "0x10"
-    contract = self.contract_transactions._extract_contract_from_transactions({
-      "_source": transaction,
-      "_id": transaction_id
-    })
-    assert contract["owner"] == transaction["from"]
-    assert contract["blockNumber"] == transaction["blockNumber"]
-    assert contract["parent_transaction"] == transaction_id
-    assert contract["address"] == transaction["address"]
-    assert contract["id"] == transaction["address"]
-    assert contract["bytecode"] == transaction["code"]
-
-class ExternalContractTransactionsTestCase(ContractTransactionsTestCase, unittest.TestCase):
-  contract_transactions_class = ExternalContractTransactions
-  index = "transaction"
-  doc_type = "tx"
-
-  def test_extract_contract_from_transaction(self):
-    transaction = {
-      "hash": "0x0",
-      "creates": "0x1",
-      "from": "0x2",
-      "input": "0x3",
-      "blockNumber": 100
-    }
-    transaction_id = "0x10"
-    contract = self.contract_transactions._extract_contract_from_transactions({
-      "_source": transaction,
-      "_id": transaction_id
-    })
-    assert contract["owner"] == transaction["from"]
-    assert contract["address"] == transaction["creates"]
-    assert contract["id"] == transaction["creates"]
-    assert contract["parent_transaction"] == transaction_id
-    assert contract["blockNumber"] == transaction["blockNumber"]
-    assert contract["bytecode"] == transaction["input"]
-
-  def test_iterate_contract_transactions(self):
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'creates': TEST_TRANSACTION_TO, 'to': None}, id=1, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to': None}, id=2, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'to': TEST_TRANSACTION_TO}, id=3, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'creates': TEST_TRANSACTION_TO, 'to': None, 'error': "Out of gas"}, id=4, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'creates': TEST_TRANSACTION_TO, 'to': None}, id=5, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, 'tx', {'creates': TEST_TRANSACTION_TO, 'to': None, "contract_created": True}, id=6, refresh=True)
-    iterator = self.contract_transactions._iterate_contract_transactions()
-    transactions = next(iterator)
-    transactions = [transaction['_id'] for transaction in transactions]
-    self.assertCountEqual(['1'], transactions)
+      call_part = []
+      for index, contracts in enumerate(contracts_from_es_list):
+        call_part.append(call.detect(contracts, test_max_block))
+        call_part.append(call.save(contracts_list[index], test_max_block))
+      process.assert_has_calls([
+                                 call.get_max_block(),
+                                 call.iterate(test_max_block)
+                               ] + call_part)
 
 TEST_TRANSACTIONS_INDEX = 'test-ethereum-transactions'
 TEST_CONTRACTS_INDEX = 'test-ethereum-contracts'
