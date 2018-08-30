@@ -356,6 +356,7 @@ class TokenHolders(utils.ContractTransactionsIterator):
       self.token_decimals = {token['_source']['address']: token['_source']['decimals'] for token in tokens if 'decimals' in token['_source'].keys()}
       self._extract_contract_creation_descr(tokens)
       self._extract_tokens_txs(tokens, max_block)
+      self._save_max_block([token["_source"]["address"] for token in tokens], max_block)
 
   def _get_listed_tokens_addresses(self):
     addresses = []

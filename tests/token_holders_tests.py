@@ -1,6 +1,6 @@
 import unittest
 from token_holders import TokenHolders, InternalTokenTransactions
-from tests.test_utils import TestElasticSearch
+from tests.test_utils import TestElasticSearch, mockify
 from unittest.mock import MagicMock, ANY, patch
 
 class TokenHoldersTestCase(unittest.TestCase):
@@ -158,6 +158,20 @@ class TokenHoldersTestCase(unittest.TestCase):
 
     self.token_holders._iterate_transactions.assert_any_call(test_contracts, test_max_block, ANY)
     assert iterator == test_iterator
+
+  def test_save_max_block(self):
+    test_max_block = 10
+    test_max_block_mock = MagicMock(return_value=test_max_block)
+    test_tokens = [[{"_source": {"address": "token1"}}]]
+    test_tokens_addresses = ["token1"]
+    mockify(self.token_holders, {
+      '_iterate_tokens': MagicMock(return_value=test_tokens)
+    }, 'get_listed_tokens_txs')
+
+    with patch('utils.get_max_block', test_max_block_mock):
+      self.token_holders.get_listed_tokens_txs()
+
+      self.token_holders._save_max_block.assert_any_call(test_tokens_addresses, test_max_block)
 
 TEST_CONTRACT_INDEX = 'test-ethereum-contracts'
 TEST_ITX_INDEX = 'test-ethereum-internal-txs'
