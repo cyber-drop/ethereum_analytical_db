@@ -62,10 +62,16 @@ def extract_prices(host):
   token_prices = TokenPrices(INDICES, host)
   token_prices.get_prices_within_interval()
 
-def extract_transactions_prices(host):
+def extract_transactions_prices(host, currency):
   print("Extracting transactions USD value...")
   transactions_prices = TokenTransactionsPrices()
-  transactions_prices.extract_transactions_prices()
+  transactions_prices.extract_transactions_prices(currency)
+
+def extract_transactions_prices_usd(host):
+  extract_transactions_prices(host, 'USD')
+
+def extract_transactions_prices_eth(host):
+  extract_transactions_prices(host, 'ETH')
 
 def run_loop(host):
   while True:
@@ -78,7 +84,8 @@ def run_loop(host):
     parse_inputs(host)
     extract_prices(host)
     extract_token_transactions(host)
-    extract_transactions_prices(host)
+    extract_transactions_prices(host, 'USD')
+    extract_transactions_prices(host, 'ETH')
 
 operations = {
   "prepare-indices": prepare_indices,
@@ -91,7 +98,8 @@ operations = {
   "search-methods": search_methods,
   "extract-token-transactions": extract_token_transactions,
   "extract-prices": extract_prices,
-  "extract-token-transactions-prices": extract_transactions_prices,
+  "extract-token-transactions-prices-usd": extract_transactions_prices_usd,
+  "extract-token-transactions-prices-eth": extract_transactions_prices_eth,
   "run-loop": run_loop
 }
 
