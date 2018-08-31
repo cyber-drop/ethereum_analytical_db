@@ -148,7 +148,7 @@ class TokenTransactionsPrices:
     symbols = [symbols_map[a] for a in addresses]
     results = []
     block_tss = self._get_block_tss()
-    for token_txs in self._iterate_top_tokens_txs(addresses):
+    for token_txs in self._iterate_top_tokens_txs(addresses, currency):
       blocks = list(set([tx['_source']['block_id'] for tx in token_txs]))
       blocks = {block: block_tss[block] for block in blocks}
       dates = list(set([date for date in blocks.values()]))
