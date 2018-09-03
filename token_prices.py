@@ -24,7 +24,7 @@ class TokenPrices:
     return value / price
 
   def _iterate_cc_tokens(self):
-    return self.client.iterate(self.indices['contract'], 'contract', 'cmc_id:*')
+    return self.client.iterate(self.indices['contract'], 'contract', 'cc_sym:*')
 
   def _get_cc_tokens(self):
     tokens = [token_chunk for token_chunk in self._iterate_cc_tokens()]
