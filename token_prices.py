@@ -6,6 +6,7 @@ from datetime import date
 from pyelasticsearch import bulk_chunks
 from tqdm import *
 import time
+import pandas as pd
 
 class TokenPrices:
   def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host='http://localhost:9200'):
@@ -23,7 +24,7 @@ class TokenPrices:
     return value / price
 
   def _iterate_cc_tokens(self):
-    return self.client.iterate(self.indices['contract'], 'contract', 'cc_sym:*')
+    return self.client.iterate(self.indices['contract'], 'contract', 'cmc_id:*')
 
   def _get_cc_tokens(self):
     tokens = [token_chunk for token_chunk in self._iterate_cc_tokens()]
@@ -170,6 +171,9 @@ class TokenPrices:
   def _update_multiple_docs(self, docs, doc_type, index_name):
     for chunk in bulk_chunks(self._construct_bulk_update_ops(docs), docs_per_chunk=1000):
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
+
+  def _iterate_cmc_tokens(self):
+    return self.client.iterate(self.indices['contract'], 'contract', '_exists_:website_slug')
 
   def _get_token_cmc_historical_info(self, identifier, symbol):
     today = datetime.date.today().strftime('%Y%m%d')
