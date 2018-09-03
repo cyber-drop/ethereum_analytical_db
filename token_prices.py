@@ -161,3 +161,39 @@ class TokenPrices:
     prices = self._get_historical_multi_prices()
     if prices != None:
       self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
+    self.add_market_cap()
+
+  def _construct_bulk_update_ops(self, docs):
+    for doc in docs:
+      yield self.client.update_op(doc, id=doc['token'] + '_' + doc['timestamp'], upsert=doc)
+
+  def _update_multiple_docs(self, docs, doc_type, index_name):
+    for chunk in bulk_chunks(self._construct_bulk_update_ops(docs), docs_per_chunk=1000):
+      self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
+
+  def _get_token_cmc_historical_info(self, identifier, symbol):
+    today = datetime.date.today().strftime('%Y%m%d')
+    url = 'https://coinmarketcap.com/currencies/{}/historical-data/?start=20130428&end={}'.format(identifier, today)
+    res = requests.get(url).text
+    parsed_data = pd.read_html(res)[0]
+    try:
+      parsed_data = parsed_data.loc[parsed_data['Market Cap'] != '-']
+    except:
+      return
+    info = [{
+      'marketCap': int(row['Market Cap']), 
+      'timestamp': datetime.datetime.strptime(row['Date'], '%b %d, %Y').strftime('%Y-%m-%d'), 
+      'USD_cmc': (row['Open*'] + row['Close**']) / 2,
+      'token': symbol
+      } for i, row in parsed_data.iterrows()]
+    return info
+
+  def add_market_cap(self):
+    cmc_tokens = self._iterate_cmc_tokens()
+    cmc_tokens = [t['_source'] for tokens in cmc_tokens for t in tokens]
+    for token in tqdm(cmc_tokens):
+      cmc_info = self._get_token_cmc_historical_info(token['website_slug'], token['token_symbol'])
+      if cmc_info == None:
+        continue
+      self._update_multiple_docs(cmc_info, 'price', self.indices['token_price'])
+
