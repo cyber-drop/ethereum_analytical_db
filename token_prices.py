@@ -6,7 +6,10 @@ from datetime import date
 from pyelasticsearch import bulk_chunks
 from tqdm import *
 import time
+import numpy as np
 import pandas as pd
+
+MOVING_AVERAGE_WINDOW = 5
 
 class TokenPrices:
   def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host='http://localhost:9200'):
@@ -80,11 +83,22 @@ class TokenPrices:
     prices = self._get_multi_prices()
     self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
 
+  def _set_moving_average(self, prices):
+    prices_stack = []
+    for price in prices:
+      prices_stack.append(price["close"])
+      if len(prices_stack) == MOVING_AVERAGE_WINDOW:
+        price["average"] = np.mean(prices_stack)
+        prices_stack.pop(0)
+      else:
+        price["average"] = price["close"]
+
   def _process_hist_prices(self, prices):
     points = []
+    self._set_moving_average(prices)
     for price in prices:
       point = {}
-      point['BTC'] = (price['open'] + price['close']) / 2
+      point['BTC'] = price["average"]
       point['BTC'] = float('{:0.10f}'.format(point['BTC']))
       point['timestamp'] = datetime.datetime.fromtimestamp(price['time']).strftime("%Y-%m-%d")
       point['token'] = price['token']
@@ -173,20 +187,20 @@ class TokenPrices:
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
 
   def _iterate_cmc_tokens(self):
-    return self.client.iterate(self.indices['contract'], 'contract', '_exists_:website_slug')
+    return self.client.iterate(self.indices['contract'], 'contract', '_exists_:website_slug AND _exists_:cc_sym')
 
   def _get_token_cmc_historical_info(self, identifier, symbol):
     today = datetime.date.today().strftime('%Y%m%d')
     url = 'https://coinmarketcap.com/currencies/{}/historical-data/?start=20130428&end={}'.format(identifier, today)
     res = requests.get(url).text
-    parsed_data = pd.read_html(res)[0]
     try:
+      parsed_data = pd.read_html(res)[0]
       parsed_data = parsed_data.loc[parsed_data['Market Cap'] != '-']
     except:
       return
     info = [{
-      'marketCap': int(row['Market Cap']), 
-      'timestamp': datetime.datetime.strptime(row['Date'], '%b %d, %Y').strftime('%Y-%m-%d'), 
+      'marketCap': int(row['Market Cap']),
+      'timestamp': datetime.datetime.strptime(row['Date'], '%b %d, %Y').strftime('%Y-%m-%d'),
       'USD_cmc': (row['Open*'] + row['Close**']) / 2,
       'token': symbol
       } for i, row in parsed_data.iterrows()]
@@ -196,7 +210,8 @@ class TokenPrices:
     cmc_tokens = self._iterate_cmc_tokens()
     cmc_tokens = [t['_source'] for tokens in cmc_tokens for t in tokens]
     for token in tqdm(cmc_tokens):
-      cmc_info = self._get_token_cmc_historical_info(token['website_slug'], token['token_symbol'])
+#      print(token['token_symbol'])
+      cmc_info = self._get_token_cmc_historical_info(token['website_slug'], token['cc_sym'])
       if cmc_info == None:
         continue
       self._update_multiple_docs(cmc_info, 'price', self.indices['token_price'])

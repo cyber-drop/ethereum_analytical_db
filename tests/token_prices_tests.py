@@ -36,6 +36,52 @@ class TokenPricesTestCase(unittest.TestCase):
     prices_usd = [p['USD'] for p in prices]
     self.assertCountEqual([0.1030971744, 0.0412649044, 2.84103009], prices_usd)
 
+  def test_moving_average(self):
+    test_prices = [
+      {"close": 2},
+      {"close": 3},
+      {"close": 4},
+      {"close": 5},
+      {"close": 4},
+      {"close": 200},
+      {"close": 5},
+    ]
+
+    self.token_prices._set_moving_average(test_prices)
+
+    self.assertSequenceEqual([price["average"] for price in test_prices], [
+      2,
+      3,
+      4,
+      5,
+      (2 + 3 + 4 + 5 + 4) / 5,
+      (3 + 4 + 5 + 4 + 200) / 5,
+      (4 + 5 + 4 + 200 + 5) / 5,
+    ])
+
+  def test_moving_average_usage(self):
+    test_prices = [{
+      "open": 1,
+      "close": 2,
+      "average": 10,
+      'time': 1415463675,
+      'token': "JAT"
+    }]
+    self.token_prices.btc_prices = {
+      '2014-11-08': 0
+    }
+    self.token_prices.eth_prices = {
+      '2014-11-08': 0
+    }
+    self.token_prices._set_moving_average = mock.MagicMock()
+    self.token_prices._to_usd = mock.MagicMock(return_value=0)
+    self.token_prices._from_usd = mock.MagicMock(return_value=0)
+
+    result = self.token_prices._process_hist_prices(test_prices)
+
+    self.token_prices._set_moving_average.assert_any_call(test_prices)
+    self.assertSequenceEqual([price["BTC"] for price in result], [10])
+
 
 TEST_PRICES_INDEX = 'test-token-prices'
 TEST_CONTRACT_INDEX = 'test-ethereum-contract'
