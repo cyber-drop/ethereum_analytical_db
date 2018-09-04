@@ -63,7 +63,7 @@ def extract_prices(host):
   token_prices.get_prices_within_interval()
 
 def extract_transactions_prices(host, currency):
-  print("Extracting transactions USD value...")
+  print("Extracting transactions {} value...".format(currency))
   transactions_prices = TokenTransactionsPrices()
   transactions_prices.extract_transactions_prices(currency)
 

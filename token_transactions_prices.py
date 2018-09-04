@@ -141,6 +141,12 @@ class TokenTransactionsPrices:
     for chunk in bulk_chunks(self._construct_bulk_update_ops(docs), docs_per_chunk=1000):
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
 
+  def _get_overflow(self, usd_value, capitalization):
+    if not capitalization:
+      return 0
+    else:
+      return usd_value / capitalization
+
   def extract_transactions_prices(self, currency):
     last_day = self._get_last_day()
     symbols = self._get_top_syms(last_day)
@@ -152,7 +158,7 @@ class TokenTransactionsPrices:
       blocks = list(set([tx['_source']['block_id'] for tx in token_txs]))
       blocks = {block: block_tss[block] for block in blocks}
       dates = list(set([date for date in blocks.values()]))
-      prices = self._get_prices_by_dates(dates, symbols, PRICE_FIELDS[currency])
+      prices, market_capitalization = self._get_prices_by_dates(dates, symbols, PRICE_FIELDS[currency])
       update_docs = []
       for tx in token_txs:
         sym = symbols_map[tx['_source']['token']]
@@ -166,6 +172,14 @@ class TokenTransactionsPrices:
           print('exception:', e)
           exchange_price = None
           value = None
-        update_doc = {'doc': {TRANSACTION_FIELD[currency]: exchange_price, 'timestamp': timestamp}, 'id': tx['_id']}
+        update_doc = {
+          'doc': {
+            TRANSACTION_FIELD[currency]: exchange_price,
+            'timestamp': timestamp,
+          },
+          'id': tx['_id']
+        }
+        if currency == 'USD':
+          update_doc['doc']['overflow'] = self._get_overflow(exchange_price, market_capitalization.get(prices_key, 0))
         update_docs.append(update_doc)
       self._update_multiple_docs(update_docs, 'tx', self.indices['token_tx'])
