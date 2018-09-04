@@ -147,7 +147,7 @@ class TokenTransactionsPrices:
     if not capitalization:
       return 0
     else:
-      return min(float(usd_value / capitalization), 1)
+      return min(usd_value / capitalization, 1)
 
   def extract_transactions_prices(self, currency):
     last_day = self._get_last_day()
