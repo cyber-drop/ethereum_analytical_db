@@ -121,14 +121,16 @@ class TokenTransactionsPrices:
     }
     res = self.client.send_request('GET', [self.indices['token_price'], 'price', '_mget'], query, {})['docs']
     prices = {}
+    market_capitalization = {}
     for price in res:
       if price['found'] == False:
         continue
       for field in price_fields:
         if (field in price['_source'].keys()) and (price["_source"][field] is not None):
           prices[price['_source']['token'] + '_' + price['_source']['timestamp']] = price['_source'][field]
+          market_capitalization[price['_source']['token'] + '_' + price['_source']['timestamp']] = price['_source'].get("marketCap", 0)
           break;
-    return prices
+    return prices, market_capitalization
 
   def _get_exchange_price(self, value, price):
     return float('{:0.10f}'.format(value * price))
@@ -180,6 +182,6 @@ class TokenTransactionsPrices:
           'id': tx['_id']
         }
         if currency == 'USD':
-          update_doc['doc']['overflow'] = self._get_overflow(exchange_price, market_capitalization.get(prices_key, 0))
+          update_doc['doc']['overflow'] = self._get_overflow(exchange_price, market_capitalization[prices_key])
         update_docs.append(update_doc)
       self._update_multiple_docs(update_docs, 'tx', self.indices['token_tx'])
