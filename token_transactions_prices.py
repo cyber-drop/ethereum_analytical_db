@@ -2,6 +2,7 @@ from config import INDICES
 from pyelasticsearch import ElasticSearch, bulk_chunks
 from tqdm import tqdm
 from web3 import Web3, HTTPProvider
+import numpy as np
 
 NUMBER_OF_JOBS = 200
 PRICE_FIELDS = {
@@ -147,7 +148,7 @@ class TokenTransactionsPrices:
     if not capitalization:
       return 0
     else:
-      return min(usd_value / capitalization, 1)
+      return min(np.abs(usd_value / capitalization), 1)
 
   def extract_transactions_prices(self, currency):
     last_day = self._get_last_day()
