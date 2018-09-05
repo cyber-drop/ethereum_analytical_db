@@ -3,13 +3,8 @@ from test_utils import TestElasticSearch, mockify
 from internal_transactions import *
 from internal_transactions import _get_parity_url_by_block, _get_traces_sync, _make_trace_requests
 import internal_transactions
-import random
-import requests
 import json
-from multiprocessing import Pool
-from tqdm import *
 import httpretty
-from test_constants import TEST_BLOCK_TRACES
 from unittest.mock import MagicMock, patch, call, Mock
 
 class InternalTransactionsTestCase(unittest.TestCase):
@@ -28,6 +23,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     }, parity_hosts=self.parity_hosts)
 
   def test_split_on_chunks(self):
+    """
+    Test splitting on chunks
+    """
     test_list = []
     test_chunks_number = 10
     test_chunks = []
@@ -38,6 +36,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
       assert chunks == test_chunks
 
   def test_iterate_blocks(self):
+    """
+    Test iteration through unprocessed blocks that are presented in given hosts config
+    """
     self.internal_transactions.parity_hosts = [(0, 4, "http://localhost:8545"), (5, None, "http://localhost:8545")]
     self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 1}, id=1, refresh=True)
     self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 2}, id=2, refresh=True)
@@ -49,6 +50,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.assertCountEqual(blocks, [1, 2, 5])
 
   def test_get_parity_url_by_block(self):
+    """
+    Test getting url for block by specified config
+    """
     parity_hosts = [
       (0, 100, "url1"),
       (100, 200, "url2")
@@ -58,6 +62,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert _get_parity_url_by_block(parity_hosts, 1000) == None
 
   def test_get_default_parity_url(self):
+    """
+    Test getting url for block inside of specified opened ranges
+    """
     parity_hosts = [
       (10, 100, "url1"),
       (None, 10, "url2"),
@@ -67,6 +74,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert _get_parity_url_by_block(parity_hosts, 10000) == "url3"
 
   def test_make_trace_requests(self):
+    """
+    Test making trace requests for each block
+    """
     parity_hosts = [
       (TEST_BLOCK_NUMBER, TEST_BLOCK_NUMBER + 3, "http://localhost:8545"),
       (TEST_BLOCK_NUMBER + 3, None, "http://localhost:8546")
@@ -81,6 +91,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
 
   @httpretty.activate
   def test_get_traces_sync(self):
+    """
+    Test getting traces through a specified url in config
+    """
     test_parity_hosts = [
       (1, 2, "http://localhost:8545/"),
       (2, 3, "http://localhost:8546/"),
@@ -126,6 +139,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
       self.assertCountEqual(internal_transactions_response, test_blocks_response)
 
   def test_get_traces(self):
+    """
+    Test parallel process of getting traces
+    """
     test_hosts = []
     test_traces = ["trace" + str(i + 1) for i in range(100)]
     test_blocks = [str(i + 1) for i in range(100)]
@@ -152,6 +168,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.assertCountEqual(test_traces, traces)
 
   def test_set_trace_hashes(self):
+    """
+    Test setting trace hashes for each transaction with ethereum transaction hash
+    """
     transactions = [{
       "transactionHash": "0x1"
     }, {
@@ -168,6 +187,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert transactions[3]["hash"] == "0x1.2"
 
   def test_set_trace_hashes_for_reward(self):
+    """
+    Test setting trace hashes for each mining transaction
+    """
     transactions = [{
       "transactionHash": None,
       "blockHash": "0x1"
@@ -176,6 +198,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert transactions[0]["hash"] == "0x1"
 
   def test_set_parent_error_root_node(self):
+    """
+    Test set parent_error field for each transaction in trace if root is corrupted
+    """
     trace = [{
       "transactionHash": "0x1",
       "error": "Out of gas",
@@ -192,6 +217,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert "parent_error" not in trace[2].keys()
 
   def test_set_parent_error_leaf(self):
+    """
+    Test skip all transactions in trace if error is in leaf
+    """
     trace = [{
       "transactionHash": "0x1",
       "traceAddress": []
@@ -204,6 +232,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert "parent_error" not in trace[0].keys()
 
   def test_set_parent_error_internal_node(self):
+    """
+    Test set parent_error field for each transaction in branch if root of branch is corrupted
+    """
     trace = [{
       "transactionHash": "0x1",
       "traceAddress": []
@@ -225,6 +256,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert "parent_error" not in trace[1].keys()
 
   def test_set_parent_error_multiple_internal_nodes(self):
+    """
+    Test set parent errors in more than one internal nodes
+    """
     trace = [{
       "transactionHash": "0x1",
       "error": "Out of gas",
@@ -241,24 +275,39 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert "parent_error" in trace[-1].keys()
 
   def test_save_traces(self):
+    """
+    Test save traces_extracted flag for specified blocks
+    """
     self.client.index(TEST_BLOCKS_INDEX, 'b', {"number": 123}, id=1, refresh=True)
     self.internal_transactions._save_traces([123])
     block = self.client.get(TEST_BLOCKS_INDEX, 'b', 1)['_source']
     assert block['traces_extracted']
 
   def test_preprocess_internal_transaction_with_empty_field(self):
+    """
+    Test preprocessing internal transaction with empty flattened field
+    """
     self.internal_transactions._preprocess_internal_transaction({"action": None})
     assert True
 
   def test_preprocess_internal_transaction_value(self):
+    """
+    Test converting internal transaction value from wei to eth
+    """
     transaction = self.internal_transactions._preprocess_internal_transaction({"value": hex(int(50.001851 * 1e18))})
     assert transaction["value"] == 50.001851
 
   def test_preprocess_internal_transaction_empty_value(self):
+    """
+    Test preprocessing internal transaction with empty value field
+    """
     transaction = self.internal_transactions._preprocess_internal_transaction({"value": "0x"})
     assert transaction["value"] == 0
 
   def test_save_internal_transactions(self):
+    """
+    Test saving given transactions from trace
+    """
     test_trace = [{"transactionHash": "0x0", "hash": "0x0.{}".format(i)} for i in range(10)]
     test_preprocessed_trace = [{
       "hash": "0x{}".format(i),
@@ -280,12 +329,18 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.assertCountEqual(internal_transactions_bodies, test_transactions_bodies)
 
   def test_save_internal_transactions_ignore_rewards(self):
+    """
+    Test ignoring transactions from trace which are not attached to any ethereum transaction
+    """
     trace = [{"transactionHash": None, "hash": "0x1"}]
     self.internal_transactions._save_internal_transactions(trace)
     internal_transactions = self.client.search(index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type="itx", query="*")["hits"]["hits"]
     assert not len(internal_transactions)
 
   def test_save_miner_transaction(self):
+    """
+    Test saving transactions which are not attached to any ethereum transaction
+    """
     trace = [{"transactionHash": None, "hash": "0x1"}, {"transactionHash": "0x1"}]
     self.internal_transactions._save_miner_transactions(trace)
     miner_transactions = self.client.search(index=TEST_MINER_TRANSACTIONS_INDEX, doc_type="tx", query="*")["hits"]["hits"]
@@ -294,6 +349,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.assertCountEqual(miner_transactions[0]["_source"], {"transactionHash": None})
 
   def test_extract_traces_chunk(self):
+    """
+    Test process of extraction internal transactions by a given blocks chunk
+    """
     test_blocks = ["0x{}".format(i) for i in range(10)]
     test_traces = [{"transactionHash": "0x{}".format(i % 3)} for i in range(10)]
     mockify(self.internal_transactions, {
@@ -319,6 +377,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     process.assert_has_calls(calls)
 
   def test_extract_traces_chunk_set_parent_error(self):
+    """
+    Test setting parent error in a process of extraction by a given block chunk
+    """
     test_blocks = ["0x1"]
     test_traces = []
     mockify(self.internal_transactions, {
@@ -338,6 +399,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     process.assert_has_calls(calls)
 
   def test_extract_traces(self):
+    """
+    Test overall extraction process
+    """
     test_chunks = [list(range(5)), list(range(5, 10))]
     test_chunks_from_elasticsearch = [[{"_source": {"number": block}} for block in chunk] for chunk in test_chunks]
     self.internal_transactions._iterate_blocks = MagicMock(return_value=test_chunks_from_elasticsearch)
@@ -355,6 +419,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     process.assert_has_calls(calls)
 
   def test_process(self):
+    """
+    Test extraction on a real data
+    """
     test_transactions = self.client.search(index=REAL_TRANSACTIONS_INDEX, doc_type="tx", query="*", size=10000)['hits']['hits']
     test_transactions = [transaction["_source"] for transaction in test_transactions]
     test_blocks = [{"number": block} for block in set(transaction["blockNumber"] for transaction in test_transactions)]

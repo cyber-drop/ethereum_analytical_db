@@ -1,11 +1,7 @@
-from custom_elastic_search import CustomElasticSearch, NUMBER_OF_JOBS
-from pyelasticsearch.exceptions import BulkError
+from custom_elastic_search import CustomElasticSearch
 import requests
 import json
-from time import sleep
-from tqdm import *
 from multiprocessing import Pool
-from functools import partial
 from itertools import repeat
 from config import PARITY_HOSTS
 import pygtrie as trie
@@ -125,7 +121,7 @@ class InternalTransactions:
 
   def _iterate_blocks(self):
     """
-    Iterate through unprocessed blocks
+    Iterate through unprocessed blocks that can be found in parity nodes specified in a given config file
 
     Returns
     -------
