@@ -20,7 +20,7 @@ class ContractMethods:
   elasticsearch_host: str
     Elasticsearch url
   parity_hosts: list
-    List of tuples that includes 3 elements: ..., ..., and Parity URL
+    List of tuples that includes 3 elements: start block, end_block, and Parity URL
   '''
   def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200", parity_hosts=PARITY_HOSTS):
     self.indices = elasticsearch_indices
