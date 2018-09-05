@@ -12,11 +12,13 @@ import utils
 ADDRESS_ENCODING_CONSTANT = 0x0010000000000000000000000000000000000000000
 
 class TokenHolders(utils.ContractTransactionsIterator):
-  '''Extract information about token transfers from internal txs and save it in a separate token_tx index
+  '''
+  Extract information about token transfers from internal txs and save it in a separate token_tx index
   
-  Arguments:
-    elasticsearch_indices (dict): Dictionary containing exisiting Elasticsearch indices
-    elasticsearch_host (str): Elasticsearch url
+  Parameters
+  ----------
+  elasticsearch_indices (dict): Dictionary containing exisiting Elasticsearch indices
+  elasticsearch_host (str): Elasticsearch url
   '''
   def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200"):
     self.indices = elasticsearch_indices
@@ -86,12 +88,12 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      docs: list
-        List of dictionaries with new data
-      doc_type: str 
-        Type of inserted documents
-      index_name: str
-        Name of the index that contains inserted documents
+    docs: list
+      List of dictionaries with new data
+    doc_type: str 
+      Type of inserted documents
+    index_name: str
+      Name of the index that contains inserted documents
     '''
     for chunk in bulk_chunks(self._construct_bulk_insert_ops(docs), docs_per_chunk=1000):
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
@@ -102,12 +104,12 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      docs: list
-        List of dictionaries with new data
-      doc_type: str 
-        Type of updated documents
-      index_name: str
-        Name of the index that contains updated documents
+    docs: list
+      List of dictionaries with new data
+    doc_type: str 
+      Type of updated documents
+    index_name: str
+      Name of the index that contains updated documents
     '''
     for chunk in bulk_chunks(self._construct_bulk_update_ops(docs), docs_per_chunk=1000):
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
