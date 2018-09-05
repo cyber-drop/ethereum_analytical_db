@@ -15,6 +15,16 @@ TRANSACTION_FIELD = {
 }
 
 class TokenTransactionsPrices:
+  '''
+  Add ETH and USD price to token transfers
+
+  Parameters
+  ----------
+  elasticsearch_host: str
+    Elasticsearch url
+  indices: dict
+    Dictionary containing exisiting Elasticsearch indices
+  '''
   def __init__(self, elastic_host='http://localhost:9200', indices=INDICES):
     self.client = ElasticSearch(elastic_host)
     self.indices = indices
@@ -23,6 +33,23 @@ class TokenTransactionsPrices:
     self.w3 = Web3(HTTPProvider('http://localhost:8550'))
 
   def _count_by_object_or_string_query(self, query, index, doc_type):
+    '''
+    Count number of documents that match the query
+
+    Parameters
+    ----------
+    query: dict or str
+      Query to Elasticsearch
+    index: str
+      Elasticsearch index
+    doc_type: str
+      Elasticsearch document type
+
+    Returns
+    -------
+    dict
+      Count query result
+    '''
     if "sort" in query:
       del query['sort']
     count_parameters = {}
@@ -30,6 +57,20 @@ class TokenTransactionsPrices:
     return self.client.send_request('GET', [index, doc_type, '_count'], count_body, count_parameters)
 
   def _iterate(self, index, doc_type, query, per=NUMBER_OF_JOBS):
+    '''
+    Iterate over documents that match query
+
+    Parameters
+    ----------
+    index: str
+      Elasticsearch index
+    doc_type: str
+      Elasticsearch document type
+    query: dict or str
+      Query to Elasticsearch
+    per: int
+      Number of documents queried in one request
+    '''
     items_count = self._count_by_object_or_string_query(query, index=index, doc_type=doc_type)['count']
     pages = round(items_count / per + 0.4999)
     scroll_id = None
@@ -46,6 +87,14 @@ class TokenTransactionsPrices:
       yield page_items
 
   def _get_last_day(self):
+    '''
+    Get timestamp of last price that has marketCap Field
+
+    Returns
+    -------
+    string
+      Timestamp of last available date
+    '''
     query = {
       'query': {
         'exists': {'field': 'marketCap'}
@@ -59,6 +108,19 @@ class TokenTransactionsPrices:
     return res['hits']['hits'][0]['_source']['timestamp']
 
   def _get_top_syms(self, timestamp):
+    '''
+    Extract top-100 tokens by market capitalization in specified date
+
+    Parameters
+    ----------
+    timestamp: str
+      Date
+
+    Returns
+    -------
+    list
+      List of top-100 token symbols
+    '''
     query = {
       'query': {
         'term': {'timestamp': timestamp},
@@ -73,6 +135,19 @@ class TokenTransactionsPrices:
     return symbols
 
   def _get_top_addr(self, symbols):
+    '''
+    Extract addresses of top tokens
+
+    Parameters
+    ----------
+    symbols: list
+      Top token symbols
+
+    Returns
+    -------
+    tuple
+      Tupple that contain top token addresses and dict with mapping from address to symbol
+    '''
     query = {
       'query': {
         'terms': {'cc_sym.keyword': symbols}
@@ -85,6 +160,21 @@ class TokenTransactionsPrices:
     return (addresses, syms_map)
 
   def _iterate_top_tokens_txs(self, addresses, currency):
+    '''
+    Iterate over top tokens transactions
+
+    Parameters
+    ----------
+    addresses: list
+      Top token addresses
+    currency: str
+      USD or ETH; currency in which transfer price will be extracted
+
+    Returns
+    -------
+    generator
+      Generator that iterates over top tokens txs
+    '''
     query = {
       'query': {
         'bool': {
@@ -104,6 +194,16 @@ class TokenTransactionsPrices:
     return self._iterate(self.indices['token_tx'], 'tx', query)
 
   def _get_block_tss(self):
+    '''
+    Extract block timestamps
+
+    Method used to add timestamp field to token transactions
+
+    Returns
+    -------
+    dict
+      Blocks timestamps dict
+    '''
     blocks = self._iterate(index=self.indices["block"], doc_type='b', query={"query": {"range": {"number": {"gte": 0}}}})
     timestamps = {}
     for chunk in blocks:
@@ -112,6 +212,22 @@ class TokenTransactionsPrices:
     return timestamps
 
   def _get_prices_by_dates(self, dates, symbols, price_fields):
+    '''
+    Construct price ids from dates and symbols and download prices from Elasticsearch by their exact ids
+
+    Parameters
+    ----------
+    dates: list
+      Price dates
+    symbols: list
+      Token symbols
+    price_fields: list
+      List of currencies that will be used to extract prices
+    Returns
+    -------
+    list
+      List of token prices
+    '''
     ids = []
     for symbol in symbols:
       for date in dates:
@@ -134,23 +250,78 @@ class TokenTransactionsPrices:
     return prices, market_capitalization
 
   def _get_exchange_price(self, value, price):
+    '''
+    Convert value from one currency to another
+
+    Parameters
+    ----------
+    value: float
+      Transfer value
+    price: float
+      Token price
+
+    Returns
+    -------
+    float:
+      Converted value
+    '''
     return float('{:0.10f}'.format(value * price))
 
   def _construct_bulk_update_ops(self, docs):
+    '''
+    Iterate over docs and create document-updating operations used in bulk update
+
+    Parameters
+    ----------
+      docs: list
+        List of dictionaries with new data
+    '''
     for doc in docs:
       yield self.client.update_op(doc['doc'], id=doc['id'])
 
   def _update_multiple_docs(self, docs, doc_type, index_name):
+    '''
+    Update multiple documents simultaneously
+
+    Parameters
+    ----------
+    docs: list
+      List of dictionaries with new data
+    doc_type: str 
+      Type of updated documents
+    index_name: str
+      Name of the index that contains updated documents
+    '''
     for chunk in bulk_chunks(self._construct_bulk_update_ops(docs), docs_per_chunk=1000):
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
 
   def _get_overflow(self, usd_value, capitalization):
+    '''
+    Check if transfer usd value is larger than token capitalization
+
+    Parameters
+    ----------
+    usd_value: float
+      Transfer value
+    capitalization: float
+      token capitalization
+    '''
     if not capitalization:
       return 0
     else:
       return min(np.abs(usd_value / capitalization), 1)
 
   def extract_transactions_prices(self, currency):
+    '''
+    Download token prices from Elasticsearch and convert token transfer values into other currency
+
+    This function is an entry point for extract-token-transactions-prices operation
+
+    Parameters
+    ----------
+    currency: str
+      Currency to convert transfer value
+    '''
     last_day = self._get_last_day()
     symbols = self._get_top_syms(last_day)
     addresses, symbols_map = self._get_top_addr(symbols)
