@@ -23,11 +23,40 @@ OTHER_TRANSACTION = 3
 MAX_BLOCKS_NUMBER = 10000000
 
 def _get_parity_url_by_block(parity_hosts, block):
+  """
+  Get url of a parity JSON RPC API for specified block
+
+  Parameters
+  ----------
+  parity_hosts : list
+      List of tuples with each parity JSON RPC url and used block range
+  block : int
+      Block number
+
+  Returns
+  -------
+  str
+      Url of parity API that will serve specified block
+  """
   for bottom_line, upper_bound, url in parity_hosts:
     if ((not bottom_line) or (block >= bottom_line)) and ((not upper_bound) or (block < upper_bound)):
       return url
 
 def _make_trace_requests(parity_hosts, blocks):
+  """
+  Create json requests to parity JSON RPC API for specified blocks
+
+  Parameters
+  ----------
+  parity_hosts : list
+      List of tuples with each parity JSON RPC url and used block range
+  blocks : list
+      Block numbers
+  Returns
+  -------
+  dict
+      Urls and lists of requests attached to it
+  """
   requests = {}
   for block_number in blocks:
     parity_url = _get_parity_url_by_block(parity_hosts, block_number)
@@ -42,6 +71,20 @@ def _make_trace_requests(parity_hosts, blocks):
   return requests
 
 def _get_traces_sync(parity_hosts, blocks):
+  """
+  Get traces for specified blocks in one array
+
+  Parameters
+  ----------
+  parity_hosts : list
+      List of tuples with each parity JSON RPC url and used block range. Can be found in conflg.py
+  blocks : list
+      Block numbers
+  Returns
+  -------
+  list
+      List of transactions inside of specified blocks
+  """
   requests_dict = _make_trace_requests(parity_hosts, blocks)
   traces = []
   for parity_url, request in requests_dict.items():
@@ -64,10 +107,31 @@ class InternalTransactions:
     self.parity_hosts = parity_hosts
 
   def _split_on_chunks(self, iterable, size):
+    """
+    Split given iterable onto chunks
+
+    Parameters
+    ----------
+    iterable : generator
+        Iterable that will be splitted
+    size : int
+        Max size of chunk
+    Returns
+    -------
+    generator
+        Generator that returns chunk on each iteration
+    """
     return utils.split_on_chunks(iterable, size)
 
   def _iterate_blocks(self):
+    """
+    Iterate through unprocessed blocks
 
+    Returns
+    -------
+    generator
+        Generator that iterates through blocks without traces_extracted flag in ElasticSearch
+    """
     ranges = [host_tuple[0:2] for host_tuple in self.parity_hosts]
     range_query = self.client.make_range_query("number", *ranges)
     query = {
@@ -78,12 +142,33 @@ class InternalTransactions:
     return self.client.iterate(self.indices["block"], "b", query)
 
   def _get_traces(self, blocks):
+    """
+    Get traces for specified blocks in parallel mode
+
+    Parameters
+    ----------
+    blocks : list
+        Block numbers
+    Returns
+    -------
+    list
+        List of transactions inside of specified blocks
+    """
     chunks = self._split_on_chunks(blocks, NUMBER_OF_PROCESSES)
     arguments = list(zip(repeat(self.parity_hosts), chunks))
     traces = self.pool.starmap(_get_traces_sync, arguments)
     return [transaction for trace in traces for transaction in trace]
 
   def _set_trace_hashes(self, trace):
+    """
+    Set hash for each transaction in trace based on ethereum transaction hash
+    and position in trace for this transaction
+
+    Parameters
+    ----------
+    trace : list
+        List of transactions
+    """
     traces_size = {}
     for transaction in trace:
       transaction_hash = transaction["transactionHash"]
@@ -96,6 +181,14 @@ class InternalTransactions:
         transaction["hash"] = transaction["blockHash"]
 
   def _set_parent_errors(self, trace):
+    """
+    Set parent_error flag for all transactions in branches finished with error in trace
+
+    Parameters
+    ----------
+    trace : list
+        List of transactions
+    """
     errors = {}
     for transaction in trace:
       if "error" in transaction.keys():
@@ -110,6 +203,14 @@ class InternalTransactions:
           transaction["parent_error"] = True
 
   def _save_traces(self, blocks):
+    """
+    Save traces_extracted flag for processed blocks in ElasticSearch
+
+    Parameters
+    ----------
+    blocks : list
+        Block numbers to process
+    """
     query = {
       "terms": {
         "number": blocks
@@ -118,6 +219,16 @@ class InternalTransactions:
     self.client.update_by_query(self.indices["block"], 'b', query, 'ctx._source.traces_extracted = true')
 
   def _preprocess_internal_transaction(self, transaction):
+    """
+    Preprocess specified transaction
+
+    Flatten 'action' and 'result' field, convert value in wei to eth
+
+    Parameters
+    ----------
+    transaction : dict
+        Transactions to process
+    """
     transaction = transaction.copy()
     for field in ["action", "result"]:
       if (field in transaction.keys()) and (transaction[field]):
@@ -131,6 +242,16 @@ class InternalTransactions:
     return transaction
 
   def _save_internal_transactions(self, blocks_traces):
+    """
+    Save specified transactions to ElasticSearch in multiple chunks
+
+    Save only those which are attached to an ethereum transaction
+
+    Parameters
+    ----------
+    blocks_traces : list
+        List of transactions to save
+    """
     docs = [
       self._preprocess_internal_transaction(transaction)
       for transaction in blocks_traces
@@ -141,11 +262,33 @@ class InternalTransactions:
         self.client.bulk_index(docs=chunk, index=self.indices["internal_transaction"], doc_type="itx", id_field="hash", refresh=True)
 
   def _save_miner_transactions(self, blocks_traces):
+    """
+    Save transactions to ElasticSearch.
+
+    Save only those which are not attached to any ethereum transaction
+
+    Parameters
+    ----------
+    blocks_traces : list
+        List of transactions to save
+    """
     docs = [self._preprocess_internal_transaction(transaction) for transaction in blocks_traces if not transaction["transactionHash"]]
     self.client.bulk_index(docs=docs, index=self.indices["miner_transaction"], doc_type="tx", id_field="hash",
                            refresh=True)
 
   def _extract_traces_chunk(self, blocks):
+    """
+    Extract transactions from specified block numbers list
+
+    Add trace hashes for each one, parent_error field
+    Saves transactions as internal or miner (without ethereum transaction hash)
+    Then saves a flag for processed blocks to ElasticSearch
+
+    Parameters
+    ----------
+    blocks : list
+        List of blocks numbers
+    """
     blocks_traces = self._get_traces(blocks)
     self._set_trace_hashes(blocks_traces)
     self._set_parent_errors(blocks_traces)
@@ -154,6 +297,11 @@ class InternalTransactions:
     self._save_traces(blocks)
 
   def extract_traces(self):
+    """
+    Extract traces to elasticsearch for all unprocessed blocks
+
+    This function is an entry point for extract-traces operation
+    """
     for blocks in self._iterate_blocks():
       blocks = [block["_source"]["number"] for block in blocks]
       self._extract_traces_chunk(blocks)
