@@ -305,6 +305,7 @@ class TokenTransactionsPrices:
       Transfer value
     capitalization: float
       token capitalization
+      
     '''
     if not capitalization:
       return 0
