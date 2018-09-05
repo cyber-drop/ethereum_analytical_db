@@ -11,6 +11,17 @@ with open('standard-token-abi.json') as json_file:
   standard_token_abi = json.load(json_file)
 
 class ContractMethods:
+  ''' Check if contract is token, is it compliant with token standards and get varibles from it such as name or symbol
+  
+  Parameters
+  ----------
+  elasticsearch_indices: dict
+    Dictionary containing exisiting Elasticsearch indices
+  elasticsearch_host: str
+    Elasticsearch url
+  parity_hosts: list
+    List of tuples that includes 3 elements: ..., ..., and Parity URL
+  '''
   def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host="http://localhost:9200", parity_hosts=PARITY_HOSTS):
     self.indices = elasticsearch_indices
     self.client = CustomElasticSearch(elasticsearch_host)
@@ -20,18 +31,52 @@ class ContractMethods:
     self.constants = ['name', 'symbol', 'decimals', 'total_supply', 'owner']
 
   def _iterate_contracts(self):
+    '''
+    Iterate over contracts that were not processed yet
+
+    Returns
+    -------
+    generator
+      Generator that iterates over contracts in Elasticsearch
+    '''
     return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(methods:true)')
 
-  def _iterate_processed_contracts(self):
-    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND methods:true')
-
   def _iterate_non_standard(self):
+    '''
+    Iterate over contracts that have transfer method butis not compliant with any standard
+
+    Returns
+    -------
+    generator
+      Generator that iterates over contracts in Elasticsearch
+    '''
     return self.client.iterate(self.indices["contract"], 'contract', 'standards:None AND !(methods:true)')
 
   def _extract_first_bytes(self, func):
+    '''
+    Create contract method signature and return first 4 bytes of this signature
+
+    Parameters
+    ----------
+    func: str
+      String that contains function name and arguments
+
+    Returns
+    -------
+    str
+      String with first 4 bytes of method signature in hex format
+    '''
     return str(self.w3.toHex(self.w3.sha3(text=func)[0:4]))[2:]
 
   def _extract_methods_signatures(self):
+    '''
+    Return dictionary with first bytes of standard method signatures
+
+    Returns
+    -------
+    dict
+      Dictionary with first 4 bytes of methods signatures in hex format
+    '''
     return {
       'erc20': {
         'totalSupply': self._extract_first_bytes('totalSupply()'),
@@ -47,10 +92,36 @@ class ContractMethods:
     }
 
   def _check_is_token(self, bytecode):
+    '''
+    Check does contract bytecode contain first 4 bytes of transfer methods
+
+    Parameters
+    ----------
+    bytecode: str
+      String with contract bytecode
+
+    Returns
+    -------
+    bool
+      True if 4 bytes of signature is found; else False
+    '''
     has_trasfer_method = re.search(r'' + self.standards['erc20']['transfer'], bytecode) != None
     return has_trasfer_method
 
   def _check_standards(self, bytecode):
+    '''
+    Check does contract bytecode contains all methods required to be compliant with token standard
+
+    Parameters
+    ----------
+    bytecode: str
+      String with contract bytecode
+
+    Returns
+    -------
+    list
+      List of token standards 
+    '''
     avail_standards = []
     for standard in self.standards:
       methods = []
@@ -63,7 +134,23 @@ class ContractMethods:
 
   
   def _round_supply(self, supply, decimals):
-    if decimals > 1:
+    '''
+    Subtract decimals from contract total supply
+    
+    Return supply in string format to avoid Elasticsearch bigint problem
+    Parameters
+    ----------
+    supply: int
+      Contract total supply
+    decimals: int
+      Contract decimals 
+
+    Returns
+    -------
+    str
+      Contract total supply without decimals
+    '''
+    if decimals > 0:
       supply = supply / math.pow(10, decimals)
       supply = Decimal(supply)
       supply = round(supply)
@@ -73,6 +160,19 @@ class ContractMethods:
     return supply
 
   def _constant_methods(self, contract_instance):
+    '''
+    Return dict with methods used to extract values of contract public variables
+
+    Parameters
+    ----------
+    contract_instance 
+      An instance of Web3.eth.contract object
+
+    Returns
+    -------
+    dict
+      Dictionary whose keys are methods used to extract public variables
+    '''
     return {
       'name': {'func': contract_instance.functions.name(), 'placeholder': 'None'},
       'symbol': {'func': contract_instance.functions.symbol(), 'placeholder': 'None'},
@@ -82,6 +182,19 @@ class ContractMethods:
     }
 
   def _get_constants(self, address):
+    '''
+    Create an instance of a contract and get values of its public variables 
+    
+    Parameters
+    ----------
+    address: str
+      Contract address
+
+    Returns
+    -------
+    list
+      List of values of available contract public variables
+    '''
     contract_checksum_addr = self.w3.toChecksumAddress(address)
     contract_instance = self.w3.eth.contract(address=contract_checksum_addr, abi=self.standard_token_abi)
     methods = self._constant_methods(contract_instance)
@@ -97,9 +210,27 @@ class ContractMethods:
     return contract_constants
     
   def _update_contract_descr(self, doc_id, body):
+    '''
+    Update contract document in Elasticsearch
+    
+    Parameters
+    ----------
+      doc_id: str
+        id of Elasticsearch document
+      body: dict
+        Dictionary with new values
+    '''
     self.client.update(self.indices['contract'], 'contract', doc_id, doc=body, refresh=True)
 
   def _classify_contract(self, contract):
+    '''
+    Check whether the contract is token, is it compliant with standards and if so, download its constants
+
+    Parameters
+    ----------
+    contract: dict
+      dictionary with contract address and bytecode
+    '''
     code = contract['_source']['bytecode']
     is_token = self._check_is_token(code)
     if is_token == True:
@@ -116,14 +247,37 @@ class ContractMethods:
       self._update_contract_descr(contract['_id'], update_body)
 
   def _construct_bulk_update_ops(self, docs):
+    '''
+    Return generator that creates document-updating operation used in bulk update
+
+    Parameters
+    ----------
+    docs: list
+      List of dictinoaries with new data
+    '''
     for doc in docs:
       yield self.client.update_op(doc['doc'], id=doc['id'])
 
   def _update_multiple_docs(self, docs, doc_type, index_name):
+    ''' 
+    Update multiple documents simultaneously
+
+    Parameters
+    ----------
+    docs: list
+      List of dictinoaries with new data
+    doc_type: str
+      Type of updated documents
+    index_name: str
+      Name of the index that comtains updated documents
+    '''
     for chunk in bulk_chunks(self._construct_bulk_update_ops(docs), docs_per_chunk=1000):
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
 
   def search_methods(self):
+    ''' 
+    Classify contract into standard tokens, non-standard and non-tokens, than extract public variables values
+    '''
     for contracts_chunk in self._iterate_contracts():
       for contract in contracts_chunk:
         self._classify_contract(contract)
