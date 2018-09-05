@@ -369,6 +369,8 @@ class TokenPrices:
   def get_prices_within_interval(self):
     '''
     Extract historcial token prices and then add to this prices data from Coinmarketcap
+
+    This function is an entry point for extract-prices operation
     '''
     prices = self._get_historical_multi_prices()
     if prices != None:
