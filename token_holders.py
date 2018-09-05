@@ -645,6 +645,8 @@ class TokenHolders(utils.ContractTransactionsIterator):
   def get_listed_tokens_txs(self):
     '''
     Extract list of tokens listed on Coinmarketcap and create token tx descriptions
+
+    This function is an entry point for extract-token-transactions operation
     '''
     max_block = utils.get_max_block()
     for tokens in self._iterate_tokens(max_block):

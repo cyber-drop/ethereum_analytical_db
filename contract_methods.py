@@ -277,6 +277,8 @@ class ContractMethods:
   def search_methods(self):
     ''' 
     Classify contract into standard tokens, non-standard and non-tokens, than extract public variables values
+
+    This function is an entry point for search-methods operation
     '''
     for contracts_chunk in self._iterate_contracts():
       for contract in contracts_chunk:

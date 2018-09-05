@@ -295,6 +295,8 @@ class TokenTransactionsPrices:
     '''
     Download token prices from Elasticsearch and convert token transfer values into other currency
 
+    This function is an entry point for extract-token-transactions-prices operation
+
     Parameters
     ----------
     currency: str
