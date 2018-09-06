@@ -5,7 +5,7 @@
 To build contents of this repo, use command:
 
 ```bash
-$ ./install.sh
+./install.sh
 ```
 
 Make sure you are done with everything correctly:
@@ -27,35 +27,36 @@ Configuration is located in config.py file. Please check this list before instal
 To start synchronization process at first time without starting point dump, use:
 
 ```bash
-$ python3 ./extractor.py --operation prepare-indices
-$ python3 ./extractor.py --operation prepare-blocks
-$ python3 ./extractor.py --operation extract-traces
-$ python3 ./extractor.py --operation detect-contracts
-$ python3 ./extractor.py --operation detect-contract-transactions
-$ python3 ./extractor.py --operation extract-contracts-abi
-$ python3 ./extractor.py --operation search-methods
-$ python3 ./extractor.py --operation extract-prices
-$ python3 ./extractor.py --operation parse-inputs
-$ python3 ./extractor.py --operation extract-token-transactions
-$ python3 ./extractor.py --operation extract-token-transactions-prices-usd
-$ python3 ./extractor.py --operation extract-token-transactions-prices-eth
+python3 ./extractor.py --operation prepare-indices
+python3 ./extractor.py --operation prepare-blocks
+python3 ./extractor.py --operation extract-traces
+python3 ./extractor.py --operation detect-contracts
+python3 ./extractor.py --operation detect-contract-transactions
+python3 ./extractor.py --operation extract-contracts-abi
+python3 ./extractor.py --operation search-methods
+python3 ./extractor.py --operation extract-prices
+python3 ./extractor.py --operation parse-inputs
+python3 ./extractor.py --operation extract-token-transactions
+python3 ./extractor.py --operation extract-token-transactions-prices-usd
+python3 ./extractor.py --operation extract-token-transactions-prices-eth
 ```
 
 ### Dump installation
 To start from existed database dump, use:
 ```bash
-$ TODO
+TODO
 ```
 
 ### Real-time synchronization
 To start real-time synchronization loop, use:
 
 ```bash
-$ python3 ./extractor.py --operation run-loop
+python3 ./extractor.py --operation run-loop
 ```
 
 ### Operations
 Operation type can be selected from list below:
+
 - prepare-indices
 
 Prepare indices in ElasticSearch
@@ -99,4 +100,5 @@ Download token capitalization, ETH, BTC and USD prices from cryptocompare and co
 
 - extract-token-transactions-prices-* (token_transactions_prices.py)
 
-Set USD and ETH prices for transactions. Also set an "overflow" field - a probability that transaction was
+Set USD and ETH prices for transactions. Also set an "overflow" field - a probability that transaction value is corrupted,
+i.e. is greater than market capitalization
