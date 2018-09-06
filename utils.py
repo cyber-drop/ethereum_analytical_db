@@ -43,15 +43,15 @@ def split_on_chunks(iterable, size):
 
 def get_max_block(query="*", min_consistent_block=MIN_CONSISTENT_BLOCK):
   """
-   Get last block in ElasticSearch
-   TODO should return max consistent block, i.e. block with max number N, for which N-1 blocks are presented in ElasticSearch
+  Get last block in ElasticSearch
+  TODO should return max consistent block, i.e. block with max number N, for which N-1 blocks are presented in ElasticSearch
 
-   Returns
-   -------
-   int:
-       Last block number
-       0 if there are no blocks in ElasticSearch
-   """
+  Returns
+  -------
+  int:
+      Last block number
+      0 if there are no blocks in ElasticSearch
+  """
   aggregation = {
     "size": 0,
     "query": {
