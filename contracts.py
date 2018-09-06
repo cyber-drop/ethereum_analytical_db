@@ -43,10 +43,11 @@ def _get_contracts_abi_sync(addresses):
       abis[key] = []
   return abis
 
-# Solution from https://ethereum.stackexchange.com/questions/20897/how-to-decode-input-data-from-tx-using-python3?rq=1
 def _decode_input(contract_abi, call_data):
   """
   Decode input data of a transaction according to a contract ABI
+
+  Solution from https://ethereum.stackexchange.com/questions/20897/how-to-decode-input-data-from-tx-using-python3?rq=1
 
   Parameters
   ----------
