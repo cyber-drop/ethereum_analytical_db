@@ -4,9 +4,33 @@ from config import INDICES, MIN_CONSISTENT_BLOCK
 client = CustomElasticSearch("http://localhost:9200")
 
 def get_elasticsearch_connection():
+  """
+  Establish ElasticSearch connection
+
+  TODO recreate connection each time it fails or remove this method
+
+  Returns
+  -------
+  CustomElasticSearch
+      ElasticSearch client
+  """
   return client
 
 def split_on_chunks(iterable, size):
+  """
+  Split given iterable onto chunks
+
+  Parameters
+  ----------
+  iterable : generator
+      Iterable that will be splitted
+  size : int
+      Max size of chunk
+  Returns
+  -------
+  generator
+      Generator that returns chunk on each iteration
+  """
   iterable = iter(iterable)
   for element in iterable:
     elements = [element]
@@ -18,6 +42,16 @@ def split_on_chunks(iterable, size):
     yield elements
 
 def get_max_block(query="*", min_consistent_block=MIN_CONSISTENT_BLOCK):
+  """
+   Get last block in ElasticSearch
+   TODO should return max consistent block, i.e. block with max number N, for which N-1 blocks are presented in ElasticSearch
+
+   Returns
+   -------
+   int:
+       Last block number
+       0 if there are no blocks in ElasticSearch
+   """
   aggregation = {
     "size": 0,
     "query": {
@@ -44,6 +78,21 @@ def get_max_block(query="*", min_consistent_block=MIN_CONSISTENT_BLOCK):
 
 class ContractTransactionsIterator():
   def _iterate_contracts(self, max_block, partial_query):
+    """
+    Iterate through contracts with unprocessed transactions before specified block
+
+    Parameters
+    ----------
+    max_block : int
+        Block number
+    partial_query : dict
+        Additional ElasticSearch query
+
+    Returns
+    -------
+    generator
+        Generator that returns contracts with unprocessed transactions
+    """
     query = {
       "bool": {
         "must": [
@@ -64,6 +113,23 @@ class ContractTransactionsIterator():
     return self.client.iterate(self.indices["contract"], 'contract', query)
 
   def _create_transactions_request(self, contracts, max_block):
+    """
+    Create ElasticSearch request to get transactions for all contracts
+    from last processed block to specified block
+
+    Parameters
+    ----------
+    contracts : list
+        Contracts info in ElasticSearch JSON format, i.e.
+        {"_id": TRANSACTION_ID, "_source": {"document": "fields"}}
+    max_block : int
+        Block number
+
+    Returns
+    -------
+    dict
+        ElasticSearch request to get transactions by conditions above
+    """
     max_blocks_contracts = {}
     for contract_dict in contracts:
       block = contract_dict["_source"].get(self._get_flag_name(), 0)
@@ -83,6 +149,24 @@ class ContractTransactionsIterator():
     return {"bool": {"should": filters}}
 
   def _iterate_transactions(self, contracts, max_block, partial_query):
+    """
+    Iterate through unprocessed transactions for specified contracts before specified block
+
+    Parameters
+    ----------
+    contracts : list
+        Contracts info in ElasticSearch JSON format, i.e.
+        {"_id": TRANSACTION_ID, "_source": {"document": "fields"}}
+    max_block : int
+        Block number
+    partial_query : dict
+        Additional ElasticSearch query
+
+    Returns
+    -------
+    generator
+        Generator that returns unprocessed transactions
+    """
     query = {
       "bool": {
         "must": [
@@ -94,6 +178,16 @@ class ContractTransactionsIterator():
     return self.client.iterate(self.indices[self.index], self.doc_type, query)
 
   def _save_max_block(self, contracts, max_block):
+    """
+    Save specified block value for specified contracts
+
+    Parameters
+    ----------
+    contracts : list
+        Contract addresses
+    max_block : int
+        Block number
+    """
     query = {
       "terms": {
         "address": contracts
@@ -107,4 +201,12 @@ class ContractTransactionsIterator():
     )
 
   def _get_flag_name(self):
+    """
+    Get name of field in which max block number should be stored
+
+    Returns
+    -------
+    str
+        Name of field
+    """
     return "{}_{}_block".format(self.doc_type, self.block_prefix)
