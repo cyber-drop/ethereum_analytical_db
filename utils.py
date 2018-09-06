@@ -1,5 +1,5 @@
 from custom_elastic_search import CustomElasticSearch
-from config import INDICES, MIN_CONSISTENT_BLOCK
+from config import INDICES
 
 client = CustomElasticSearch("http://localhost:9200")
 
@@ -41,7 +41,7 @@ def split_on_chunks(iterable, size):
       pass
     yield elements
 
-def get_max_block(query="*", min_consistent_block=MIN_CONSISTENT_BLOCK):
+def get_max_block(query="*", min_consistent_block=0):
   """
   Get last block in ElasticSearch
   TODO should return max consistent block, i.e. block with max number N, for which N-1 blocks are presented in ElasticSearch

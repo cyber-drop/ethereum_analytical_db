@@ -10,6 +10,7 @@ from token_transactions_prices import TokenTransactionsPrices
 from config import INDICES
 from token_prices import TokenPrices
 from blocks import Blocks
+from time import sleep
 
 def prepare_indices(host):
   elasticsearch = CustomElasticSearch(host)
@@ -86,6 +87,7 @@ def run_loop(host):
     extract_token_transactions(host)
     extract_transactions_prices(host, 'USD')
     extract_transactions_prices(host, 'ETH')
+    sleep(10)
 
 operations = {
   "prepare-indices": prepare_indices,

@@ -1,6 +1,7 @@
 from pyelasticsearch import ElasticSearch
 from tqdm import *
 from pyelasticsearch.exceptions import ElasticHttpError
+from config import NUMBER_OF_JOBS
 
 STRING_PROPERTIES = {
   "tx": ["from", "hash", "blockTimestamp", "creates", "to"],
@@ -23,8 +24,6 @@ TEXT_PROPERTIES = {
   "tx": ["input"],
   "itx": ["code", "input", "init", "error", "output"]
 }
-
-NUMBER_OF_JOBS = 1000
 
 class CustomElasticSearch(ElasticSearch):
   def __init__(self, *args, **kwargs):
