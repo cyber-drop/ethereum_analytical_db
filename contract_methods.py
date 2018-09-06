@@ -11,7 +11,7 @@ with open('standard-token-abi.json') as json_file:
   standard_token_abi = json.load(json_file)
 
 class ContractMethods:
-  ''' Check if contract is token, is it compliant with token standards and get varibles from it such as name or symbol
+  ''' Check if contract is token, is it compliant with token standards and get variables from it such as name or symbol
   
   Parameters
   ----------
