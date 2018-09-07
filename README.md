@@ -108,6 +108,22 @@ C --> |no more contracts|H[End]
 
 Extract ABI description from etherscan.io for specified contracts
 
+```mermaid
+graph TD
+A[Begin] 
+A --> B(For contract chunk in contracts without abi_extracted flag)
+B --> C(For contract in chunk)
+C --> D{contract ABI in cache}
+D --> |yes|F[Get ABI from cache]
+D --> |no|E[Get ABI from etherscan.io]
+E --> G[Save ABI to cache]
+G --> H[Extract ABI]
+F --> H
+H --> C
+C --> |no more contracts| I[Save extracted ABIs and abi_extracted flag for contracts]
+I --> J[End]
+```
+
 - parse-inputs (contracts.py)
 
 Starts input parsing. Each transaction will get a field 'decoded_input' with name of method and arguments description
