@@ -65,6 +65,19 @@ Prepare indices in ElasticSearch
 
 Extract blocks with timestamps to ElasticSearch
 
+```mermaid
+graph TD
+A[Begin] --> B[Get last block from parity]
+B --> C[Get last block from database]
+C --> D(For numbers chunk from last database block + 1 to last parity block)
+D --> E(For number in chunk)
+E --> F[Extract timestamp for block number from parity]
+F --> E
+E --> |no more numbers|G[Save extracted blocks]
+G --> D
+D --> |no more numbers|H[End]
+```
+
 - extract-traces (internal_transactions.py)
 
 Starts extraction of internal ethereum transactions
