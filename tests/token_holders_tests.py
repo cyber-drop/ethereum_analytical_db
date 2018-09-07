@@ -20,6 +20,9 @@ class TokenHoldersTestCase(unittest.TestCase):
   def iterate_supply_transfers(self):
     return self.token_holders.client.iterate(TEST_TOKEN_TX_INDEX, 'tx', 'method:initial')
 
+  def iterate_token_txs(self):
+    return self.token_holders.client.iterate(TEST_TOKEN_TX_INDEX, 'tx', 'token:*')
+
   def test_extract_token_txs(self):
     self.token_holders._create_transactions_request = MagicMock(return_value={
       "query_string": {
@@ -130,6 +133,52 @@ class TokenHoldersTestCase(unittest.TestCase):
     assert type(values[1]) is float
     assert values[1] == 0.01
 
+  def test_process_only_uint(self):
+    tokens = [
+      {'_source': {'address': '0xb8c77482e45f1f44de1745f52c74426c631bdd52'}},
+      {'_source': {'address': '0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2'}}
+    ]
+    txs = [
+      {"blockHash":"0x37dada95b3bf37bc9f9e2029c2af291e8e099348ffadd270f1fc897573964671","to_contract":True,"traceAddress":[],"decoded_input":{"name":"unfreeze","params":[{"type":"uint256","value":"16000000000000000000000000"}]},"type":"call","transactionHash":"0x20b2be5acb83856e56c64429b096c8d0852e1b810356c8fcea9d278aeee094a6","callType":"call","output":"0x0000000000000000000000000000000000000000000000000000000000000001","input":"0x6623fc460000000000000000000000000000000000000000000d3c21bcecceda10000000","gasUsed":"0x33c2","transactionPosition":129,"blockNumber":5987277,"gas":"0x5ada","from":"0x00c5e04176d95a286fcce0e68c683ca0bfec8454","to":"0xb8c77482e45f1f44de1745f52c74426c631bdd52","value":0.0,"subtraces":0},
+      {"blockHash":"0xee385ac028bb7d8863d70afa02d63181894e0b2d51b99c0c525ef24538c44c24","to_contract":True,"traceAddress":[1],"decoded_input":{"name":"mint","params":[{"type":"uint256","value":"1000000000000000000000000"}]},"type":"call","callType":"call","transactionHash":"0x5c9b0f9c6c32d2690771169ec62dd648fef7bce3d45fe8a6505d99fdcbade27a","output":"0x","input":"0xa0712d6800000000000000000000000000000000000000000000d3c21bcecceda1000000","gasUsed":"0xab31","transactionPosition":55,"blockNumber":4620855,"gas":"0x209a04","from":"0x731c6f8c754fa404cfcc2ed8035ef79262f65702","to":"0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2","value":0.0,"subtraces":0}      
+    ]
+    for tx in txs:
+      self.client.index(TEST_ITX_INDEX, 'itx', tx, refresh=True, id=tx['transactionHash'])
+    self.token_holders._extract_tokens_txs(tokens, 7000000)
+    token_txs = self.iterate_token_txs()
+    token_txs = [tx['_source'] for txs in token_txs for tx in txs]
+    amount = [tx['value'] for tx in token_txs]
+    self.assertCountEqual([16000000.0, 1000000.0], amount)
+
+  def test_process_only_uint_negative(self):
+    txs = [
+      {"blockHash":"0xbcae7deb3db192a04d913de137f6dcd6a2b2f3da8507a929a006548b2263a69e","to_contract":True,"traceAddress":[0],"decoded_input":{"name":"burnTokens","params":[{"type":"uint256","value":"6000000000"}]},"type":"call","callType":"call","transactionHash":"0x2b135d9f0e1a766dee8190fec050bfea9575f4f95d89e90f51f43d349d8368f3","output":"0x0000000000000000000000000000000000000000000000000000000000000001","input":"0x6d1b229d0000000000000000000000000000000000000000000000000000000165a0bc0000000000000000000000000000000000000000000000000000000000","gasUsed":"0x2d93","transactionPosition":77,"blockNumber":5375200,"gas":"0x34d16","from":"0xecf8db4968a8817e21bdd5ecda830e413089b534","to":"0x014b50466590340d41307cc54dcee990c8d58aa8","value":0.0,"subtraces":0},
+      {"blockHash":"0xde18db2a41c7250412ff1297ad983173ccce8281c1d19498427a765e73cf9b98","to_contract":True,"traceAddress":[],"decoded_input":{"name":"freeze","params":[{"type":"uint256","value":"64000000000000000000000000"}]},"type":"call","callType":"call","transactionHash":"0x72af0f55b97b033af3b6e6162463681730c6429d0bc9c6c6ae9ad595aa2fbc57","output":"0x0000000000000000000000000000000000000000000000000000000000000001","input":"0xd7a78db800000000000000000000000000000000000000000034f086f3b33b6840000000","gasUsed":"0x6ede","transactionPosition":70,"blockNumber":3978360,"gas":"0x9629","from":"0x00c5e04176d95a286fcce0e68c683ca0bfec8454","to":"0xb8c77482e45f1f44de1745f52c74426c631bdd52","value":0.0,"subtraces":0},
+      {"blockHash":"0x51cc9f042550639ab691b83b52edf5df9e0c2b7671c547e04d08c41bd6c6dee8","to_contract":True,"traceAddress":[],"decoded_input":{"name":"sell","params":[{"type":"uint256","value":"2550"}]},"type":"call","callType":"call","transactionHash":"0xf6519730315fdcdd4c6e7dde1585ebe93bee7832addba0b6c06498f19d03a6ff","output":"0x","input":"0xe4849b3200000000000000000000000000000000000000000000000000000000000009f6","gasUsed":"0x52fe","transactionPosition":118,"blockNumber":5934288,"gas":"0x53fd","from":"0x0eaf6b9bee938435f71c1c3f8b998ee338d7b8c3","to":"0x12480e24eb5bec1a9d4369cab6a80cad3c0a377a","value":0.0,"subtraces":1},
+      {"blockHash":"0x78eb2c45274cac457f788426f09d22c2fc00864dc733d62f2b91ad0c8d011209","to_contract":True,"traceAddress":[],"decoded_input":{"name":"sell","params":[{"type":"uint256","value":"1"}]},"type":"call","callType":"call","transactionHash":"0xcd64ac8f0517a35eb3350e190f7a70a29a38be33ea97dc6cbb60968bb938234c","output":"0x","input":"0xe4849b320000000000000000000000000000000000000000000000000000000000000001","gasUsed":"0x52fe","transactionPosition":174,"blockNumber":5771056,"gas":"0x53fd","from":"0x63353fba2f6a015949f0aa6ad18a1739da4aaf5e","to":"0x12480e24eb5bec1a9d4369cab6a80cad3c0a377a","value":0.0,"subtraces":1},
+      {"blockHash":"0x4fe50638a0382e5a9112d6183505e91e86538069ae5db2514a782f8bbae3a16e","to_contract":True,"traceAddress":[],"decoded_input":{"name":"burn","params":[{"type":"uint256","value":"250000000000000000000000"}]},"type":"call","transactionHash":"0x9efa420d547eed423421c2c8e9626a4de7eed8f167303ef36b6a44cc10ea1bee","callType":"call","output":"0x","input":"0x42966c680000000000000000000000000000000000000000000034f086f3b33b68400000","gasUsed":"0x7043","transactionPosition":13,"blockNumber":6027920,"gas":"0x7043","from":"0x964d9d1a532b5a5daeacbac71d46320de313ae9c","to":"0x8dd5fbce2f6a956c3022ba3663759011dd51e73e","value":0.0,"subtraces":5}
+    ]
+    tokens = [{'_source': {'address': item}} for item in set([tx['to'] for tx in txs])]
+    for tx in txs:
+      self.client.index(TEST_ITX_INDEX, 'itx', tx, refresh=True, id=tx['transactionHash'])
+    self.token_holders._extract_tokens_txs(tokens, 7000000)
+    token_txs = self.iterate_token_txs()
+    token_txs = [tx['_source'] for txs in token_txs for tx in txs]
+    only_negative = list(set([tx['value'] <= 0 for tx in token_txs]))
+    self.assertCountEqual([True], only_negative)
+
+  def test_process_multiple_addr_tx(self):
+    txs = [
+      {"blockHash":"0xeb8da1f537b7850889dd234dc5328f2c5133467dffa63366369457d20ee820ab","to_contract":True,"traceAddress":[],"decoded_input":{"name":"transfers","params":[{"type":"address[]","value":"['0xad5583aa4a0372102b671862c70dd5024747c298', '0xbb50e800ad522740ae8ec058f5320ae8319e64e6', '0x3091e1a9be756581b44c61ed5591c7a842fed0c5', '0x3ab1d58e9f92148df1c9b45ff9a0af45a59796b4', '0xde962ec72491985a28e9a630a1dd092cd313192e', '0x970a0f23c69b42c595612489c97300cb8265eb5e', '0x53fb39bbe132dfd658a0fc35c2634561d1000e32', '0x2064d2cfc17e25de93bf8874c5826bf5363f55bc', '0x6a0ec8c9e15feb70a489f8bfb49e857c921339d6', '0x4334d90fcf57dc5abdf6addaf1ae60c237411147', '0xc968214fa62bf0edaa7ae9025130381bb7abec9a', '0xf9f1e87d80300bbba0370193a5cebe1425b48643', '0xabdbbc24b3a3489f961c096cce37e50f590e0b9f', '0x8a38504cb731808a1ab2fd2d41cdf38c737a78a1', '0xdae809267a3ce4ef5237f248c54fcb4fa5e12505', '0x1b460e46c3f16a589d2933861005d082bef7aab5', '0xaaef5997e3bc73d5b8766779e1322ea426a1759d', '0x96c7b33c068aa97c5758442adec89d1f6033be6a', '0x442b88b865b8de103a12970a0f50ef83ab677fd9', '0xef9d921e4b6a0006d3df1bfebee824ea5c032841', '0x27680b6c9ddf2910c3a7eac51e6ef0d90edf9945', '0xc05a822bb90bf9a20402d09edcbbd5f004fb2ac4', '0x00204885b78a57f67129e06a5fc5a2bc9d6ba0b2', '0x8d99977a9fb49ba83b6b6507994b08c7e9ddc8ac', '0x237ec5207db39a850e77e2ced0bdf8159cedebdb']"},{"type":"uint256[]","value":"[347050583290000000000, 61990659630000000000, 28511650680000000000, 28212315760000000000, 31654667290000000000, 68676737920000000000, 46900269540000000000, 28207860590000000000, 28171659310000000000, 36360221620000000000, 112520807750000000000, 255896559320000000000, 27920049390000000000, 139081157240000000000, 30302841130000000000, 238761454510000020000, 28381041760000000000, 76576965590000000000, 66921546880000000000, 64765185920000000000, 27469005810000000000, 94306416960000000000, 56729497150000000000, 78623734090000000000, 140622418070000000000]"}]},"type":"call","callType":"call","transactionHash":"0x59cc939cfffc79e239de3c3cf13f59a667a096abf04100dd3b8909d3cd4ad263","output":"0x0000000000000000000000000000000000000000000000000000000000000001","gasUsed":"0x85cc0","transactionPosition":76,"blockNumber":5744643,"gas":"0xe25a8","from":"0x00d5718ab3b3e9afce7c2b4e106d2a97ad477526","to":"0xd0a4b8946cb52f0661273bfbc6fd0e0c75fc6433","value":0.0,"subtraces":0}
+    ]
+    tokens = [{'_source': {'address': item}} for item in set([tx['to'] for tx in txs])]
+    for tx in txs:
+      self.client.index(TEST_ITX_INDEX, 'itx', tx, refresh=True, id=tx['transactionHash'])
+    self.token_holders._extract_tokens_txs(tokens, 7000000)
+    token_txs = self.iterate_token_txs()
+    token_txs = [tx['_source'] for txs in token_txs for tx in txs]
+    assert len(token_txs) == 25
+
   def test_process_multi_addr_one_uint(self):
     descriptions = self.token_holders._process_multi_addr_one_uint(TEST_MINT_ADDRESSES)
     values = list(set([tx['value'] for tx in descriptions]))
@@ -176,6 +225,7 @@ class TokenHoldersTestCase(unittest.TestCase):
 TEST_CONTRACT_INDEX = 'test-ethereum-contracts'
 TEST_ITX_INDEX = 'test-ethereum-internal-txs'
 TEST_TOKEN_TX_INDEX = 'test-token-txs'
+TEST_BLOCK_INDEX = 'test-block'
 
 TEST_TOKEN_ADDRESSES = ['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d',
   '0xa74476443119a942de498590fe1f2454d7d4ac0d'

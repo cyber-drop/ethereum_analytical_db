@@ -11,7 +11,8 @@ with open('standard-token-abi.json') as json_file:
   standard_token_abi = json.load(json_file)
 
 class ContractMethods:
-  ''' Check if contract is token, is it compliant with token standards and get variables from it such as name or symbol
+  ''' 
+  Check if contract is token, is it compliant with token standards and get variables from it such as name or symbol
   
   Parameters
   ----------
@@ -215,10 +216,10 @@ class ContractMethods:
     
     Parameters
     ----------
-      doc_id: str
-        id of Elasticsearch document
-      body: dict
-        Dictionary with new values
+    doc_id: str
+      id of Elasticsearch document
+    body: dict
+      Dictionary with new values
     '''
     self.client.update(self.indices['contract'], 'contract', doc_id, doc=body, refresh=True)
 
@@ -235,13 +236,18 @@ class ContractMethods:
     is_token = self._check_is_token(code)
     if is_token == True:
       token_standards = self._check_standards(code)
-      if len(token_standards) > 0:
-        name, symbol, decimals, total_supply, owner = self._get_constants(contract['_source']['address'])
-        update_body = {'standards': token_standards, 'token_name': name, 'token_symbol': symbol, 'decimals': decimals, 'total_supply': total_supply, 'token_owner': owner, 'is_token': True, 'methods': True}
-        self._update_contract_descr(contract['_id'], update_body)
-      else:
-        update_body = {'standards': ['None'], 'is_token': True}
-        self._update_contract_descr(contract['_id'], update_body)
+      name, symbol, decimals, total_supply, owner = self._get_constants(contract['_source']['address'])
+      update_body = {
+        'standards': token_standards, 
+        'token_name': name, 
+        'token_symbol': symbol, 
+        'decimals': decimals, 
+        'total_supply': total_supply, 
+        'token_owner': owner, 
+        'is_token': True, 
+        'methods': True
+      }
+      self._update_contract_descr(contract['_id'], update_body)
     else:
       update_body = {'is_token': False, 'methods': True}
       self._update_contract_descr(contract['_id'], update_body)
@@ -256,7 +262,7 @@ class ContractMethods:
       List of dictinoaries with new data
     '''
     for doc in docs:
-      yield self.client.update_op(doc['doc'], id=doc['id'])
+      yield self.client.update_op(doc['doc'], id=doc['id'], upsert=doc['doc'])
 
   def _update_multiple_docs(self, docs, doc_type, index_name):
     ''' 
@@ -274,17 +280,27 @@ class ContractMethods:
     for chunk in bulk_chunks(self._construct_bulk_update_ops(docs), docs_per_chunk=1000):
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
 
+  def _add_cmc_id(self):
+    '''
+    Add identificators used in Cryptocompare and Coinmarketcap to contract documents
+    '''
+    with open('./tokens.json') as json_file:
+      tokens = json.load(json_file)
+    update_docs = [{'doc': {
+      'cmc_id': token['cmc_id'], 
+      'website_slug': token['website_slug'],
+      'cc_sym': token['cc_sym'],
+      'address': token['address']
+    }, 'id': token['address']} for token in tokens]
+    self._update_multiple_docs(update_docs, 'contract', self.indices['contract'])
+
   def search_methods(self):
     ''' 
-    Classify contract into standard tokens, non-standard and non-tokens, than extract public variables values
+    Classify contracts into standard tokens, non-standard and non-tokens, than extract public variables values
 
     This function is an entry point for search-methods operation
     '''
     for contracts_chunk in self._iterate_contracts():
       for contract in contracts_chunk:
         self._classify_contract(contract)
-    for tokens_chunk in self._iterate_non_standard():
-      for token in tokens_chunk:
-        name, symbol, decimals, total_supply, owner = self._get_constants(token['_source']['address'])
-        update_body = {'token_name': name, 'token_symbol': symbol, 'decimals': decimals, 'total_supply': total_supply, 'token_owner': owner, 'methods': True}
-        self._update_contract_descr(token['_id'], update_body)
+    self._add_cmc_id()

@@ -19,7 +19,7 @@ def mocked_requests_get(*args, **kwargs):
 class TokenPricesTestCase(unittest.TestCase):
   def setUp(self):
     self.client = TestElasticSearch()
-    self.token_prices = TokenPrices({'contract': TEST_CONTRACT_INDEX, 'token_prices': TEST_PRICES_INDEX})
+    self.token_prices = TokenPrices({'contract': TEST_CONTRACT_INDEX, 'token_price': TEST_PRICES_INDEX})
     self.client.recreate_index(TEST_PRICES_INDEX)
     self.client.recreate_index(TEST_CONTRACT_INDEX)
   def _iterate_prices(self):
@@ -88,4 +88,3 @@ TEST_CONTRACT_INDEX = 'test-ethereum-contract'
 TEST_TOKEN_SYMBOLS = ['AE', 'FND', 'CPAY', 'SEXC']
 TEST_ADDRESSES = ['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', '0x4df47b4969b2911c966506e3592c41389493953b', '0x0ebb614204e47c09b6c3feb9aaecad8ee060e23e', '0x2567c677473d110d75a8360c35309e63b1d52429']
 TEST_RES = {"AE":{"BTC":0.0004365},"FND":{"BTC":0.00001584},"CPAY":{"BTC":0.00000634}}
-
