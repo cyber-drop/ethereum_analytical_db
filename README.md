@@ -128,6 +128,25 @@ I --> J[End]
 
 Starts input parsing. Each transaction will get a field 'decoded_input' with name of method and arguments description
 
+```mermaid
+graph TD
+A[Begin] 
+A --> B[Get current max block from ElasticSearch]
+B --> C(For contract chunk in contracts with ABI and itx_inputs_decoded_block < current max block)
+C --> D(For contract in chunk)
+D --> E[Add contract address and itx_transactions_detected_block to request]
+E --> D
+D --> |no more contracts| F(For transactions chunk in transactions by generated request)
+F --> G(For transaction in chunk)
+G --> H[Extract name and params for transaction input according to ABI]
+H --> G
+G --> |no more transactions|I[Save extracted names and params to decoded_input field]
+I --> F
+F --> |no more transactions|J[Save itx_transactions_detected_block = current max block fro contracts]
+J --> C
+C --> |no more contracts|K[End]
+```
+
 - search-methods (contract_methods.py)
 
 Checks if contracts contain signatures of standards-specific methods. The list of standards stored in 'standards' field.
