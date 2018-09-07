@@ -22,7 +22,7 @@ class TokenHoldersTestCase(unittest.TestCase):
 
   def iterate_token_txs(self):
     return self.token_holders.client.iterate(TEST_TOKEN_TX_INDEX, 'tx', 'token:*')
-    
+
   def test_extract_token_txs(self):
     self.token_holders._create_transactions_request = MagicMock(return_value={
       "query_string": {
@@ -166,6 +166,18 @@ class TokenHoldersTestCase(unittest.TestCase):
     token_txs = [tx['_source'] for txs in token_txs for tx in txs]
     only_negative = list(set([tx['value'] <= 0 for tx in token_txs]))
     self.assertCountEqual([True], only_negative)
+
+  def test_process_multiple_addr_tx(self):
+    txs = [
+      {"blockHash":"0xeb8da1f537b7850889dd234dc5328f2c5133467dffa63366369457d20ee820ab","to_contract":True,"traceAddress":[],"decoded_input":{"name":"transfers","params":[{"type":"address[]","value":"['0xad5583aa4a0372102b671862c70dd5024747c298', '0xbb50e800ad522740ae8ec058f5320ae8319e64e6', '0x3091e1a9be756581b44c61ed5591c7a842fed0c5', '0x3ab1d58e9f92148df1c9b45ff9a0af45a59796b4', '0xde962ec72491985a28e9a630a1dd092cd313192e', '0x970a0f23c69b42c595612489c97300cb8265eb5e', '0x53fb39bbe132dfd658a0fc35c2634561d1000e32', '0x2064d2cfc17e25de93bf8874c5826bf5363f55bc', '0x6a0ec8c9e15feb70a489f8bfb49e857c921339d6', '0x4334d90fcf57dc5abdf6addaf1ae60c237411147', '0xc968214fa62bf0edaa7ae9025130381bb7abec9a', '0xf9f1e87d80300bbba0370193a5cebe1425b48643', '0xabdbbc24b3a3489f961c096cce37e50f590e0b9f', '0x8a38504cb731808a1ab2fd2d41cdf38c737a78a1', '0xdae809267a3ce4ef5237f248c54fcb4fa5e12505', '0x1b460e46c3f16a589d2933861005d082bef7aab5', '0xaaef5997e3bc73d5b8766779e1322ea426a1759d', '0x96c7b33c068aa97c5758442adec89d1f6033be6a', '0x442b88b865b8de103a12970a0f50ef83ab677fd9', '0xef9d921e4b6a0006d3df1bfebee824ea5c032841', '0x27680b6c9ddf2910c3a7eac51e6ef0d90edf9945', '0xc05a822bb90bf9a20402d09edcbbd5f004fb2ac4', '0x00204885b78a57f67129e06a5fc5a2bc9d6ba0b2', '0x8d99977a9fb49ba83b6b6507994b08c7e9ddc8ac', '0x237ec5207db39a850e77e2ced0bdf8159cedebdb']"},{"type":"uint256[]","value":"[347050583290000000000, 61990659630000000000, 28511650680000000000, 28212315760000000000, 31654667290000000000, 68676737920000000000, 46900269540000000000, 28207860590000000000, 28171659310000000000, 36360221620000000000, 112520807750000000000, 255896559320000000000, 27920049390000000000, 139081157240000000000, 30302841130000000000, 238761454510000020000, 28381041760000000000, 76576965590000000000, 66921546880000000000, 64765185920000000000, 27469005810000000000, 94306416960000000000, 56729497150000000000, 78623734090000000000, 140622418070000000000]"}]},"type":"call","callType":"call","transactionHash":"0x59cc939cfffc79e239de3c3cf13f59a667a096abf04100dd3b8909d3cd4ad263","output":"0x0000000000000000000000000000000000000000000000000000000000000001","gasUsed":"0x85cc0","transactionPosition":76,"blockNumber":5744643,"gas":"0xe25a8","from":"0x00d5718ab3b3e9afce7c2b4e106d2a97ad477526","to":"0xd0a4b8946cb52f0661273bfbc6fd0e0c75fc6433","value":0.0,"subtraces":0}
+    ]
+    tokens = [{'_source': {'address': item}} for item in set([tx['to'] for tx in txs])]
+    for tx in txs:
+      self.client.index(TEST_ITX_INDEX, 'itx', tx, refresh=True, id=tx['transactionHash'])
+    self.token_holders._extract_tokens_txs(tokens, 7000000)
+    token_txs = self.iterate_token_txs()
+    token_txs = [tx['_source'] for txs in token_txs for tx in txs]
+    assert len(token_txs) == 25
 
   def test_process_multi_addr_one_uint(self):
     descriptions = self.token_holders._process_multi_addr_one_uint(TEST_MINT_ADDRESSES)
