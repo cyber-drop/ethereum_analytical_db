@@ -103,7 +103,7 @@ Download token capitalization, ETH, BTC and USD prices from cryptocompare and co
 Set USD and ETH prices for transactions. Also set an "overflow" field - a probability that transaction value is corrupted,
 i.e. is greater than market capitalization
 
-​```flow
+```flow
 st=>start: Start
 op=>operation: Your Operation
 cond=>condition: Yes or No?
