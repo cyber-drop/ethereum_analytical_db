@@ -73,6 +73,20 @@ Starts extraction of internal ethereum transactions
 
 Extract contract info (address, bytecode, author, etc) from transactions
 
+```mermaid
+graph TD
+A[Begin] --> B(For transactions chunk with 'created' field)
+B --> C(For transaction in chunk)
+C --> D{Transaction contains 'error' field}
+D --> |no|E[Extract contract with bytecode, owner, bytecode, block number, parent transaction]
+E -.-> C
+D -.-> |yes|C
+C --> |no more transactions|F[Save extracted contracts to database]
+F --> G[Save contract_created flag for transactions chunk]
+G -.-> B
+B --> |no more transactions|End
+```
+
 - detect-contract-transactions (contract_transactions.py)
 
 Highlight all transactions to contracts with to_contract flag
@@ -102,14 +116,3 @@ Download token capitalization, ETH, BTC and USD prices from cryptocompare and co
 
 Set USD and ETH prices for transactions. Also set an "overflow" field - a probability that transaction value is corrupted,
 i.e. is greater than market capitalization
-
-```mermaid
-st=>start: Start
-op=>operation: Your Operation
-cond=>condition: Yes or No?
-e=>end
-
-st->op->cond
-cond(yes)->e
-cond(no)->op
-```
