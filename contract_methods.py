@@ -235,13 +235,18 @@ class ContractMethods:
     is_token = self._check_is_token(code)
     if is_token == True:
       token_standards = self._check_standards(code)
-      if len(token_standards) > 0:
-        name, symbol, decimals, total_supply, owner = self._get_constants(contract['_source']['address'])
-        update_body = {'standards': token_standards, 'token_name': name, 'token_symbol': symbol, 'decimals': decimals, 'total_supply': total_supply, 'token_owner': owner, 'is_token': True, 'methods': True}
-        self._update_contract_descr(contract['_id'], update_body)
-      else:
-        update_body = {'standards': ['None'], 'is_token': True}
-        self._update_contract_descr(contract['_id'], update_body)
+      name, symbol, decimals, total_supply, owner = self._get_constants(contract['_source']['address'])
+      update_body = {
+        'standards': token_standards, 
+        'token_name': name, 
+        'token_symbol': symbol, 
+        'decimals': decimals, 
+        'total_supply': total_supply, 
+        'token_owner': owner, 
+        'is_token': True, 
+        'methods': True
+      }
+      self._update_contract_descr(contract['_id'], update_body)
     else:
       update_body = {'is_token': False, 'methods': True}
       self._update_contract_descr(contract['_id'], update_body)
@@ -297,9 +302,4 @@ class ContractMethods:
     for contracts_chunk in self._iterate_contracts():
       for contract in contracts_chunk:
         self._classify_contract(contract)
-    for tokens_chunk in self._iterate_non_standard():
-      for token in tokens_chunk:
-        name, symbol, decimals, total_supply, owner = self._get_constants(token['_source']['address'])
-        update_body = {'token_name': name, 'token_symbol': symbol, 'decimals': decimals, 'total_supply': total_supply, 'token_owner': owner, 'methods': True}
-        self._update_contract_descr(token['_id'], update_body)
     self._add_cmc_id()
