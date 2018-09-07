@@ -165,6 +165,32 @@ C --> |no more contracts|K[End]
 Checks if contracts contain signatures of standards-specific methods. The list of standards stored in 'standards' field.
 It also saves ERC20 token names, symbols, total supply and etc.
 
+```mermaid
+graph TD
+A[Begin] --> B(For contracts chunk in contracts without 'methods' flag)
+B --> C(For contract in chunk)
+C --> D{Bytecode contrains transfer signature}
+D --> |yes|E[Find standards]
+E --> F[Extract name, symbol and owner from parity]
+F --> G{Can extract decimals}
+G --> |yes|H[Extract decimals from parity]
+G --> |no|I[Set decimals = 18]
+I --> J{Can extract total_supply}
+H --> J
+J --> |yes|K[Extract total_supply from parity]
+K --> K1[Convert total_suppy from wei to eth]
+J --> |no|L[Set total_supply = 0]
+L --> M[Update contract with extracted name, symbol, owner, decimals, total_supply, standards, is_token:true]
+K1 --> M
+D --> |no|O[Update contract with is_token:false]
+O --> P[Update contract with methods:true]
+M --> P
+P --> Q[Save contract to database]
+Q --> C
+C --> |no more contracts| B
+B --> |no more contracts| R[End]
+```
+
 - extract-token-transactions (token_holders.py)
 
 Downloads list of tokens from coinmarketcap API and tries to find contracts with corresponding names in ES and then saves matching contracts into separate index. After finishing this process finds all transactions that have 'to' field equal to token contract address and also saves these transaction to separate index.
