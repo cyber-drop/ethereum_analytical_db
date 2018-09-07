@@ -91,6 +91,19 @@ B --> |no more transactions|End
 
 Highlight all transactions to contracts with to_contract flag
 
+```mermaid
+graph TD
+A[Begin] --> B[Get current max block from ElasticSearch]
+B --> C(For contract chunk in contracts with itx_transactions_detected_block < current max block)
+C --> D(For contract in chunk)
+D --> E[Add contract and itx_transactions_detected_block to request]
+E --> D
+D --> |no more contracts| F[Set to_contract flag to transactions by generated request]
+F --> G[Save itx_transactions_detected_block = current max block for contracts]
+G --> C
+C --> |no more contracts|H[End]
+```
+
 - extract-contracts-abi (contracts.py)
 
 Extract ABI description from etherscan.io for specified contracts
