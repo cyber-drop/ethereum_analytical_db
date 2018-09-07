@@ -13,4 +13,5 @@ INDICES = {
   "token_price": "ethereum-token-price"
 }
 
-MIN_CONSISTENT_BLOCK = 0
+NUMBER_OF_JOBS = 1000
+PROCESSED_CONTRACTS = None

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import click
 from custom_elastic_search import CustomElasticSearch
-from contract_transactions import InternalContractTransactions, ExternalContractTransactions, ContractTransactions
+from contract_transactions import ContractTransactions
 from internal_transactions import InternalTransactions
 from contracts import InternalContracts, Contracts
 from contract_methods import ContractMethods
@@ -10,6 +10,7 @@ from token_transactions_prices import TokenTransactionsPrices
 from config import INDICES
 from token_prices import TokenPrices
 from blocks import Blocks
+from time import sleep
 
 def prepare_indices(host):
   elasticsearch = CustomElasticSearch(host)
@@ -24,12 +25,12 @@ def prepare_blocks(host):
 
 def detect_contracts(host):
   print("Detecting contracts...")
-  contract_transactions = InternalContractTransactions(INDICES, host)
+  contract_transactions = ContractTransactions(INDICES, host)
   contract_transactions.extract_contract_addresses()
 
 def detect_contract_transactions(host):
   print("Detecting transactions to contracts...")
-  contract_transactions = InternalContractTransactions(INDICES, host)
+  contract_transactions = ContractTransactions(INDICES, host)
   contract_transactions.detect_contract_transactions()
 
 def extract_traces(host):
@@ -86,6 +87,7 @@ def run_loop(host):
     extract_token_transactions(host)
     extract_transactions_prices(host, 'USD')
     extract_transactions_prices(host, 'ETH')
+    sleep(10)
 
 operations = {
   "prepare-indices": prepare_indices,

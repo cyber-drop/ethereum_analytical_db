@@ -1,11 +1,10 @@
-from contracts import InternalContracts, _get_contracts_abi_sync
+from contracts import Contracts, _get_contracts_abi_sync
 import contracts
 import os
 import unittest
 from tests.test_utils import TestElasticSearch, mockify
 from tqdm import *
 from unittest.mock import MagicMock, call, Mock, patch, ANY
-from time import sleep
 import multiprocessing
 import json
 
@@ -19,7 +18,7 @@ TEST_CONTRACTS_INDEX = 'test-ethereum-contracts'
 class InputParsingTestCase(unittest.TestCase):
   doc_type = "itx"
   index = "internal_transaction"
-  contracts_class = InternalContracts
+  contracts_class = Contracts
   doc = {'to': TEST_CONTRACT_ADDRESS, 'input': TEST_CONTRACT_PARAMETERS, "callType": "call", 'blockNumber': 10}
   blocks_query = "traces_extracted:true"
 
@@ -33,22 +32,27 @@ class InputParsingTestCase(unittest.TestCase):
     self.client.recreate_fast_index(TEST_TRANSACTIONS_INDEX)
 
   def test_pool(self):
+    """Test pool size"""
     assert self.contracts.pool._processes == 10
 
   def test_set_contracts_abi(self):
+    """Test setting contracts ABI"""
     contracts_abi = {"0x0": TEST_CONTRACT_ABI, "0x1": TEST_CONTRACT_ABI}
     self.contracts._set_contracts_abi(contracts_abi)
     self.assertSequenceEqual(self.contracts._contracts_abi, contracts_abi)
 
   def test_get_contract_abi(self):
+    """Test getting contract ABI by address"""
     response = _get_contracts_abi_sync({1: TEST_CONTRACT_ADDRESS})
     self.assertSequenceEqual(response, {1: TEST_CONTRACT_ABI})
 
   def test_get_wrong_contract_abi(self):
+    """Test getting contract ABI by invalid address"""
     response = _get_contracts_abi_sync({"wrong": "0x0"})
     self.assertSequenceEqual(response, {"wrong": []})
 
   def test_get_uncached_contract_abi(self):
+    """Test getting contract ABI with no record in cache"""
     try:
       os.remove("/home/noomkcalb/.quickBlocks/cache/abis/" + TEST_CONTRACT_ADDRESS + ".json")
     except:
@@ -57,15 +61,18 @@ class InputParsingTestCase(unittest.TestCase):
     self.assertSequenceEqual(response, {"uncached": TEST_CONTRACT_ABI})
 
   def test_get_multiple_contracts_abi(self):
+    """Test getting ABI for multiple contracts"""
     response = _get_contracts_abi_sync({1: TEST_CONTRACT_ADDRESS, 2: TEST_CONTRACT_ADDRESS})
     self.assertSequenceEqual(response, {1: TEST_CONTRACT_ABI, 2: TEST_CONTRACT_ABI})
 
   def test_split_on_chunks(self):
+    """Test splitting on chunks"""
     test_list = list(range(10))
     test_chunks = list(self.contracts._split_on_chunks(test_list, 3))
     self.assertSequenceEqual(test_chunks, [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]])
 
   def test_get_contracts_abi(self):
+    """Test getting ABI in parallel mode with right order"""
     addresses = ["address" + str(i) for i in range(100)]
     chunks = [[(0, "address1")], [(1, "address2")]]
     abis = [{1: "abi2"}, {0: "abi1"}]
@@ -80,6 +87,7 @@ class InputParsingTestCase(unittest.TestCase):
     self.assertSequenceEqual(["abi1", "abi2"], response)
 
   def test_decode_inputs_batch_sync(self):
+    """Test decode inputs batch"""
     response = contracts._decode_inputs_batch_sync({
       "0x1": (TEST_CONTRACT_ABI, TEST_CONTRACT_PARAMETERS),
       "0x2": (TEST_CONTRACT_ABI, TEST_CONTRACT_PARAMETERS)
@@ -90,6 +98,7 @@ class InputParsingTestCase(unittest.TestCase):
     })
 
   def test_decode_inputs_batch(self):
+    """Test decoding inputs batch in parallel mode"""
     inputs = {"0x" + str(i): "input" + str(i) for i in range(100)}
     chunks = [[("0x1", "input1")], [("0x1", "input2")]]
     decoded_inputs = [{"0x1": "decoded_input2"}, {"0x0": "decoded_input1"}]
@@ -103,15 +112,8 @@ class InputParsingTestCase(unittest.TestCase):
     self.contracts.pool.map.assert_called_with(contracts._decode_inputs_batch_sync, [dict(chunk) for chunk in chunks])
     self.assertSequenceEqual({"0x0": "decoded_input1", "0x1": "decoded_input2"}, response)
 
-  def xtest_decode_inputs_batch_timeout(self):
-    def sleepy(*args):
-      sleep(60)
-      return "input"
-    self.contracts._decode_input = MagicMock(side_effect=sleepy)
-    with self.assertRaises(multiprocessing.context.TimeoutError):
-      self.contracts._decode_inputs_batch([("0x0", "0x")])
-
   def add_contracts_with_and_without_abi(self):
+    """Add 10 contracts with no ABI at all, 10 contracts with abi_extracted flag and 5 contracts with ABI"""
     for i in tqdm(range(10)):
       self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS, "blockNumber": i}, id=i + 1, refresh=True)
     for i in tqdm(range(10)):
@@ -120,6 +122,7 @@ class InputParsingTestCase(unittest.TestCase):
       self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS, "blockNumber": i, 'abi_extracted': True, 'abi': True}, id=i + 21, refresh=True)
 
   def test_iterate_contracts_without_abi(self):
+    """Test iterations through contracts without abi_extracted flag"""
     self.contracts = self.contracts_class(
       {"contract": TEST_CONTRACTS_INDEX, self.index: TEST_TRANSACTIONS_INDEX},
       parity_hosts=[(0, 8, "http://localhost:8545")]
@@ -131,6 +134,7 @@ class InputParsingTestCase(unittest.TestCase):
       self.assertCountEqual(contracts, [str(i) for i in range(1, 9)])
 
   def test_save_contracts_abi(self):
+    """Test saving ABI for each contract in ElasticSearch"""
     for i in tqdm(range(10)):
       self.client.index(TEST_CONTRACTS_INDEX, 'contract', {"blockNumber": i, 'address': TEST_CONTRACT_ADDRESS}, id=i + 1, refresh=True)
     self.contracts.save_contracts_abi()
@@ -139,6 +143,7 @@ class InputParsingTestCase(unittest.TestCase):
     self.assertCountEqual(abis, [TEST_CONTRACT_ABI] * 10)
 
   def test_save_contracts_abi_status(self):
+    """Test saving abi_extracted flag for each contract in ElasticSearch"""
     for i in tqdm(range(10)):
       self.client.index(TEST_CONTRACTS_INDEX, 'contract', {"blockNumber": i, 'address': TEST_CONTRACT_ADDRESS}, id=i + 1, refresh=True)
     self.contracts.save_contracts_abi()
@@ -146,6 +151,7 @@ class InputParsingTestCase(unittest.TestCase):
     assert contracts_count == 10
 
   def test_iterate_contracts_with_abi(self):
+    """Test iterations through contracts with ABI"""
     test_max_block = 100
     self.contracts = self.contracts_class(
       {"contract": TEST_CONTRACTS_INDEX, self.index: TEST_TRANSACTIONS_INDEX},
@@ -157,6 +163,7 @@ class InputParsingTestCase(unittest.TestCase):
     self.assertCountEqual(contracts, [str(i) for i in range(21, 25)])
 
   def test_iterate_contracts_with_abi_call_iterate_contracts(self):
+    """Test iterations through contracts with unprocessed transactions before some block"""
     test_max_block = 2
     test_iterator = "iterator"
     self.contracts._iterate_contracts = MagicMock(return_value=test_iterator)
@@ -167,6 +174,7 @@ class InputParsingTestCase(unittest.TestCase):
     assert contracts == test_iterator
 
   def test_iterate_transactions_by_targets_ignore_transactions_with_error(self):
+    """Test iterations through CALL EVM transactions without errors"""
     self.contracts._create_transactions_request = MagicMock(return_value={"query_string": {"query": "*"}})
     self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
       'callType': 'call',
@@ -184,6 +192,7 @@ class InputParsingTestCase(unittest.TestCase):
     self.assertCountEqual(transactions, ['1'])
 
   def test_iterate_transactions_by_targets_select_unprocessed_transactions(self):
+    """Test iterations through transactions before specified block"""
     test_iterator = "iterator"
     test_max_block = 0
     test_contracts = ["contract"]
@@ -195,6 +204,7 @@ class InputParsingTestCase(unittest.TestCase):
     assert transactions == test_iterator
 
   def test_decode_inputs_for_contracts(self):
+    """Test decoding inputs for contracts chunk from elasticsearch"""
     test_max_block = 1000
     self.contracts._set_contracts_abi({TEST_CONTRACT_ADDRESS: TEST_CONTRACT_ABI})
     self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS, 'abi': TEST_CONTRACT_ABI}, id=1, refresh=True)
@@ -207,6 +217,7 @@ class InputParsingTestCase(unittest.TestCase):
     self.assertCountEqual(decoded_inputs, [TEST_CONTRACT_DECODED_PARAMETERS] * 10)
 
   def test_decode_inputs_for_contracts_iterate_arguments(self):
+    """Test arguments for iterate method (should pass contracts and max block)"""
     test_contracts = [
       {"_source": {"address": "0x" + str(i), self.doc_type + "_inputs_decoded_block": i}}
       for i in range(10)
@@ -223,6 +234,7 @@ class InputParsingTestCase(unittest.TestCase):
     mock_iterate.assert_called_with(test_contracts, test_block)
 
   def test_decode_inputs_for_contracts_exception(self):
+    """Test exception for some input in chunk"""
     def exception_on_seven(inputs):
       if "input7" in str(inputs):
         raise multiprocessing.context.TimeoutError()
@@ -246,6 +258,7 @@ class InputParsingTestCase(unittest.TestCase):
     assert self.contracts.client.bulk.call_count == 9
 
   def test_decode_inputs_save_inputs_decoded(self):
+    """Test saving decoded inputs in process"""
     test_contracts = ["contract1", "contract2", "contract3"]
     test_contracts_from_elasticsearch = [{"_source": {"abi": contract, "address": contract}} for contract in test_contracts]
     mockify(self.contracts, {
@@ -265,6 +278,7 @@ class InputParsingTestCase(unittest.TestCase):
       ])
 
   def test_decode_inputs_save_max_block_for_query(self):
+    """Test saving max block parameter during all operation"""
     test_max_block = 1000
     test_contracts_from_elasticsearch = [{"_source": {"abi": "contract", "address": "contract" + str(i)}} for i in range(3)]
     mockify(self.contracts, {
@@ -287,6 +301,7 @@ class InputParsingTestCase(unittest.TestCase):
       ])
 
   def test_decode_inputs_for_big_portion_of_contracts(self):
+    """Test decoding inputs for big portion of contracts in ElasticSearch"""
     for i in tqdm(range(10)):
       self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS, 'blockNumber': i}, id=i + 1, refresh=True)
     for i in tqdm(range(10)):

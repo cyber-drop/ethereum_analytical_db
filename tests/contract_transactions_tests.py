@@ -1,5 +1,5 @@
 import unittest 
-from contract_transactions import ExternalContractTransactions, InternalContractTransactions
+from contract_transactions import ContractTransactions
 from pyelasticsearch import ElasticSearch
 from time import sleep
 from tqdm import *
@@ -7,7 +7,7 @@ from test_utils import TestElasticSearch
 from unittest.mock import MagicMock, Mock, call, ANY, patch
 
 class InternalContractTransactionsTestCase(unittest.TestCase):
-  contract_transactions_class = InternalContractTransactions
+  contract_transactions_class = ContractTransactions
   index = "internal_transaction"
   doc_type = "itx"
 
@@ -18,6 +18,9 @@ class InternalContractTransactionsTestCase(unittest.TestCase):
     self.contract_transactions = self.contract_transactions_class({"contract": TEST_CONTRACTS_INDEX, self.index: TEST_TRANSACTIONS_INDEX})
 
   def test_iterate_contract_transactions(self):
+    """
+    Test iterations through transactions that create contracts
+    """
     self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "call"}, id=1, refresh=True)
     self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create"}, id=2, refresh=True)
     self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create", "error": "Out of gas"}, id=3, refresh=True)
@@ -29,6 +32,9 @@ class InternalContractTransactionsTestCase(unittest.TestCase):
     self.assertCountEqual(['2'], transactions)
 
   def test_extract_contract_from_internal_transaction(self):
+    """
+    Test extracting contract from a defined transaction
+    """
     transaction = {
       "from": "0x0",
       "input": "0x1",
@@ -49,6 +55,9 @@ class InternalContractTransactionsTestCase(unittest.TestCase):
     assert contract["bytecode"] == transaction["code"]
 
   def test_extract_contract_addresses(self):
+    """
+    Test extracting contracts from transactions to ElasticSearch
+    """
     transactions_list = [
       [{"_source": {"hash": "transaction" + str(i)}} for i in range(10)],
       [{"_source": {"hash": "transaction" + str(i)}} for i in range(10, 11)]
@@ -81,6 +90,9 @@ class InternalContractTransactionsTestCase(unittest.TestCase):
     process.assert_has_calls(calls)
 
   def test_save_flag_for_contracts(self):
+    """
+    Test save flag for processed transactions
+    """
     transactions = [{
       "hash": "0x" + str(i)
     } for i in range(10)]
@@ -106,6 +118,9 @@ class InternalContractTransactionsTestCase(unittest.TestCase):
     assert transactions_count == 10
 
   def test_iterate_contracts(self):
+    """
+    Test iterations through all contracts
+    """
     self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_TRANSACTION_TO}, id=1, refresh=True)
     self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_TRANSACTION_TO_CONTRACT}, id=2, refresh=True)
     iterator = self.contract_transactions._iterate_contracts_without_detected_transactions(0)
@@ -114,6 +129,9 @@ class InternalContractTransactionsTestCase(unittest.TestCase):
     self.assertCountEqual(["1", "2"], contracts)
 
   def test_iterate_unprocessed_contracts(self):
+    """
+    Test iterations through unprocessed contracts with helper class usage
+    """
     test_iterator = "iterator"
     test_max_block = 0
     self.contract_transactions._iterate_contracts = MagicMock(return_value=test_iterator)
@@ -123,6 +141,9 @@ class InternalContractTransactionsTestCase(unittest.TestCase):
     assert contracts == test_iterator
 
   def test_detect_transactions_by_contracts(self):
+    """
+    Test to_contract flag placement in ElasticSearch
+    """
     test_query = {"test": "query"}
     test_max_block = 0
     self.contract_transactions.client.update_by_query = MagicMock()
@@ -147,6 +168,9 @@ class InternalContractTransactionsTestCase(unittest.TestCase):
     )
 
   def test_detect_contract_transactions(self):
+    """
+    Test contract transactions detection process
+    """
     test_max_block = 10
     contracts_list = [[TEST_TRANSACTION_TO + str(j * 10 + i) for i in range(10)] for j in range(5)]
     contracts_from_es_list = [[{"_source": {"address": contract}} for contract in contracts] for contracts in
