@@ -203,3 +203,22 @@ Download token capitalization, ETH, BTC and USD prices from cryptocompare and co
 
 Set USD and ETH prices for transactions. Also set an "overflow" field - a probability that transaction value is corrupted,
 i.e. is greater than market capitalization
+
+- run-loop
+
+Runs real-time synchronization loop
+
+```mermaid
+graph TD
+A[Begin] --> B[Prepare blocks]
+B --> C[Extract internal transactions]
+C --> D[Extract contracts]
+D --> E[Extract contract transactions]
+E --> F[Extract contracts ABI]
+F --> G[Parse transactions inputs]
+G --> H[Extract token prices]
+H --> I[Extract token transactions]
+I --> J[Extract USD transaction values]
+J --> K[Extract ETH transaction values]
+K --> B
+```
