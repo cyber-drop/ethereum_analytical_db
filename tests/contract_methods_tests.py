@@ -70,7 +70,6 @@ class ContractMethodsTestCase(unittest.TestCase):
 
     dec_exists = self.contract_methods._get_constants('0xa0e89120768bf166d228988627e4ac8af350220a')
     dec_non_exists = self.contract_methods._get_constants('0xc569a08db1a5f2cd3ef9c2c3bfbc4f42f74de51b')
-    
     assert dec_exists[2] == 0
     assert dec_non_exists[2] == 18
 
