@@ -225,6 +225,7 @@ class TokenHoldersTestCase(unittest.TestCase):
 TEST_CONTRACT_INDEX = 'test-ethereum-contracts'
 TEST_ITX_INDEX = 'test-ethereum-internal-txs'
 TEST_TOKEN_TX_INDEX = 'test-token-txs'
+TEST_BLOCK_INDEX = 'test-block'
 
 TEST_TOKEN_ADDRESSES = ['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d',
   '0xa74476443119a942de498590fe1f2454d7d4ac0d'
