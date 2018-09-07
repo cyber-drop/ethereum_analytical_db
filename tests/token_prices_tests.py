@@ -1,6 +1,6 @@
 import unittest
 from token_prices import TokenPrices
-from test_utils import TestElasticSearch
+from tests.test_utils import TestElasticSearch
 from unittest import mock
 
 def mocked_requests_get(*args, **kwargs):
@@ -19,7 +19,7 @@ def mocked_requests_get(*args, **kwargs):
 class TokenPricesTestCase(unittest.TestCase):
   def setUp(self):
     self.client = TestElasticSearch()
-    self.token_prices = TokenPrices({'contract': TEST_CONTRACT_INDEX, 'token_prices': TEST_PRICES_INDEX})
+    self.token_prices = TokenPrices({'contract': TEST_CONTRACT_INDEX, 'token_price': TEST_PRICES_INDEX})
     self.client.recreate_index(TEST_PRICES_INDEX)
     self.client.recreate_index(TEST_CONTRACT_INDEX)
   def _iterate_prices(self):
