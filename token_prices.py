@@ -173,8 +173,8 @@ class TokenPrices:
 
     Parameters
     ----------
-      docs: list
-        List of dictionaries with new data
+    docs: list
+      List of dictionaries with new data
     '''
     for doc in docs:
       yield self.client.index_op(doc, id=doc['token']+'_'+doc['timestamp'])
@@ -185,12 +185,12 @@ class TokenPrices:
 
     Parameters
     ----------
-      docs: list
-        List of dictionaries with new data
-      doc_type: str 
-        Type of inserted documents
-      index_name: str
-        Name of the index that contains inserted documents
+    docs: list
+      List of dictionaries with new data
+    doc_type: str 
+      Type of inserted documents
+    index_name: str
+      Name of the index that contains inserted documents
     '''
     for chunk in bulk_chunks(self._construct_bulk_insert_ops(docs), docs_per_chunk=1000):
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
@@ -383,8 +383,8 @@ class TokenPrices:
 
     Parameters
     ----------
-      docs: list
-        List of dictionaries with new data
+    docs: list
+      List of dictionaries with new data
     '''
     for doc in docs:
       yield self.client.update_op(doc, id=doc['token'] + '_' + doc['timestamp'], upsert=doc)

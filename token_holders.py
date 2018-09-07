@@ -64,8 +64,8 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      docs: list
-        List of dictionaries with new data
+    docs: list
+      List of dictionaries with new data
     '''
     for doc in docs:
       yield self.client.index_op(doc, id=doc['tx_hash'])
@@ -76,8 +76,8 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      docs: list
-        List of dictionaries with new data
+    docs: list
+      List of dictionaries with new data
     '''
     for doc in docs:
       yield self.client.update_op(doc['doc'], id=doc['id'])
@@ -120,8 +120,8 @@ class TokenHolders(utils.ContractTransactionsIterator):
     
     Parameters
     ----------
-      max_block: int
-        Block upper limit
+    max_block: int
+      Block upper limit
 
     Returns
     -------
@@ -141,10 +141,10 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      tokens: list
-        List of token addresses
-      max_block: int 
-        Block upper limit
+    tokens: list
+      List of token addresses
+    max_block: int 
+      Block upper limit
     
     Returns
     -------
@@ -164,8 +164,8 @@ class TokenHolders(utils.ContractTransactionsIterator):
     
     Parameters
     ----------
-      token: str
-        Token address
+    token: str
+      Token address
 
     Returns
     -------
@@ -181,10 +181,10 @@ class TokenHolders(utils.ContractTransactionsIterator):
     
     Parameters
     ----------
-      value: int
-        Transfer value
-      decimals:int
-        Token decimals
+    value: int
+      Transfer value
+    decimals:int
+      Token decimals
 
     Returns
     -------
@@ -202,8 +202,8 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      inputs: dict
-        A dictionary with decoded transaction input
+    inputs: dict
+      A dictionary with decoded transaction input
 
     Returns
     -------
@@ -223,13 +223,13 @@ class TokenHolders(utils.ContractTransactionsIterator):
     
     Parameters
     ----------
-      tx: dict
-        A dictionary with transaction info
+    tx: dict
+      A dictionary with transaction info
 
     Returns
     -------
-      bool
-        A boolean value signifies is tx valid
+    bool
+      A boolean value signifies is tx valid
     '''
     if 'error' in tx.keys():
       return False
@@ -246,13 +246,13 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      tx: dict
-        A dictionary with transaction info
+    tx: dict
+      A dictionary with transaction info
 
     Returns
     -------
-      list:
-        A list containing dictionary with token tx data
+    list:
+      A list containing dictionary with token tx data
     '''
     tx_input = tx['decoded_input']
     valid = self._check_is_valid(tx)
@@ -272,13 +272,13 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      tx: dict
-        A dictionary with transaction info
+    tx: dict
+      A dictionary with transaction info
 
     Returns
     -------
-      list:
-        A list containing dictionary with token tx data
+    list:
+      A list containing dictionary with token tx data
     '''
     tx_input = tx['decoded_input']
     decimals = self._check_decimals(tx['to'])
@@ -302,13 +302,13 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      tx: dict 
-        A dictionary with transaction info
+    tx: dict 
+      A dictionary with transaction info
 
     Returns
     -------
-      list:
-        A list containing dictionary with token tx data
+    list:
+      A list containing dictionary with token tx data
     '''
     transaction = self._process_only_uint(tx)[0]
     try:
@@ -324,13 +324,13 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      tx: dict 
-        A dictionary with transaction info
+    tx: dict 
+      A dictionary with transaction info
 
     Returns
     -------
-      list:
-        A list containing dictionary with token tx data
+    list:
+      A list containing dictionary with token tx data
     '''
     tx_input = tx['decoded_input']
     decimals = self._check_decimals(tx['to'])
@@ -355,13 +355,13 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      tx: dict 
-        A dictionary with transaction info
+    tx: dict 
+      A dictionary with transaction info
 
     Returns
     -------
-      list:
-        A list containing dictionary with token tx data
+    list:
+      A list containing dictionary with token tx data
     '''
     transaction = self._process_address_uint_tx(tx)[0]
     try:
@@ -383,13 +383,13 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      tx: dict 
-        A dictionary with transaction info
+    tx: dict 
+      A dictionary with transaction info
 
     Returns
     -------
-      list:
-        A list containing dictionary with token tx data
+    list:
+      A list containing dictionary with token tx data
     '''
     tx_input = tx['decoded_input']
     decimals = self._check_decimals(tx['to'])
@@ -414,13 +414,13 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      tx: dict 
-        A dictionary with transaction info
+    tx: dict 
+      A dictionary with transaction info
 
     Returns
     -------
-      list:
-        A list containing dictionaries with token tx data
+    list:
+      A list containing dictionaries with token tx data
     '''
     tx_input = tx['decoded_input']
     decimals = self._check_decimals(tx['to'])
@@ -453,13 +453,13 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      tx: dict 
-        A dictionary with transaction info
+    tx: dict 
+      A dictionary with transaction info
 
     Returns
     -------
-      list:
-        A list containing dictionaries with token tx data
+    list:
+      A list containing dictionaries with token tx data
     '''
     tx_input = tx['decoded_input']
     decimals = self._check_decimals(tx['to'])
@@ -492,13 +492,13 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      tx: dict 
-        A dictionary with transaction info
+    tx: dict 
+      A dictionary with transaction info
 
     Returns
     -------
-      function:
-        _process_two_addr_tx method described above
+    function:
+      _process_two_addr_tx method described above
     '''
     tx["decoded_input"]['params'] = [
       tx["decoded_input"]['params'][0], 
@@ -513,13 +513,13 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      tx: dict 
-        A dictionary with transaction info
+    tx: dict 
+      A dictionary with transaction info
 
     Returns
     -------
-      function:
-        A method that handles appropriate type of txs
+    function:
+      A method that handles appropriate type of txs
     '''
     method_signature = self._construct_signature(tx['decoded_input'])
     if method_signature in self.signatures:
@@ -533,13 +533,13 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      tx: dict 
-        A dictionary with transaction info
+    tx: dict 
+      A dictionary with transaction info
 
     Returns
     -------
-      function:
-        _construct_tx_descr_from_input method described above
+    function:
+      _construct_tx_descr_from_input method described above
     '''
     if 'decoded_input' in tx['_source'].keys() and tx['_source']['decoded_input'] != None and len(tx['_source']['decoded_input']['params']) > 0:
       tx['_source']['id'] = tx['_id']
@@ -553,8 +553,8 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      txs: list 
-        A list of internal txs that contains information about token transfers
+    txs: list 
+      A list of internal txs that contains information about token transfers
     '''
     txs_info = [self._check_tx_input(tx) for tx in txs]
     txs_info = [tx for tx in txs_info if tx != None]
@@ -586,10 +586,10 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      txs: list 
-        A list of internal txs that contains information about token transfers
-      max_block: int
-        Block upper limit
+    txs: list 
+      A list of internal txs that contains information about token transfers
+    max_block: int
+      Block upper limit
     '''
     for txs_chunk in self._iterate_tokens_txs(tokens, max_block):
       self._extract_descriptions_from_txs(txs_chunk)
@@ -602,13 +602,13 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      contract: dict 
-        A dictionary with token contract info
+    contract: dict 
+      A dictionary with token contract info
 
     Returns
     -------
-      dict:
-        A dictionary containing data about supply transfer
+    dict:
+      A dictionary containing data about supply transfer
     '''
     if 'token_owner' in contract.keys() and contract['token_owner'] != 'None':
       to = contract['token_owner']
@@ -636,8 +636,8 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Parameters
     ----------
-      contracts: list 
-        A list with token contracts info
+    contracts: list 
+      A list with token contracts info
     '''
     descriptions = [self._construct_creation_descr(contract['_source']) for contract in contracts]
     self._insert_multiple_docs(descriptions, 'tx', self.indices['token_tx'])
@@ -661,8 +661,8 @@ class TokenHolders(utils.ContractTransactionsIterator):
 
     Returns
     -------
-      list:
-        A list containing listed token addresses
+    list:
+      A list containing listed token addresses
     '''
     addresses = []
     for tokens in self._iterate_tokens():
@@ -676,8 +676,8 @@ class TokenHolders(utils.ContractTransactionsIterator):
     
     Parameters
     ----------
-      block: int 
-        block number
+    block: int 
+      block number
     '''
     listed_tokens_addresses = self._get_listed_tokens_addresses()
     transfer_methods = ['transfer', 'transferFrom', 'approve']

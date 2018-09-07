@@ -11,7 +11,8 @@ with open('standard-token-abi.json') as json_file:
   standard_token_abi = json.load(json_file)
 
 class ContractMethods:
-  ''' Check if contract is token, is it compliant with token standards and get variables from it such as name or symbol
+  ''' 
+  Check if contract is token, is it compliant with token standards and get variables from it such as name or symbol
   
   Parameters
   ----------
@@ -215,10 +216,10 @@ class ContractMethods:
     
     Parameters
     ----------
-      doc_id: str
-        id of Elasticsearch document
-      body: dict
-        Dictionary with new values
+    doc_id: str
+      id of Elasticsearch document
+    body: dict
+      Dictionary with new values
     '''
     self.client.update(self.indices['contract'], 'contract', doc_id, doc=body, refresh=True)
 
@@ -295,7 +296,7 @@ class ContractMethods:
 
   def search_methods(self):
     ''' 
-    Classify contract into standard tokens, non-standard and non-tokens, than extract public variables values
+    Classify contracts into standard tokens, non-standard and non-tokens, than extract public variables values
 
     This function is an entry point for search-methods operation
     '''
