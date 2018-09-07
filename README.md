@@ -96,9 +96,9 @@ graph TD
 A[Begin] --> B[Get current max block from ElasticSearch]
 B --> C(For contract chunk in contracts with itx_transactions_detected_block < current max block)
 C --> D(For contract in chunk)
-D --> E[Add contract and itx_transactions_detected_block to request]
+D --> E[Add contract address and itx_transactions_detected_block to request]
 E --> D
-D --> |no more contracts| F[Set to_contract flag to transactions by generated request]
+D --> |no more contracts| F[Set to_contract flag to transactions by generated request before current max block]
 F --> G[Save itx_transactions_detected_block = current max block for contracts]
 G --> C
 C --> |no more contracts|H[End]
