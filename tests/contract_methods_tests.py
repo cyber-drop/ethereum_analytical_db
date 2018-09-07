@@ -42,7 +42,7 @@ class ContractMethodsTestCase(unittest.TestCase):
 
   def test_get_empty_constants(self):
     empty_constants = self.contract_methods._get_constants(TEST_EMPTY_CONTRACT)
-    self.assertCountEqual(('', '', '0', 0, 'None',), empty_constants)
+    self.assertCountEqual(('', '', '0', 0, None,), empty_constants)
 
   def test_set_contract_flags(self):
     for i, address in enumerate(TEST_CONTRACT_ADDRESSES):
