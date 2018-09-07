@@ -3,7 +3,7 @@ from contract_transactions import ContractTransactions
 from pyelasticsearch import ElasticSearch
 from time import sleep
 from tqdm import *
-from test_utils import TestElasticSearch
+from tests.test_utils import TestElasticSearch
 from unittest.mock import MagicMock, Mock, call, ANY, patch
 
 class InternalContractTransactionsTestCase(unittest.TestCase):

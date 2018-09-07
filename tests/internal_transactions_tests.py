@@ -1,5 +1,5 @@
 import unittest
-from test_utils import TestElasticSearch, mockify
+from tests.test_utils import TestElasticSearch, mockify
 from internal_transactions import *
 from internal_transactions import _get_parity_url_by_block, _get_traces_sync, _make_trace_requests
 import internal_transactions

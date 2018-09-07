@@ -196,7 +196,7 @@ class TokenPrices:
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
 
   def get_recent_token_prices(self):
-     '''
+    '''
     Extract listed tokens current prices from CryptoCompare and saves in Elasticsearch
     '''
     prices = self._get_multi_prices()

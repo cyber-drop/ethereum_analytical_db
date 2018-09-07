@@ -14,6 +14,7 @@ class BlocksTestCase(unittest.TestCase):
 
   @httpretty.activate
   def test_get_max_parity_block(self):
+    """Test sending request to parity to get last block"""
     test_block = 100
     httpretty.register_uri(
       httpretty.POST,
@@ -36,6 +37,7 @@ class BlocksTestCase(unittest.TestCase):
     assert max_block == test_block
 
   def test_get_max_elasticsearch_block(self):
+    """Test getting max block from elasticsearch"""
     self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
       "number": 1
     }, refresh=True)
@@ -46,10 +48,12 @@ class BlocksTestCase(unittest.TestCase):
     assert max_block == 2
 
   def test_get_max_elasticsearch_block_empty_index(self):
+    """Test get max block in empty ElasticSearch index"""
     max_block = self.blocks._get_max_elasticsearch_block()
     assert max_block == 0
 
   def test_create_blocks_by_range(self):
+    """Test create blocks in ElasticSearch by range"""
     mockify(self.blocks, {}, "_create_blocks")
     self.blocks._create_blocks(1, 3)
     blocks = self.client.search(index=TEST_BLOCKS_INDEX, doc_type="b", query="*")['hits']['hits']

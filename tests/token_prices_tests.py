@@ -1,6 +1,6 @@
 import unittest
 from token_prices import TokenPrices
-from test_utils import TestElasticSearch
+from tests.test_utils import TestElasticSearch
 from unittest import mock
 
 def mocked_requests_get(*args, **kwargs):
