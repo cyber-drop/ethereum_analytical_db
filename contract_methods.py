@@ -256,7 +256,7 @@ class ContractMethods:
       List of dictinoaries with new data
     '''
     for doc in docs:
-      yield self.client.update_op(doc['doc'], id=doc['id'])
+      yield self.client.update_op(doc['doc'], id=doc['id'], upsert=doc['doc'])
 
   def _update_multiple_docs(self, docs, doc_type, index_name):
     ''' 
@@ -280,8 +280,12 @@ class ContractMethods:
     '''
     with open('./tokens.json') as json_file:
       tokens = json.load(json_file)
-    update_docs = [{'doc': {'cmc_id': token['cmc_id'], 'cc_sym': token['cc_sym']}, 'id': token['address']}
-      for token in tokens]
+    update_docs = [{'doc': {
+      'cmc_id': token['cmc_id'], 
+      'website_slug': token['website_slug'],
+      'cc_sym': token['cc_sym'],
+      'address': token['address']
+    }, 'id': token['address']} for token in tokens]
     self._update_multiple_docs(update_docs, 'contract', self.indices['contract'])
 
   def search_methods(self):

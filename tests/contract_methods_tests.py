@@ -2,6 +2,7 @@ import unittest
 from contract_methods import ContractMethods
 from tests.test_utils import TestElasticSearch
 import json
+from pyelasticsearch import bulk_chunks
 
 class ContractMethodsTestCase(unittest.TestCase):
   def setUp(self):
@@ -11,6 +12,14 @@ class ContractMethodsTestCase(unittest.TestCase):
   
   def iterate_processed_contracts(self):
     return self.contract_methods.client.iterate(TEST_INDEX, 'contract', 'address:* AND methods:true')
+
+  def construct_bulk_insert_ops(self, docs):
+    for doc in docs:
+      yield self.client.index_op(doc, id=doc['address'])
+
+  def insert_multiple_docs(self, docs, doc_type, index_name):
+    for chunk in bulk_chunks(self.construct_bulk_insert_ops(docs), docs_per_chunk=1000):
+      self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
 
   def test_iterate_non_standard(self):
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[0], 'blockNumber': 5748810, 'standards': ['erc20'], 'bytecode': TEST_BYTECODES[0]}, id=1, refresh=True)
@@ -77,13 +86,17 @@ class ContractMethodsTestCase(unittest.TestCase):
   def test_add_cmc_id(self):
     with open('tokens.json') as json_file:
       tokens = json.load(json_file)
-    for token in tokens:
-      self.client.index(TEST_INDEX, 'contract', {'address': token['address']}, id=token['address'], refresh=True)
+    tokens = [{'address': token['address']} for token in tokens]
+    self.insert_multiple_docs(tokens, 'contract', TEST_INDEX)
+    #for token in tokens:
+    #  self.client.index(TEST_INDEX, 'contract', {'address': token['address']}, id=token['address'], refresh=True)
     self.contract_methods._add_cmc_id()
     contract_chunks = self.contract_methods._iterate_contracts()
     contracts = [c['_source'] for contract in contract_chunks for c in contract]
     have_cmc_id = [contract for contract in contracts if 'cmc_id' in contract.keys()]
+    have_website_slug = [contract for contract in contracts if 'website_slug' in contract.keys()]
     assert len(have_cmc_id) == 627
+    assert len(have_website_slug) == 627
 
 TEST_INDEX = 'test-ethereum-contracts'
 TEST_EMPTY_CONTRACT = '0xd3857e9ab037454e47281e51e42fc3e32677337f'
