@@ -274,6 +274,16 @@ class ContractMethods:
     for chunk in bulk_chunks(self._construct_bulk_update_ops(docs), docs_per_chunk=1000):
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
 
+  def _add_cmc_id(self):
+    '''
+    Add identificators used in Cryptocompare and Coinmarketcap to contract documents
+    '''
+    with open('./tokens.json') as json_file:
+      tokens = json.load(json_file)
+    update_docs = [{'doc': {'cmc_id': token['cmc_id'], 'cc_sym': token['cc_sym']}, 'id': token['address']}
+      for token in tokens]
+    self._update_multiple_docs(update_docs, 'contract', self.indices['contract'])
+
   def search_methods(self):
     ''' 
     Classify contract into standard tokens, non-standard and non-tokens, than extract public variables values
@@ -288,3 +298,4 @@ class ContractMethods:
         name, symbol, decimals, total_supply, owner = self._get_constants(token['_source']['address'])
         update_body = {'token_name': name, 'token_symbol': symbol, 'decimals': decimals, 'total_supply': total_supply, 'token_owner': owner, 'methods': True}
         self._update_contract_descr(token['_id'], update_body)
+    self._add_cmc_id()

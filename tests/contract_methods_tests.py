@@ -1,6 +1,7 @@
 import unittest
 from contract_methods import ContractMethods
 from tests.test_utils import TestElasticSearch
+import json
 
 class ContractMethodsTestCase(unittest.TestCase):
   def setUp(self):
@@ -72,6 +73,17 @@ class ContractMethodsTestCase(unittest.TestCase):
     dec_non_exists = self.contract_methods._get_constants('0xc569a08db1a5f2cd3ef9c2c3bfbc4f42f74de51b')
     assert dec_exists[2] == 0
     assert dec_non_exists[2] == 18
+
+  def test_add_cmc_id(self):
+    with open('tokens.json') as json_file:
+      tokens = json.load(json_file)
+    for token in tokens:
+      self.client.index(TEST_INDEX, 'contract', {'address': token['address']}, id=token['address'], refresh=True)
+    self.contract_methods._add_cmc_id()
+    contract_chunks = self.contract_methods._iterate_contracts()
+    contracts = [c['_source'] for contract in contract_chunks for c in contract]
+    have_cmc_id = [contract for contract in contracts if 'cmc_id' in contract.keys()]
+    assert len(have_cmc_id) == 627
 
 TEST_INDEX = 'test-ethereum-contracts'
 TEST_EMPTY_CONTRACT = '0xd3857e9ab037454e47281e51e42fc3e32677337f'
