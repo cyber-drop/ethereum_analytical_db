@@ -9,7 +9,10 @@ from pyelasticsearch import bulk_chunks
 import os
 import utils
 
-CURRENT_DIR = os.getcwd()[:-5]
+CURRENT_DIR = os.getcwd()
+
+if "tests" in CURRENT_DIR:
+  CURRENT_DIR = CURRENT_DIR[:-5]
 
 with open('{}/standard-token-abi.json'.format(CURRENT_DIR)) as json_file:
   standard_token_abi = json.load(json_file)
