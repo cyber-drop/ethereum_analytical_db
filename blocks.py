@@ -1,4 +1,4 @@
-from config import INDICES, PARITY_HOSTS
+from config import INDICES, PARITY_HOSTS, NUMBER_OF_JOBS
 from custom_elastic_search import CustomElasticSearch
 import requests
 import json
@@ -7,7 +7,7 @@ from tqdm import tqdm
 from web3 import Web3, HTTPProvider
 import datetime
 
-BLOCKS_PER_CHUNK = 10000
+BLOCKS_PER_CHUNK = NUMBER_OF_JOBS
 
 class Blocks:
   def __init__(self,
