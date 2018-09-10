@@ -195,6 +195,31 @@ B --> |no more contracts| R[End]
 
 Downloads list of tokens from coinmarketcap API and tries to find contracts with corresponding names in ES and then saves matching contracts into separate index. After finishing this process finds all transactions that have 'to' field equal to token contract address and also saves these transaction to separate index.
 
+```mermaid
+graph TD
+A[Begin] 
+A --> B[Get current max block from ElasticSearch]
+B --> C(For contract chunk in contracts with cmc_id and itx_token_transactions_extracted_block < current max block)
+C --> D(For contract in chunk)
+D --> E[Extract total_supply transaction]
+E --> D
+D --> |no more contracts|F[Save extracted transactions to ElasticSearch]
+F --> G(For contract in chunk)
+G --> H[Add contract address and itx_token_transactions_extracted_block to request]
+H --> G
+G --> |no more contracts| I(For transactions chunk in transactions by generated request)
+I --> J(For transaction in chunk)
+J --> K{No error, decoded_input presented}
+K --> |yes| L{Method can transfer tokens}
+L --> M[Extract transaction]
+K --> |no|J
+L --> |no|J
+M --> J
+J --> |no more transactions|O[Save extracted transactions to ElasticSearch]
+O --> C
+C --> |no more contracts| P[End]
+```
+
 - extract-prices (token_prices.py)
 
 Download token capitalization, ETH, BTC and USD prices from cryptocompare and coinmarketcap
