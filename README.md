@@ -247,3 +247,30 @@ I --> J[Extract USD transaction values]
 J --> K[Extract ETH transaction values]
 K --> B
 ```
+
+### Indices
+
+Current data schema is going below:
+
+```mermaid
+graph LR
+Block[ethereum-block <hr> <b>id #number</b> <br> number: integer <br> timestamp: timestamp]
+
+Transaction[ethereum-internal-transaction <hr> <b>id #hash + position in trace</b> <br> blockNumber: integer <br> hash: string <br> from: string <br> to: string <br> value: float <br> input: string <br> output: string <br> gas: string <br> gasUsed: string <br> blockHash:string <br> transactionHash:string <br> transactionPosition:integer <br> subtraces: integer <br>traceAddress: array <br> type: string <br> callType:string <br> address:string <br> code:text <br> init: text <br> refundAddress:string <br>error: text <br>parent_error: boolean <br> balance: string <br>]
+
+MiningTransaction[ethereum-miner-transaction <hr> <b>id #blockHash</b> <br> blockNumber: integer<br> author: string <br> blockHash: string <br> rewardType: string <br> subtraces: integer <br> type: string <br> value: float <br>]
+
+Contract[ethereum-contract <hr><b> id #address</b> <br>  address: string <br> parent_transaction: string <br> blockNumber: integer <br> abi: object <br> bytecode: text <br> decimals: integer <br> owner: string <br> standards: array <br> token_name: string <br> token_owner: string <br> total_supply: string <br> token_symbol: string <br> cc_sym: string <br> cmc_id: integer]
+
+TokenTransaction[ethereum-token-transaction <hr> <b>id#tx_hash</b> <br> tx_hash: string <br> block_id: integer <br> token: string <br> tx_hash: string <br> valid: boolean <br> raw_value: string <br> value: float <br> to: string <br> from: string <br> method: string]
+
+Price[ethereum-token-price <hr> <b>id#token_symbol + _  + date </b><br> token: string <br> BTC: float <br> USD: float <br> ETH: float <br> USD_cmc: float <br> marketCap: integer <br> timestamp: timestamp]
+
+Transaction -->|blockNumber| Block
+MiningTransaction -->|blockNumber| Block
+Contract -->|blockNumber| Block
+Contract --> |parent_transaction| Transaction
+TokenTransaction --> |token| Contract
+TokenTransaction -->|block_id| Block
+Price --> |token:cc_sym|Contract
+```
