@@ -6,11 +6,18 @@ import json
 import math
 from decimal import Decimal
 from pyelasticsearch import bulk_chunks
+import os
+import utils
 
-with open('standard-token-abi.json') as json_file:
+CURRENT_DIR = os.getcwd()
+
+if "tests" in CURRENT_DIR:
+  CURRENT_DIR = CURRENT_DIR[:-5]
+
+with open('{}/standard-token-abi.json'.format(CURRENT_DIR)) as json_file:
   standard_token_abi = json.load(json_file)
 
-class ContractMethods:
+class ContractMethods(utils.ContractTransactionsIterator):
   ''' 
   Check if contract is token, is it compliant with token standards and get variables from it such as name or symbol
   
@@ -31,7 +38,7 @@ class ContractMethods:
     self.standards = self._extract_methods_signatures()
     self.constants = ['name', 'symbol', 'decimals', 'total_supply', 'owner']
 
-  def _iterate_contracts(self):
+  def _iterate_unprocessed_contracts(self):
     '''
     Iterate over contracts that were not processed yet
 
@@ -40,18 +47,12 @@ class ContractMethods:
     generator
       Generator that iterates over contracts in Elasticsearch
     '''
-    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(methods:true)')
-
-  def _iterate_non_standard(self):
-    '''
-    Iterate over contracts that have transfer method butis not compliant with any standard
-
-    Returns
-    -------
-    generator
-      Generator that iterates over contracts in Elasticsearch
-    '''
-    return self.client.iterate(self.indices["contract"], 'contract', 'standards:None AND !(methods:true)')
+    query = {
+      "query_string": {
+        "query": 'address:* AND !(methods:true)'
+      }
+    }
+    return self._iterate_contracts(partial_query=query)
 
   def _extract_first_bytes(self, func):
     '''
@@ -284,7 +285,7 @@ class ContractMethods:
     '''
     Add identificators used in Cryptocompare and Coinmarketcap to contract documents
     '''
-    with open('./tokens.json') as json_file:
+    with open('{}/tokens.json'.format(CURRENT_DIR)) as json_file:
       tokens = json.load(json_file)
     update_docs = [{'doc': {
       'cmc_id': token['cmc_id'], 
@@ -300,7 +301,7 @@ class ContractMethods:
 
     This function is an entry point for search-methods operation
     '''
-    for contracts_chunk in self._iterate_contracts():
+    for contracts_chunk in self._iterate_unprocessed_contracts():
       for contract in contracts_chunk:
         self._classify_contract(contract)
     self._add_cmc_id()

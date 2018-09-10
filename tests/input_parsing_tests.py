@@ -133,6 +133,16 @@ class InputParsingTestCase(unittest.TestCase):
       contracts = [c["_id"] for contracts_list in contracts for c in contracts_list]
       self.assertCountEqual(contracts, [str(i) for i in range(1, 9)])
 
+  def test_iterate_contracts_without_abi_call_iterate_contracts(self):
+    """Test iterations through all contracts using limitations by whitelist"""
+    test_iterator = "iterator"
+    self.contracts._iterate_contracts = MagicMock(return_value=test_iterator)
+
+    contracts = self.contracts._iterate_contracts_without_abi()
+
+    self.contracts._iterate_contracts.assert_any_call(partial_query=ANY)
+    assert contracts == test_iterator
+
   def test_save_contracts_abi(self):
     """Test saving ABI for each contract in ElasticSearch"""
     for i in tqdm(range(10)):
