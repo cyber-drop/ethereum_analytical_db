@@ -343,7 +343,7 @@ ExtractTokenTransactions --> ExtractPrices
 ExtractPrices --> ExtractTokenTransactionsPricesUSD
 ExtractTokenTransactionsPricesUSD --> ExtractTokenTransactionsPricesETH
 
-subgraph inner
+subgraph  
 PrepareIndices
 PrepareBlocks
 ExtractTraces
