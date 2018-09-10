@@ -1,10 +1,12 @@
 import unittest
-from contract_methods import ContractMethods
+from contract_methods import ContractMethods, CURRENT_DIR
 from tests.test_utils import TestElasticSearch
 import json
 from pyelasticsearch import bulk_chunks
+from unittest.mock import MagicMock, ANY
 
 class ContractMethodsTestCase(unittest.TestCase):
+  # Make sure you have running parity node before these tests
   def setUp(self):
     self.client = TestElasticSearch()
     self.client.recreate_index(TEST_INDEX)
@@ -20,23 +22,23 @@ class ContractMethodsTestCase(unittest.TestCase):
   def insert_multiple_docs(self, docs, doc_type, index_name):
     for chunk in bulk_chunks(self.construct_bulk_insert_ops(docs), docs_per_chunk=1000):
       self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
-
-  def test_iterate_non_standard(self):
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[0], 'blockNumber': 5748810, 'standards': ['erc20'], 'bytecode': TEST_BYTECODES[0]}, id=1, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[3], 'blockNumber': 5748809, 'standards': ['erc20'], 'bytecode': TEST_BYTECODES[3]}, id=2, refresh=True)
-    self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[4], 'blockNumber': 5748808, 'standards': 'None', 'bytecode': TEST_BYTECODES[4]}, id=3, refresh=True)
-    iterator = self.contract_methods._iterate_non_standard()
-    contracts = [c for contracts_list in iterator for c in contracts_list]
-    contracts = [contract['_id'] for contract in contracts]
-    self.assertCountEqual(['3'], contracts)
   
   def tests_iterate_unprocessed(self):
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[0], 'methods': True}, id=1, refresh=True)
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[3]}, id=2, refresh=True)
     self.client.index(TEST_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESSES[4]}, id=3, refresh=True)
-    contracts = self.contract_methods._iterate_contracts()
+    contracts = self.contract_methods._iterate_unprocessed_contracts()
     contracts = [c['_id'] for contract in contracts for c in contract]
     self.assertCountEqual(['2', '3'], contracts)
+
+  def test_iterate_unprocessed_without_abi_call_iterate_contracts(self):
+    test_iterator = "iterator"
+    self.contract_methods._iterate_contracts = MagicMock(return_value=test_iterator)
+
+    contracts = self.contract_methods._iterate_unprocessed_contracts()
+
+    self.contract_methods._iterate_contracts.assert_any_call(partial_query=ANY)
+    assert contracts == test_iterator
 
   def test_check_if_token(self):
     is_token = self.contract_methods._check_is_token(TEST_BYTECODES[2])
@@ -84,14 +86,14 @@ class ContractMethodsTestCase(unittest.TestCase):
     assert dec_non_exists[2] == 18
 
   def test_add_cmc_id(self):
-    with open('tokens.json') as json_file:
+    with open('{}/tokens.json'.format(CURRENT_DIR)) as json_file:
       tokens = json.load(json_file)
     tokens = [{'address': token['address']} for token in tokens]
     self.insert_multiple_docs(tokens, 'contract', TEST_INDEX)
     #for token in tokens:
     #  self.client.index(TEST_INDEX, 'contract', {'address': token['address']}, id=token['address'], refresh=True)
     self.contract_methods._add_cmc_id()
-    contract_chunks = self.contract_methods._iterate_contracts()
+    contract_chunks = self.contract_methods._iterate_unprocessed_contracts()
     contracts = [c['_source'] for contract in contract_chunks for c in contract]
     have_cmc_id = [contract for contract in contracts if 'cmc_id' in contract.keys()]
     have_website_slug = [contract for contract in contracts if 'website_slug' in contract.keys()]
