@@ -4,7 +4,7 @@ import os
 import unittest
 from tests.test_utils import TestElasticSearch, mockify
 from tqdm import *
-from unittest.mock import MagicMock, call, Mock, patch, ANY, DEFAULT
+from unittest.mock import MagicMock, call, Mock, patch, ANY
 import multiprocessing
 import json
 
@@ -140,7 +140,7 @@ class InputParsingTestCase(unittest.TestCase):
 
     contracts = self.contracts._iterate_contracts_without_abi()
 
-    self.contracts._iterate_contracts.assert_any_call(DEFAULT, ANY)
+    self.contracts._iterate_contracts.assert_any_call(partial_query=ANY)
     assert contracts == test_iterator
 
   def test_save_contracts_abi(self):
