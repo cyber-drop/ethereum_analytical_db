@@ -186,13 +186,19 @@ class Contracts(utils.ContractTransactionsIterator):
   def _iterate_contracts_without_abi(self):
     """
     Iterate through contracts without an attemp to extract ABI from etherscan.io
-    within block range specified in config.py
+    within block range specified in config.py.
+
     Returns
     -------
     generator
         Generator that iterates through contracts by conditions above
     """
-    return self.client.iterate(self.indices["contract"], 'contract', 'address:* AND !(_exists_:abi_extracted) AND ' + self._get_range_query())
+    query = {
+      "query_string": {
+        "query": 'address:* AND !(_exists_:abi_extracted) AND ' + self._get_range_query()
+      }
+    }
+    return self._iterate_contracts(partial_query=query)
 
   def save_contracts_abi(self):
     """

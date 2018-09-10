@@ -22,6 +22,9 @@ class UtilsTestCase(unittest.TestCase):
     self.client.recreate_index(TEST_CONTRACTS_INDEX)
     self._create_contracts_iterator()
 
+  def tearDown(self):
+    config.PROCESSED_CONTRACTS.clear()
+
   def test_create_transactions_request(self):
     test_max_block = 40
     test_contracts = [
@@ -111,6 +114,49 @@ class UtilsTestCase(unittest.TestCase):
       for c in contracts
     ]
     self.assertCountEqual(contracts, ['1', '4'])
+
+  def test_iterate_contracts_from_list(self):
+    config.PROCESSED_CONTRACTS.append("0x1")
+    test_max_block = 2
+    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
+      "tx_test_block": 1,
+      "address": "0x1",
+      "blockNumber": 1,
+    }, refresh=True, id=1)
+    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
+      "tx_test_block": 1,
+      "address": "0x2",
+      "blockNumber": 1
+    }, refresh=True, id=2)
+    contracts = [
+      c["_id"] for contracts in self.contracts_iterator._iterate_contracts(test_max_block, {"query_string": {"query": "*"}})
+      for c in contracts
+    ]
+    self.assertCountEqual(contracts, ['1'])
+
+  def test_iterate_contracts_without_specified_block(self):
+    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
+      "tx_test_block": 1,
+      "address": "0x1",
+      "blockNumber": 1,
+    }, refresh=True, id=1)
+    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
+      "address": "0x2",
+      "blockNumber": 1,
+    }, refresh=True, id=2)
+
+    contracts_without_max_block = [
+      c["_id"] for contracts in self.contracts_iterator._iterate_contracts(partial_query={"query_string": {"query": "*"}})
+      for c in contracts
+    ]
+    contracts_with_zero_max_block = [
+      c["_id"] for contracts in
+      self.contracts_iterator._iterate_contracts(0, {"query_string": {"query": "*"}})
+      for c in contracts
+    ]
+
+    self.assertCountEqual(contracts_without_max_block, ['1', '2'])
+    self.assertCountEqual(contracts_with_zero_max_block, ['2'])
 
   def test_iterate_transactions_by_query(self):
     self.contracts_iterator._create_transactions_request = MagicMock(return_value={

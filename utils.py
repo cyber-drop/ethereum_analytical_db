@@ -1,5 +1,5 @@
 from custom_elastic_search import CustomElasticSearch
-from config import INDICES
+from config import INDICES, PROCESSED_CONTRACTS
 
 client = CustomElasticSearch("http://localhost:9200")
 
@@ -77,7 +77,7 @@ def get_max_block(query="*", min_consistent_block=0):
     return min_consistent_block
 
 class ContractTransactionsIterator():
-  def _iterate_contracts(self, max_block, partial_query):
+  def _iterate_contracts(self, max_block=None, partial_query=None):
     """
     Iterate through contracts with unprocessed transactions before specified block
 
@@ -97,19 +97,23 @@ class ContractTransactionsIterator():
       "bool": {
         "must": [
           partial_query,
-          {"bool": {
-            "should": [
-              {"range": {
-                self._get_flag_name(): {
-                  "lt": max_block
-                }
-              }},
-              {"bool": {"must_not": [{"exists": {"field": self._get_flag_name()}}]}},
-            ]
-          }}
         ]
       }
     }
+    if max_block is not None:
+      query["bool"]["must"].append({"bool": {
+        "should": [
+          {"range": {
+            self._get_flag_name(): {
+              "lt": max_block
+            }
+          }},
+          {"bool": {"must_not": [{"exists": {"field": self._get_flag_name()}}]}},
+        ]
+      }})
+    if PROCESSED_CONTRACTS:
+      query["bool"]["must"].append({"terms": {"address": PROCESSED_CONTRACTS}})
+    print(query)
     return self.client.iterate(self.indices["contract"], 'contract', query)
 
   def _create_transactions_request(self, contracts, max_block):
