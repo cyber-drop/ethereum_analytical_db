@@ -92,11 +92,11 @@ A[Begin] --> B(For transactions chunk with 'created' field)
 B --> C(For transaction in chunk)
 C --> D{Transaction contains 'error' field}
 D --> |no|E[Extract contract with bytecode, owner, bytecode, block number, parent transaction]
-E -.-> C
-D -.-> |yes|C
+E --> C
+D --> |yes|C
 C --> |no more transactions|F[Save extracted contracts to database]
 F --> G[Save contract_created flag for transactions chunk]
-G -.-> B
+G --> B
 B --> |no more transactions|End
 ```
 
