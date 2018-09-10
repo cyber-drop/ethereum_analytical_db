@@ -274,3 +274,90 @@ TokenTransaction --> |token| Contract
 TokenTransaction -->|block_id| Block
 Price --> |token:cc_sym|Contract
 ```
+
+### Architecture
+
+All components of this repo and their interactions can be found below:
+```mermaid
+graph TD
+PrepareIndices["<i class='fab fa-python'></i> prepare-indices"]
+PrepareBlocks["<i class='fab fa-python'></i> prepare-blocks"]
+DetectContracts["<i class='fab fa-python'></i> detect-contracts"]
+DetectContractTransactions["<i class='fab fa-python'></i> detect-contract-transactions"]
+ExtractTraces["<i class='fab fa-python'></i> extract-traces"]
+ExtractContractsABI["<i class='fab fa-python'></i> extract-contracts-abi"]
+ParseInputs["<i class='fab fa-python'></i> parse-inputs"]
+SearchMethods["<i class='fab fa-python'></i> search-methods"]
+ExtractTokenTransactions["<i class='fab fa-python'></i> extract-token-transactions"]
+ExtractPrices["<i class='fab fa-python'></i> extract-prices"]
+ExtractTokenTransactionsPricesUSD["<i class='fab fa-python'></i> extract-token-transactions-prices-usd"]
+ExtractTokenTransactionsPricesETH["<i class='fab fa-python'></i> extract-token-transactions-prices-eth"]
+
+ElasticSearch[fa:fa-database ElasticSearch]
+Parity["<i class='fab fa-ethereum'>Parity"]
+Etherscan["<i class='fas fa-globe'>etherscan.io"]
+CryptoCompare["<i class='fas fa-globe'>cryptocompare.com"]
+CoinMarketCap["<i class='fas fa-globe'>coinmarketcap.com"]
+TokensFIle["<i class='fas fa-file'>tokens.json"]
+
+PrepareIndices --> |Create indices if not exists|ElasticSearch
+ElasticSearch --> |Get last block| PrepareBlocks 
+Parity --> |Get last block and timestamps| PrepareBlocks 
+PrepareBlocks --> |Create blocks| ElasticSearch 
+ElasticSearch -->  |Get unprocessed blocks|ExtractTraces
+Parity -->  |Get traces|ExtractTraces
+ExtractTraces -->  |Save internal and mining transactions|ElasticSearch
+ElasticSearch --> |Get contract transactions|DetectContracts
+DetectContracts --> |Extract contracts|ElasticSearch
+ElasticSearch --> |Get contracts|DetectContractTransactions
+DetectContractTransactions --> |Update transactions to contracts|ElasticSearch
+ElasticSearch --> |Get contracts|ExtractContractsABI
+Etherscan --> |Get ABI| ExtractContractsABI
+ExtractContractsABI --> |Save ABI|ElasticSearch
+ElasticSearch --> |Get ABI and inputs| ParseInputs 
+ParseInputs --> |Save decoded inputs|ElasticSearch
+ElasticSearch --> |Get contracts|SearchMethods
+Parity --> |Get decimals, name, symbol, supply|SearchMethods
+TokensFIle --> |Get cmc_id, cc_sym, website_slug|SearchMethods
+SearchMethods --> |Save contracts|ElasticSearch
+ElasticSearch --> |Get transactions to tokens|ExtractTokenTransactions
+ExtractTokenTransactions --> |Save token transactions|ElasticSearch
+ElasticSearch --> |Get tokens with cc_sym, website slug| ExtractPrices
+CryptoCompare --> |Get token prices| ExtractPrices
+CoinMarketCap --> |Get token capitalization| ExtractPrices
+ExtractPrices --> |Save prices and capitalization| ElasticSearch
+ElasticSearch --> |Get prices, capitalization and token transactions|ExtractTokenTransactionsPricesUSD 
+ExtractTokenTransactionsPricesUSD --> |Set usd value and overflow flag for transactions|ElasticSearch
+ElasticSearch --> |Get prices and token transactions|ExtractTokenTransactionsPricesETH
+ExtractTokenTransactionsPricesETH --> |Set usd value for transactions|ElasticSearch
+
+PrepareIndices --> PrepareBlocks
+PrepareBlocks --> ExtractTraces
+ExtractTraces --> DetectContracts
+DetectContracts --> DetectContractTransactions
+DetectContractTransactions --> ExtractContractsABI
+ExtractContractsABI --> ParseInputs
+ParseInputs --> SearchMethods
+SearchMethods --> ExtractTokenTransactions
+ExtractTokenTransactions --> ExtractPrices
+ExtractPrices --> ExtractTokenTransactionsPricesUSD
+ExtractTokenTransactionsPricesUSD --> ExtractTokenTransactionsPricesETH
+
+subgraph inner
+PrepareIndices
+PrepareBlocks
+ExtractTraces
+DetectContracts
+DetectContractTransactions
+ExtractContractsABI
+ParseInputs
+SearchMethods
+ExtractTokenTransactions
+ExtractPrices
+ExtractTokenTransactionsPricesUSD
+ExtractTokenTransactionsPricesETH
+ElasticSearch
+Parity
+TokensFIle 
+end
+```
