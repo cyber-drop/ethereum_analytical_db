@@ -1,3 +1,7 @@
+# Install and configure ElasticSearch
+
+# Install and configure Parity
+
 sudo -H mkdir /usr/local/share/man
 
 sudo apt-get install libcurl4-openssl-dev cmake python3-pip libpython3-dev libssl-dev build-essential automake pkg-config libtool libffi-dev libgmp-dev libyaml-cpp-dev
@@ -24,7 +28,3 @@ git clone https://github.com/cyberFund/ethdrain
 cd ./ethdrain
 sudo -H pip3 install -r ./requirements.txt
 cd ../
-
-echo "ssh -L 9200:localhost:9200 cyberdrop@195.201.105.114"
-echo "nano ./config.py"
-echo "telegram-send --configure"
