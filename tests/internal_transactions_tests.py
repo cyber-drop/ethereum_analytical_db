@@ -193,9 +193,14 @@ class InternalTransactionsTestCase(unittest.TestCase):
     transactions = [{
       "transactionHash": None,
       "blockHash": "0x1"
+    }, {
+      "transactionHash": None,
+      "blockHash": "0x1"
     }]
     self.internal_transactions._set_trace_hashes(transactions)
-    assert transactions[0]["hash"] == "0x1"
+    print(transactions)
+    assert transactions[0]["hash"] == "0x1.0"
+    assert transactions[1]["hash"] == "0x1.1"
 
   def test_set_parent_error_root_node(self):
     """

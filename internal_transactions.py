@@ -167,14 +167,11 @@ class InternalTransactions:
     """
     traces_size = {}
     for transaction in trace:
-      transaction_hash = transaction["transactionHash"]
-      if transaction_hash:
-        if transaction_hash not in traces_size.keys():
-          traces_size[transaction_hash] = 0
-        transaction["hash"] = "{}.{}".format(transaction["transactionHash"], traces_size[transaction_hash])
-        traces_size[transaction_hash] += 1
-      else:
-        transaction["hash"] = transaction["blockHash"]
+      transaction_hash = transaction["transactionHash"] or transaction["blockHash"]
+      if transaction_hash not in traces_size.keys():
+        traces_size[transaction_hash] = 0
+      transaction["hash"] = "{}.{}".format(transaction_hash, traces_size[transaction_hash])
+      traces_size[transaction_hash] += 1
 
   def _set_parent_errors(self, trace):
     """
