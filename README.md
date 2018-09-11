@@ -278,3 +278,5 @@ Price --> |token:cc_sym|Contract
 ### Architecture
 
 All components of this repo and their interactions can be found below:
+
+![Architecture](core.png)
