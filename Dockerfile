@@ -31,6 +31,7 @@ RUN pip3 install -r ./requirements.txt
 
 RUN chmod +x /wait
 
-RUN nosetests .
+# RUN nosetests .
 
-CMD /bin/bash -c "/wait && python3 ./extractor.py --operation run-loop"
+CMD /bin/bash -c "/wait && python3 ./extractor.py --operation prepare-indices && python3 ./extractor.py --operation run-loop"
+#CMD /bin/bash -c "/wait && curl localhost:8545"

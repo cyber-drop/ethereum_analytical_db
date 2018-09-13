@@ -198,7 +198,6 @@ class InternalTransactionsTestCase(unittest.TestCase):
       "blockHash": "0x1"
     }]
     self.internal_transactions._set_trace_hashes(transactions)
-    print(transactions)
     assert transactions[0]["hash"] == "0x1.0"
     assert transactions[1]["hash"] == "0x1.1"
 
@@ -452,10 +451,8 @@ class InternalTransactionsTestCase(unittest.TestCase):
     """
     Test extraction on a real data
     """
-    test_transactions = self.client.search(index=REAL_TRANSACTIONS_INDEX, doc_type="tx", query="*", size=10000)['hits']['hits']
-    test_transactions = [transaction["_source"] for transaction in test_transactions]
+    test_transactions = json.load(open("real_transactions.json", "r"))
     test_blocks = [{"number": block} for block in set(transaction["blockNumber"] for transaction in test_transactions)]
-    test_blocks_number = len(list(set(transaction["blockNumber"] for transaction in test_transactions)))
     self.client.bulk_index(
       docs=test_transactions,
       index=TEST_TRANSACTIONS_INDEX,
@@ -475,11 +472,11 @@ class InternalTransactionsTestCase(unittest.TestCase):
     internal_transactions_count = self.client.count(index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type="itx", query="*")["count"]
     miner_transactions_count = self.client.count(index=TEST_MINER_TRANSACTIONS_INDEX, doc_type="tx", query="*")["count"]
     print(miner_transactions_count)
-    assert internal_transactions_count == 422
     print(internal_transactions_count)
-    assert miner_transactions_count == test_blocks_number
+    assert internal_transactions_count == 66201
+    assert miner_transactions_count == 447
 
-REAL_TRANSACTIONS_INDEX = "ethereum-transaction"
+REAL_TRANSACTIONS_INDEX = "ethereum-internal-transaction"
 TEST_TRANSACTIONS_NUMBER = 10
 TEST_BLOCK_NUMBER = 3068185
 TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 10
