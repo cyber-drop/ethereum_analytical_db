@@ -2,15 +2,21 @@ version: '3'
 services:
   cyberdrop:
     build: .
-    ports:
-    - "5000:5000"
     volumes:
     - .:/usr/src/core
     environment:
-      WAIT_HOSTS: elasticsearch:9200
+      WAIT_HOSTS: elasticsearch:9200, parity:8545
     depends_on:
       - elasticsearch
+      - parity
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:5.5.1
+    build: elasticsearch/.
     ports:
     - "9200:9200"
+    environment:
+      ES_JAVA_OPTS: -Xms2g -Xmx2g
+  parity:
+    image: parity/parity:v1.11.11
+    ports:
+    - "8545:8545"
+    command: --mode=active --allow-ips public --tracing on --pruning archive --port 3304 --rpcport 8545 --jsonrpc-threads 15 --jsonrpc-server-threads 15 --release-track=nightly --jsonrpc-hosts all --jsonrpc-interface all
