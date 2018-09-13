@@ -6,7 +6,8 @@ services:
     volumes:
     - .:/usr/src/core
     environment:
-      WAIT_HOSTS: localhost:9200, localhost:8545
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
     depends_on:
       - elasticsearch
       - parity
