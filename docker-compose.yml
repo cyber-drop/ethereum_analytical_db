@@ -1,11 +1,12 @@
 version: '3'
 services:
   cyberdrop:
+    network_mode: host
     build: .
     volumes:
     - .:/usr/src/core
     environment:
-      WAIT_HOSTS: elasticsearch:9200, parity:8545
+      WAIT_HOSTS: localhost:9200, localhost:8545
     depends_on:
       - elasticsearch
       - parity
