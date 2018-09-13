@@ -18,7 +18,7 @@ class Blocks:
     self.indices = indices
     self.client = CustomElasticSearch(elasticsearch_host)
     self.parity_host = parity_host
-    self.w3 = Web3(HTTPProvider('http://localhost:8550'))
+    self.w3 = Web3(HTTPProvider(parity_host))
 
   def _get_max_parity_block(self):
     """
