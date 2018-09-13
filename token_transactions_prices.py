@@ -1,7 +1,6 @@
 from config import INDICES
 from pyelasticsearch import ElasticSearch, bulk_chunks
 from tqdm import tqdm
-from web3 import Web3, HTTPProvider
 import numpy as np
 
 NUMBER_OF_JOBS = 200
@@ -30,7 +29,6 @@ class TokenTransactionsPrices:
     self.indices = indices
     self.start_block = 4000000
     self.end_block = 7000000
-    self.w3 = Web3(HTTPProvider('http://localhost:8550'))
 
   def _count_by_object_or_string_query(self, query, index, doc_type):
     '''

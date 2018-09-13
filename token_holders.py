@@ -1,4 +1,3 @@
-from web3 import Web3
 from custom_elastic_search import CustomElasticSearch
 from config import INDICES
 import requests
@@ -24,7 +23,6 @@ class TokenHolders(utils.ContractTransactionsIterator):
     self.indices = elasticsearch_indices
     self.client = CustomElasticSearch(elasticsearch_host)
     self.token_decimals = {}
-    self.w3 = Web3()
     self.signatures = {
       # ERC-20 methods
       'transfer(address,uint256)': self._process_address_uint_tx,
