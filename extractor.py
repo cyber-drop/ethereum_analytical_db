@@ -49,7 +49,7 @@ def extract_contracts_abi(host):
 
 def parse_inputs(host):
   print("Parsing inputs...")
-  internal_transactions = InternalContracts(INDICES, host)
+  internal_transactions = Contracts(INDICES, host)
   internal_transactions.decode_inputs()
 
 def search_methods(host):
