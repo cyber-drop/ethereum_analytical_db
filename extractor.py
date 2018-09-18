@@ -13,6 +13,7 @@ from blocks import Blocks
 from time import sleep
 
 def prepare_indices(host):
+  print("Preparing indices...")
   elasticsearch = CustomElasticSearch(host)
   elasticsearch.create_index(INDICES["block"])
   elasticsearch.create_index(INDICES["contract"])
@@ -20,6 +21,7 @@ def prepare_indices(host):
   elasticsearch.create_index(INDICES["miner_transaction"])
   elasticsearch.create_index(INDICES["token_price"])
   elasticsearch.create_index(INDICES["token_tx"])
+  print("Indices prepared")
 
 def prepare_blocks(host):
   print("Preparing blocks...")
@@ -48,7 +50,7 @@ def extract_contracts_abi(host):
 
 def parse_inputs(host):
   print("Parsing inputs...")
-  internal_transactions = InternalContracts(INDICES, host)
+  internal_transactions = Contracts(INDICES, host)
   internal_transactions.decode_inputs()
 
 def search_methods(host):
@@ -78,6 +80,7 @@ def extract_transactions_prices_eth(host):
   extract_transactions_prices(host, 'ETH')
 
 def run_loop(host):
+  print("Running loop...")
   while True:
     prepare_blocks(host)
     extract_traces(host)

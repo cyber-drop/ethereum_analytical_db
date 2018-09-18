@@ -10,15 +10,9 @@ services:
       LANG: C.UTF-8
     depends_on:
       - elasticsearch
-      - parity
   elasticsearch:
     build: elasticsearch/.
     ports:
     - "9200:9200"
     environment:
       ES_JAVA_OPTS: -Xms2g -Xmx2g
-  parity:
-    image: parity/parity:v1.11.11
-    ports:
-    - "8545:8545"
-    command: --mode=active --allow-ips public --tracing on --pruning archive --port 3304 --rpcport 8545 --jsonrpc-threads 15 --jsonrpc-server-threads 15 --release-track=nightly --jsonrpc-hosts all --jsonrpc-interface all

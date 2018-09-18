@@ -38,7 +38,7 @@ class Blocks:
     }), headers={
       "Content-Type": "application/json"
     }).json()
-    return int(response["result"], 0)
+    return min(int(response["result"], 0), PARITY_HOSTS[0][1])
 
   def _get_max_elasticsearch_block(self):
     """
@@ -63,9 +63,9 @@ class Blocks:
     result = self.client.send_request("GET", [self.indices["block"], "_search"], aggregation, {})
     max_block = result["aggregations"]["max_block"]["value"]
     if max_block:
-      return int(max_block)
+      return max(int(max_block), PARITY_HOSTS[0][1])
     else:
-      return 0
+      return PARITY_HOSTS[0][0]
 
   def _extract_block_timestamp(self, block_number):
     """
