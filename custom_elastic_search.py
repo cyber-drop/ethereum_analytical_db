@@ -215,7 +215,7 @@ class CustomElasticSearch(ElasticSearch):
   def _set_text_properties_mapping(self, index, doc_type):
     """
     Set text type for specified document type properties,
-    and sets keyword size = 10
+    and sets keyword size = 256
 
     Parameters
     ----------
@@ -233,7 +233,7 @@ class CustomElasticSearch(ElasticSearch):
         "fields": {
           "keyword": {
             "type": "keyword",
-            "ignore_above": 10
+            "ignore_above": 256
           }
         }
       }

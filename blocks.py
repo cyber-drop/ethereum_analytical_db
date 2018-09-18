@@ -65,7 +65,7 @@ class Blocks:
     if max_block:
       return int(max_block)
     else:
-      return 0
+      return -1
 
   def _extract_block_timestamp(self, block_number):
     """
