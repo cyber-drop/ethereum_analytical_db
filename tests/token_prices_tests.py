@@ -82,6 +82,10 @@ class TokenPricesTestCase(unittest.TestCase):
     self.token_prices._set_moving_average.assert_any_call(test_prices)
     self.assertSequenceEqual([price["BTC"] for price in result], [10])
 
+  def test_get_last_day_empty_index(self):
+    last_date = self.token_prices._get_last_avail_price_date()
+    self.assertSequenceEqual(last_date, ["2013", "01", "01"])
+
 
 TEST_PRICES_INDEX = 'test-token-prices'
 TEST_CONTRACT_INDEX = 'test-ethereum-contract'
