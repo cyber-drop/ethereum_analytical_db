@@ -354,12 +354,15 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.assertCountEqual(miner_transactions[0]["_source"], {"transactionHash": None})
 
   def test_save_genesis(self):
-    test_genesis = [{}]
-    self.internal_transactions._save_internal_transactions = MagicMock()
+    test_genesis = [{"hash": "1", "test": True}]
     with open('test_genesis.json', "w") as file:
       file.write(json.dumps(test_genesis))
+
     self.internal_transactions._save_genesis_block('test_genesis.json')
-    self.internal_transactions._save_internal_transactions.assert_any_call(test_genesis)
+    genesis = self.client.search(index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type="itx", query="test:true")['hits']['hits']
+
+    assert genesis[0]["_source"]["test"]
+    assert genesis[0]["_id"] == "1"
 
   def test_extract_traces_chunk(self):
     """

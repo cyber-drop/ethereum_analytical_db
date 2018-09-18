@@ -271,7 +271,7 @@ class InternalTransactions:
 
   def _save_genesis_block(self, genesis_file=GENESIS):
     genesis = json.load(open(genesis_file))
-    self._save_internal_transactions(genesis)
+    self.client.bulk_index(docs=genesis, index=self.indices["internal_transaction"], doc_type="itx", id_field="hash", refresh=True)
 
   def _extract_traces_chunk(self, blocks):
     """
