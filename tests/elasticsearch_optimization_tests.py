@@ -43,6 +43,7 @@ class ElasticSearchOptimizationTestCase():
       mapping_field = mapping_fields[field]
       assert mapping_field["type"] == "text"
       assert not mapping_field["index"]
+      assert mapping_field['fields']["keyword"]["ignore_above"] > 100
 
   def test_object_properties_mapping(self):
     self.new_client._set_object_properties_mapping(index=TEST_INDEX, doc_type=self.doc_type)

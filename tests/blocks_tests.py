@@ -50,7 +50,7 @@ class BlocksTestCase(unittest.TestCase):
   def test_get_max_elasticsearch_block_empty_index(self):
     """Test get max block in empty ElasticSearch index"""
     max_block = self.blocks._get_max_elasticsearch_block()
-    assert max_block == 0
+    assert max_block == -1
 
   def test_create_blocks_by_range(self):
     """Test create blocks in ElasticSearch by range"""
