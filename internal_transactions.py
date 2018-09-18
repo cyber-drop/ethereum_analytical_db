@@ -266,8 +266,8 @@ class InternalTransactions:
         List of transactions to save
     """
     docs = [self._preprocess_internal_transaction(transaction) for transaction in blocks_traces if not transaction["transactionHash"]]
-    self.client.bulk_index(docs=docs, index=self.indices["miner_transaction"], doc_type="tx", id_field="hash",
-                           refresh=True)
+    if docs:
+      self.client.bulk_index(docs=docs, index=self.indices["miner_transaction"], doc_type="tx", id_field="hash", refresh=True)
 
   def _extract_traces_chunk(self, blocks):
     """
