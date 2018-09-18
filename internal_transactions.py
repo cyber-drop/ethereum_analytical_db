@@ -3,7 +3,8 @@ import requests
 import json
 from multiprocessing import Pool
 from itertools import repeat
-from config import PARITY_HOSTS
+from config import PARITY_HOSTS, GENESIS
+import config
 import pygtrie as trie
 import utils
 from pyelasticsearch import bulk_chunks
@@ -266,8 +267,11 @@ class InternalTransactions:
         List of transactions to save
     """
     docs = [self._preprocess_internal_transaction(transaction) for transaction in blocks_traces if not transaction["transactionHash"]]
-    if docs:
-      self.client.bulk_index(docs=docs, index=self.indices["miner_transaction"], doc_type="tx", id_field="hash", refresh=True)
+    self.client.bulk_index(docs=docs, index=self.indices["miner_transaction"], doc_type="tx", id_field="hash", refresh=True)
+
+  def _save_genesis_block(self, genesis_file=GENESIS):
+    genesis = json.load(open(genesis_file))
+    self._save_internal_transactions(genesis)
 
   def _extract_traces_chunk(self, blocks):
     """
@@ -282,6 +286,8 @@ class InternalTransactions:
     blocks : list
         List of blocks numbers
     """
+    if 0 in blocks:
+      self._save_genesis_block()
     blocks_traces = self._get_traces(blocks)
     self._set_trace_hashes(blocks_traces)
     self._set_parent_errors(blocks_traces)
