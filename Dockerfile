@@ -25,15 +25,15 @@ ADD . .
 #    make install && \
 #    cd ../../
 
-RUN git clone https://github.com/ethereum/pyethereum && \
-    cd ./pyethereum && \
-    git checkout develop && \
-    git checkout 3d5ec14032cc471f4dcfc7cc5c947294daf85fe0 && \
-    pip3.6 install . && \
-    cd ../
+#RUN git clone https://github.com/ethereum/pyethereum && \
+#    cd ./pyethereum && \
+#    git checkout develop && \
+#    git checkout 3d5ec14032cc471f4dcfc7cc5c947294daf85fe0 && \
+#    pip3.6 install --default-timeout=100 . && \
+#    cd ../
 
-RUN pip3.6 install -r ./requirements.txt
+RUN pip3.6 install --default-timeout=100 -r ./requirements.txt
 
 #RUN nosetests .
 
-CMD /bin/bash -c "sleep 20 && python3.6 ./extractor.py --operation prepare-indices && python3.6 ./extractor.py --operation run-loop"
+CMD /bin/bash -c "sleep 10 && python3.6 ./extractor.py --operation prepare-indices && python3.6 ./extractor.py --operation run-loop"
