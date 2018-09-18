@@ -353,6 +353,12 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert miner_transactions[0]["_id"] == "0x1"
     self.assertCountEqual(miner_transactions[0]["_source"], {"transactionHash": None})
 
+  def test_save_genesis_miner_transactions(self):
+    """
+    Test saving array with no miner transactions (for genesis block)
+    """
+    self.internal_transactions._save_miner_transactions([{"transactionHash": "0x1"}])
+
   def test_extract_traces_chunk(self):
     """
     Test process of extraction internal transactions by a given blocks chunk
