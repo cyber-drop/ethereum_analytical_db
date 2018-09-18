@@ -3,7 +3,7 @@ from custom_elastic_search import CustomElasticSearch
 from unittest.mock import MagicMock
 
 def mockify(object, mocks, not_mocks):
-  def cat(x, *args, **kwargs):
+  def cat(x=None, *args, **kwargs):
     return x
   for attr in  dir(object):
     if not attr.startswith('__'):

@@ -353,11 +353,13 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert miner_transactions[0]["_id"] == "0x1"
     self.assertCountEqual(miner_transactions[0]["_source"], {"transactionHash": None})
 
-  def test_save_genesis_miner_transactions(self):
-    """
-    Test saving array with no miner transactions (for genesis block)
-    """
-    self.internal_transactions._save_miner_transactions([{"transactionHash": "0x1"}])
+  def test_save_genesis(self):
+    test_genesis = [{}]
+    self.internal_transactions._save_internal_transactions = MagicMock()
+    with open('test_genesis.json', "w") as file:
+      file.write(json.dumps(test_genesis))
+    self.internal_transactions._save_genesis_block('test_genesis.json')
+    self.internal_transactions._save_internal_transactions.assert_any_call(test_genesis)
 
   def test_extract_traces_chunk(self):
     """
@@ -408,6 +410,20 @@ class InternalTransactionsTestCase(unittest.TestCase):
       call.save_traces(test_traces)
     ]
     process.assert_has_calls(calls)
+
+  def test_extract_traces_chunk_extract_genesis(self):
+    test_blocks = [0]
+    test_traces = []
+    test_blocks_no_genesis = [1]
+    mockify(self.internal_transactions, {
+      "_get_traces": MagicMock(return_value=test_traces)
+    }, ["_extract_traces_chunk"])
+
+    self.internal_transactions._extract_traces_chunk(test_blocks_no_genesis)
+    self.internal_transactions._save_genesis_block.assert_not_called()
+
+    self.internal_transactions._extract_traces_chunk(test_blocks)
+    self.internal_transactions._save_genesis_block.assert_called_with()
 
   def test_extract_traces(self):
     """

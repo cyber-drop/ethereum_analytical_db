@@ -13,6 +13,7 @@ INDICES = {
   "token_price": "ethereum-token-price"
 }
 
+GENESIS = "genesis.json"
 NUMBER_OF_JOBS = 1000
 PROCESSED_CONTRACTS = []
 
