@@ -64,7 +64,7 @@ class TransactionFeesTestCase(unittest.TestCase):
   @httpretty.activate
   def test_extract_gas_used_sync(self):
     test_gas_used = 21000
-    test_transaction_hash = "0x01"
+    test_transaction_hashes = ["0x01", "0x02"]
     httpretty.register_uri(
       httpretty.POST,
       "http://localhost:8545/",
@@ -76,9 +76,8 @@ class TransactionFeesTestCase(unittest.TestCase):
         }
       })
     )
-    gas_used = _extract_gas_used_sync([test_transaction_hash, test_transaction_hash], "http://localhost:8545")
-    print(gas_used)
-    self.assertSequenceEqual(gas_used, [test_gas_used, test_gas_used])
+    gas_used = _extract_gas_used_sync(test_transaction_hashes, "http://localhost:8545")
+    self.assertSequenceEqual(gas_used, {"0x01": test_gas_used, "0x02": test_gas_used})
 
   def test_extract_gas_used(self):
     hashes = ["hash" + str(i) for i in range(100)]
