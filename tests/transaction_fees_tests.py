@@ -1,10 +1,11 @@
 from tests.test_utils import TestElasticSearch, mockify
 import unittest
-from transaction_fees import TransactionFees
+from transaction_fees import TransactionFees, _extract_gas_used_sync
 import httpretty
-from unittest.mock import MagicMock, call, Mock
+from unittest.mock import MagicMock, call, Mock, patch
 import json
 from web3 import Web3
+import transaction_fees
 
 class TransactionFeesTestCase(unittest.TestCase):
   def setUp(self):
@@ -61,7 +62,7 @@ class TransactionFeesTestCase(unittest.TestCase):
     assert json.loads(httpretty.last_request().body.decode("utf-8"))["params"][-1]
 
   @httpretty.activate
-  def test_extract_gas_used(self):
+  def test_extract_gas_used_sync(self):
     test_gas_used = 21000
     test_transaction_hash = "0x01"
     httpretty.register_uri(
@@ -75,8 +76,21 @@ class TransactionFeesTestCase(unittest.TestCase):
         }
       })
     )
-    gas_used = self.transaction_fees._extract_gas_used(test_transaction_hash)
-    assert gas_used == test_gas_used
+    gas_used = _extract_gas_used_sync([test_transaction_hash, test_transaction_hash], "http://localhost:8545")
+    print(gas_used)
+    self.assertSequenceEqual(gas_used, [test_gas_used, test_gas_used])
+
+  def test_extract_gas_used(self):
+    hashes = ["hash" + str(i) for i in range(100)]
+    chunks = [["hash1"], ["hash2"]]
+    gas_used = [{"hash1": "gas1"}, {"hash2": "gas2"}]
+    split_mock = MagicMock(return_value=chunks)
+    self.transaction_fees.pool.map = MagicMock(return_value=gas_used)
+    with patch('utils.split_on_chunks', split_mock):
+      response = self.transaction_fees._extract_gas_used(hashes)
+      split_mock.assert_called_with(hashes, 10)
+      self.transaction_fees.pool.map.assert_called_with(transaction_fees._extract_gas_used_sync, chunks)
+      self.assertSequenceEqual({"hash1": "gas1", "hash2": "gas2"}, response)
 
   def test_update_transactions(self):
     test_transactions = [{"hash": "0x01", "gasPrice": 10, "gasUsed": 100, "test": False}]
@@ -128,12 +142,12 @@ class TransactionFeesTestCase(unittest.TestCase):
     test_all_blocks = [b for l in test_blocks for b in l]
     test_transactions = [[{"hash": "0x01"}], [{"hash": "0x02"}]]
     test_all_transactions = [t for l in test_transactions for t in l]
-    test_gas_used = [100, 200]
+    test_gas_used = {"0x01": 100, "0x02": 200}
     test_transaction_fees = {1: 2}
     mockify(self.transaction_fees, {
       "_iterate_blocks": MagicMock(return_value=test_blocks),
       "_extract_transactions_for_block": MagicMock(side_effect=test_transactions),
-      "_extract_gas_used": MagicMock(side_effect=test_gas_used),
+      "_extract_gas_used": MagicMock(return_value=test_gas_used),
       "_count_transaction_fees": MagicMock(return_value=test_transaction_fees)
     }, "extract_transaction_fees")
 
@@ -151,14 +165,13 @@ class TransactionFeesTestCase(unittest.TestCase):
     calls = [call.iterate()]
     for block in test_all_blocks:
       calls += [call.extract(block["_source"]["number"])]
-    for transaction in test_all_transactions:
-      calls += [call.extract_gas(transaction["hash"])]
+    calls += [call.extract_gas([transaction["hash"] for transaction in test_all_transactions])]
     calls += [call.update_transactions(test_all_transactions)]
     calls += [call.count_fees(test_all_transactions, [t["_source"]["number"] for t in test_all_blocks])]
     calls += [call.update_blocks(test_transaction_fees)]
 
-    for i, transaction in enumerate(test_all_transactions):
-      assert transaction["gasUsed"] == test_gas_used[i]
+    for transaction in test_all_transactions:
+      assert transaction["gasUsed"] == test_gas_used[transaction["hash"]]
 
     process.assert_has_calls(calls)
 
