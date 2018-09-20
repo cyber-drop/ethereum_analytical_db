@@ -7,7 +7,7 @@ import utils
 
 NUMBER_OF_PROCESSES = 10
 
-def _extract_gas_used_sync(hashes, parity_host):
+def _extract_gas_used_sync(hashes, parity_host=PARITY_HOSTS[0][-1]):
   w3 = Web3(HTTPProvider(parity_host))
   return [w3.eth.getTransactionReceipt(hash).gasUsed for hash in hashes]
 
