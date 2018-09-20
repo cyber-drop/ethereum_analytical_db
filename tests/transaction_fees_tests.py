@@ -58,6 +58,7 @@ class TransactionFeesTestCase(unittest.TestCase):
     )
     result = self.transaction_fees._extract_transactions_for_block(test_block)
     self.assertCountEqual(result, test_transactions)
+    assert json.loads(httpretty.last_request().body.decode("utf-8"))["params"][-1]
 
   @httpretty.activate
   def test_extract_gas_used(self):
@@ -157,7 +158,7 @@ class TransactionFeesTestCase(unittest.TestCase):
     calls += [call.update_blocks(test_transaction_fees)]
 
     for i, transaction in enumerate(test_all_transactions):
-      assert transaction["gasPrice"] == test_gas_used[i]
+      assert transaction["gasUsed"] == test_gas_used[i]
 
     process.assert_has_calls(calls)
 

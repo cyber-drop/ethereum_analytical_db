@@ -13,7 +13,7 @@ class TransactionFees:
     return self.client.iterate(index=self.indices["block"], doc_type="b", query="!(_exists_:transactionFees)")
 
   def _extract_transactions_for_block(self, block_number):
-    transactions = self.w3.eth.getBlock(block_number).transactions
+    transactions = self.w3.eth.getBlock(block_number, True).transactions
     transactions = [dict(transaction) for transaction in transactions]
     for transaction in transactions:
       transaction["hash"] = transaction["hash"].hex()
@@ -52,7 +52,7 @@ class TransactionFees:
       for block in blocks:
         transactions += self._extract_transactions_for_block(block["_source"]["number"])
       for transaction in transactions:
-        transaction["gasPrice"] = self._extract_gas_used(transaction["hash"])
+        transaction["gasUsed"] = self._extract_gas_used(transaction["hash"])
       self._update_transactions(transactions)
       transaction_fees = self._count_transaction_fees(transactions, [block["_source"]["number"] for block in blocks])
       self._update_blocks(transaction_fees)
