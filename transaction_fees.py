@@ -11,6 +11,18 @@ def _extract_gas_used_sync(hashes, parity_host=PARITY_HOSTS[0][-1]):
   w3 = Web3(HTTPProvider(parity_host))
   return {hash: w3.eth.getTransactionReceipt(hash).gasUsed for hash in hashes}
 
+def _extract_transactions_for_blocks_sync(blocks, parity_host=PARITY_HOSTS[0][-1]):
+  w3 = Web3(HTTPProvider(parity_host))
+  result = []
+  for block in blocks:
+    transactions = w3.eth.getBlock(block, True).transactions
+    transactions = [dict(transaction) for transaction in transactions]
+    for transaction in transactions:
+      transaction["hash"] = transaction["hash"].hex()
+      transaction["gasPrice"] = Web3.fromWei(transaction["gasPrice"], 'ether')
+    result += transactions
+  return result
+
 class TransactionFees:
   def __init__(self, indices=INDICES, elasticsearch_host="http://localhost:9200", parity_host=PARITY_HOSTS[0][-1]):
     self.client = CustomElasticSearch(elasticsearch_host)
@@ -21,13 +33,10 @@ class TransactionFees:
   def _iterate_blocks(self):
     return self.client.iterate(index=self.indices["block"], doc_type="b", query="!(_exists_:transactionFees)")
 
-  def _extract_transactions_for_block(self, block_number):
-    transactions = self.w3.eth.getBlock(block_number, True).transactions
-    transactions = [dict(transaction) for transaction in transactions]
-    for transaction in transactions:
-      transaction["hash"] = transaction["hash"].hex()
-      transaction["gasPrice"] = Web3.fromWei(transaction["gasPrice"], 'ether')
-    return transactions
+  def _extract_transactions_for_blocks(self, blocks):
+    chunks = utils.split_on_chunks(blocks, NUMBER_OF_PROCESSES)
+    transactions = self.pool.map(_extract_transactions_for_blocks_sync, chunks)
+    return [transaction for transactions_chunk in transactions for transaction in transactions_chunk]
 
   def _extract_gas_used(self, hashes):
     chunks = utils.split_on_chunks(hashes, NUMBER_OF_PROCESSES)
@@ -59,9 +68,8 @@ class TransactionFees:
 
   def extract_transaction_fees(self):
     for blocks in self._iterate_blocks():
-      transactions = []
-      for block in blocks:
-        transactions += self._extract_transactions_for_block(block["_source"]["number"])
+      block_numbers = [block["_source"]["number"] for block in blocks]
+      transactions = self._extract_transactions_for_blocks(block_numbers)
       gas_used = self._extract_gas_used([transaction["hash"] for transaction in transactions])
       for transaction in transactions:
         transaction["gasUsed"] = gas_used[transaction["hash"]]
