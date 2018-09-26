@@ -11,7 +11,8 @@ docker-compose up
 ```
 
 It will prepare main components and start run-loop operation.
-Parity node is not include in docker container, so make sure you have an access to parity API before this step
+
+Parity node is not included in docker container, so make sure you have an access to parity API before this step
 
 ### Manual installation
 
