@@ -3,7 +3,7 @@ import click
 from custom_elastic_search import CustomElasticSearch
 from contract_transactions import ContractTransactions
 from internal_transactions import InternalTransactions
-from contracts import InternalContracts, Contracts
+from contracts import Contracts
 from contract_methods import ContractMethods
 from token_holders import InternalTokenTransactions
 from token_transactions_prices import TokenTransactionsPrices
@@ -14,10 +14,15 @@ from time import sleep
 from transaction_fees import TransactionFees
 
 def prepare_indices(host):
+  print("Preparing indices...")
   elasticsearch = CustomElasticSearch(host)
   elasticsearch.create_index(INDICES["block"])
-  elasticsearch.prepare_fast_index(INDICES["transaction"], 'tx')
+  elasticsearch.create_index(INDICES["contract"])
   elasticsearch.prepare_fast_index(INDICES["internal_transaction"], 'itx')
+  elasticsearch.create_index(INDICES["miner_transaction"])
+  elasticsearch.create_index(INDICES["token_price"])
+  elasticsearch.create_index(INDICES["token_tx"])
+  print("Indices prepared")
 
 def prepare_blocks(host):
   print("Preparing blocks...")
@@ -46,7 +51,7 @@ def extract_contracts_abi(host):
 
 def parse_inputs(host):
   print("Parsing inputs...")
-  internal_transactions = InternalContracts(INDICES, host)
+  internal_transactions = Contracts(INDICES, host)
   internal_transactions.decode_inputs()
 
 def search_methods(host):
@@ -80,6 +85,7 @@ def extract_transaction_fees(host):
   transaction_fees.extract_transaction_fees()
 
 def run_loop(host):
+  print("Running loop...")
   while True:
     prepare_blocks(host)
     extract_traces(host)

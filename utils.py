@@ -113,7 +113,6 @@ class ContractTransactionsIterator():
       }})
     if PROCESSED_CONTRACTS:
       query["bool"]["must"].append({"terms": {"address": PROCESSED_CONTRACTS}})
-    print(query)
     return self.client.iterate(self.indices["contract"], 'contract', query)
 
   def _create_transactions_request(self, contracts, max_block):

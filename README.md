@@ -2,7 +2,21 @@
 
 ## Installation
 
-To build contents of this repo, use command:
+### Docker installation
+
+To run contents of this repo with docker-compose, use command
+
+```
+docker-compose up
+```
+
+It will prepare main components and start run-loop operation.
+
+Parity node is not included in docker container, so make sure you have an access to parity API before this step
+
+### Manual installation
+
+To build contents of this repo manually, use command:
 
 ```bash
 ./install.sh

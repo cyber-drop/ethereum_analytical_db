@@ -283,8 +283,11 @@ class TokenPrices:
         'timestamp': {'order': 'desc'}
       }
     }
-    res = self.client.send_request('GET', [self.indices['token_price'], 'price', '_search'], query, {})['hits']['hits']
-    last_date = res[0]['_source']['timestamp'] if len(res) > 0 else '2013-01-01'
+    try:
+      res = self.client.send_request('GET', [self.indices['token_price'], 'price', '_search'], query, {})['hits']['hits']
+      last_date = res[0]['_source']['timestamp']
+    except:
+      last_date = '2013-01-01'
     last_date = last_date.split('-')
     return last_date
 
