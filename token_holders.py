@@ -1,11 +1,9 @@
-from custom_elastic_search import CustomElasticSearch
+from clients.custom_elastic_search import CustomElasticSearch
 from config import INDICES
-import requests
 from pyelasticsearch import bulk_chunks
 import math
 import json
 import re
-import pdb
 import utils
 
 ADDRESS_ENCODING_CONSTANT = 0x0010000000000000000000000000000000000000000

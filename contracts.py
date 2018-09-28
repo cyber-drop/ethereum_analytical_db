@@ -1,5 +1,5 @@
 import os
-from custom_elastic_search import CustomElasticSearch
+from clients.custom_elastic_search import CustomElasticSearch
 import json
 from ethereum.abi import (
     decode_abi,
@@ -8,8 +8,6 @@ from ethereum.abi import (
 from ethereum.utils import encode_int, zpad, decode_hex
 from multiprocessing import Pool
 from config import PARITY_HOSTS
-import multiprocessing.pool
-import functools
 import utils
 
 GRAB_ABI_PATH = "/usr/local/qblocks/bin/grabABI {} > /dev/null 2>&1"

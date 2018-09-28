@@ -1,10 +1,9 @@
-from custom_elastic_search import CustomElasticSearch
+from clients.custom_elastic_search import CustomElasticSearch
 import requests
 import json
 from multiprocessing import Pool
 from itertools import repeat
 from config import PARITY_HOSTS, GENESIS
-import config
 import pygtrie as trie
 import utils
 from pyelasticsearch import bulk_chunks

@@ -37,3 +37,13 @@ class ClickhouseTestCase(unittest.TestCase):
     self.assertSequenceEqual(formatted_documents[0:test_per], next(result))
     self.assertSequenceEqual(formatted_documents[test_per:2*test_per], next(result))
 
+  def test_bulk_index(self):
+    documents = [{"x": i} for i in range(10)]
+    self.new_client.bulk_index(index="test", docs=documents)
+    result = self.client.execute('SELECT x FROM test')
+    self.assertCountEqual(result, [(doc["x"], ) for doc in documents])
+
+  def test_send_sql_request(self):
+    formatted_documents = self._add_records()
+    result = self.new_client.send_sql_request("SELECT max(x) FROM test")
+    assert result == max(doc["_source"]["x"] for doc in formatted_documents)

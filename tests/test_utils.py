@@ -1,5 +1,5 @@
 from pyelasticsearch import ElasticSearch
-from custom_elastic_search import CustomElasticSearch
+from clients.custom_elastic_search import CustomElasticSearch
 from unittest.mock import MagicMock
 
 def mockify(object, mocks, not_mocks):

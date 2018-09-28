@@ -1,4 +1,4 @@
-from custom_elastic_search import CustomElasticSearch
+from clients.custom_elastic_search import CustomElasticSearch
 from config import INDICES, PROCESSED_CONTRACTS
 
 client = CustomElasticSearch("http://localhost:9200")

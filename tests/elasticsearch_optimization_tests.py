@@ -1,7 +1,6 @@
 import unittest
 from test_utils import TestElasticSearch
-from custom_elastic_search import CustomElasticSearch as NewElasticSearch
-import json
+from clients.custom_elastic_search import CustomElasticSearch as NewElasticSearch
 import datetime as dt
 from unittest.mock import MagicMock
 import subprocess

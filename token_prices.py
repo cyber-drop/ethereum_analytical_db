@@ -1,11 +1,10 @@
 import requests
-from custom_elastic_search import CustomElasticSearch
+from clients.custom_elastic_search import CustomElasticSearch
 from config import INDICES
 import datetime
 from datetime import date
 from pyelasticsearch import bulk_chunks
 from tqdm import *
-import time
 import numpy as np
 import pandas as pd
 

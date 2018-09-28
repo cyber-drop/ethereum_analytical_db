@@ -1,7 +1,6 @@
-from custom_elastic_search import CustomElasticSearch
+from clients.custom_elastic_search import CustomElasticSearch
 from config import INDICES, PARITY_HOSTS
 from web3 import Web3, HTTPProvider
-import json
 from multiprocessing import Pool
 import utils
 

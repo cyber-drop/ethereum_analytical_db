@@ -321,3 +321,7 @@ class CustomElasticSearch(ElasticSearch):
       self._set_object_properties_mapping(index, doc_type)
       self._set_string_properties_mapping(index, doc_type)
       self._set_text_properties_mapping(index, doc_type)
+
+  def send_sql_request(self, sql):
+    result = self.send_request("GET", ["_sql"], {}, {"sql": sql})
+    return list(result['aggregations'].values())[0]["value"]

@@ -1,5 +1,5 @@
 from config import INDICES, PARITY_HOSTS, NUMBER_OF_JOBS
-from custom_elastic_search import CustomElasticSearch
+from clients.custom_elastic_search import CustomElasticSearch
 import requests
 import json
 import utils

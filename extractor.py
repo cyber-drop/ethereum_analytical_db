@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import click
-from custom_elastic_search import CustomElasticSearch
+from clients.custom_elastic_search import CustomElasticSearch
 from contract_transactions import ContractTransactions
 from internal_transactions import InternalTransactions
 from contracts import Contracts
