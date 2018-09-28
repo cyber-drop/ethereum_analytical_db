@@ -12,11 +12,11 @@ BLOCKS_PER_CHUNK = NUMBER_OF_JOBS
 class Blocks:
   def __init__(self,
                indices=INDICES,
-               elasticsearch_host="http://localhost:9200",
+               client=CustomElasticSearch("http://localhost:9200"),
                parity_host=PARITY_HOSTS[0][-1]
                ):
     self.indices = indices
-    self.client = CustomElasticSearch(elasticsearch_host)
+    self.client = client
     self.parity_host = parity_host
     self.w3 = Web3(HTTPProvider(parity_host))
 
@@ -50,18 +50,7 @@ class Blocks:
         Last block number
         0 if there are no blocks in ElasticSearch
     """
-    aggregation = {
-      "size": 0,
-      "aggs": {
-        "max_block": {
-          "max": {
-            "field": "number"
-          }
-        }
-      }
-    }
-    result = self.client.send_request("GET", [self.indices["block"], "_search"], aggregation, {})
-    max_block = result["aggregations"]["max_block"]["value"]
+    max_block = self.client.send_sql_request('SELECT max(number) FROM {}'.format(self.indices["block"]))
     if max_block:
       return int(max_block)
     else:

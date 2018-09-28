@@ -1,3 +1,5 @@
+# from clients.custom_clickhouse import CustomClickhouse
+
 PARITY_HOSTS = [
   (3900000, 3901000, "http://localhost:8545")
 ]
@@ -13,6 +15,7 @@ INDICES = {
   "token_price": "ethereum-token-price"
 }
 
+# CLIENT = CustomClickhouse
 GENESIS = "genesis.json"
 NUMBER_OF_JOBS = 1000
 PROCESSED_CONTRACTS = []

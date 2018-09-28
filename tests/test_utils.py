@@ -1,5 +1,6 @@
 from pyelasticsearch import ElasticSearch
 from clients.custom_elastic_search import CustomElasticSearch
+from clients.custom_clickhouse import CustomClickhouse
 from unittest.mock import MagicMock
 
 def mockify(object, mocks, not_mocks):
@@ -13,6 +14,11 @@ def mockify(object, mocks, not_mocks):
         value = getattr(object, attr)
         if callable(value):
           setattr(object, attr, MagicMock(side_effect=cat))
+
+class TestClickhouse(CustomClickhouse):
+  def recreate_index(self, index, fields):
+    self.client.execute('DROP TABLE IF EXISTS {}'.format(index))
+    self.client.execute('CREATE TABLE {} ({}) ENGINE = MergeTree() ORDER BY id'.format(index, fields))
 
 class TestElasticSearch(ElasticSearch):
   def __init__(self):

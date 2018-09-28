@@ -6,14 +6,14 @@ class ClickhouseTestCase(unittest.TestCase):
   def setUp(self):
     self.client = Client('localhost')
     self.client.execute('DROP TABLE IF EXISTS test')
-    self.client.execute('CREATE TABLE test (x Int32) ENGINE = Memory')
+    self.client.execute('CREATE TABLE test (id String, x Int32) ENGINE = Memory')
     self.new_client = CustomClickhouse()
 
   def _add_records(self):
-    documents = [{'x': 1}, {'x': 2}, {'x': 3}, {'x': 100}]
-    formatted_documents = [{"_source": doc} for doc in documents]
+    documents = [{'x': 1, "id": "1"}, {'x': 2, "id": "2"}, {'x': 3, "id": "3"}, {'x': 100, "id": "100"}]
+    formatted_documents = [{"_id": doc["id"], "_source": {'x': doc["x"]}} for doc in documents]
     self.client.execute(
-      'INSERT INTO test (x) VALUES',
+      'INSERT INTO test (id, x) VALUES',
       documents
     )
     return formatted_documents
@@ -39,11 +39,12 @@ class ClickhouseTestCase(unittest.TestCase):
 
   def test_bulk_index(self):
     documents = [{"x": i} for i in range(10)]
-    self.new_client.bulk_index(index="test", docs=documents)
-    result = self.client.execute('SELECT x FROM test')
-    self.assertCountEqual(result, [(doc["x"], ) for doc in documents])
+    self.new_client.bulk_index(index="test", docs=[d.copy() for d in documents], id_field="x")
+    result = self.client.execute('SELECT id FROM test')
+    self.assertCountEqual(result, [(str(doc["x"]), ) for doc in documents])
 
   def test_send_sql_request(self):
     formatted_documents = self._add_records()
     result = self.new_client.send_sql_request("SELECT max(x) FROM test")
     assert result == max(doc["_source"]["x"] for doc in formatted_documents)
+
