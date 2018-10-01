@@ -1,13 +1,15 @@
 import unittest
-from tests.test_utils import TestElasticSearch, mockify
+from tests.test_utils import TestElasticSearch, mockify, TestClickhouse
 from internal_transactions import *
 from internal_transactions import _get_parity_url_by_block, _get_traces_sync, _make_trace_requests
 import internal_transactions
 import json
 import httpretty
 from unittest.mock import MagicMock, patch, call, Mock
+from clients.custom_clickhouse import CustomClickhouse
+from clients.custom_elastic_search import CustomElasticSearch
 
-class InternalTransactionsTestCase(unittest.TestCase):
+class InternalTransactionsTestCase():
   def setUp(self):
     self.client = TestElasticSearch()
     self.client.recreate_fast_index(TEST_TRANSACTIONS_INDEX)
@@ -34,20 +36,6 @@ class InternalTransactionsTestCase(unittest.TestCase):
       chunks = self.internal_transactions._split_on_chunks(test_list, test_chunks_number)
       split_mock.assert_called_with(test_list, test_chunks_number)
       assert chunks == test_chunks
-
-  def test_iterate_blocks(self):
-    """
-    Test iteration through unprocessed blocks that are presented in given hosts config
-    """
-    self.internal_transactions.parity_hosts = [(0, 4, "http://localhost:8545"), (5, None, "http://localhost:8545")]
-    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 1}, id=1, refresh=True)
-    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 2}, id=2, refresh=True)
-    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 3, 'traces_extracted': True}, id=3, refresh=True)
-    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 4}, id=4, refresh=True)
-    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 5}, id=5, refresh=True)
-    blocks = next(self.internal_transactions._iterate_blocks())
-    blocks = [block["_source"]["number"] for block in blocks]
-    self.assertCountEqual(blocks, [1, 2, 5])
 
   def test_get_parity_url_by_block(self):
     """
@@ -278,15 +266,6 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.internal_transactions._set_parent_errors(trace)
     assert "parent_error" in trace[-1].keys()
 
-  def test_save_traces(self):
-    """
-    Test save traces_extracted flag for specified blocks
-    """
-    self.client.index(TEST_BLOCKS_INDEX, 'b', {"number": 123}, id=1, refresh=True)
-    self.internal_transactions._save_traces([123])
-    block = self.client.get(TEST_BLOCKS_INDEX, 'b', 1)['_source']
-    assert block['traces_extracted']
-
   def test_preprocess_internal_transaction_with_empty_field(self):
     """
     Test preprocessing internal transaction with empty flattened field
@@ -475,6 +454,61 @@ class InternalTransactionsTestCase(unittest.TestCase):
     print(internal_transactions_count)
     assert internal_transactions_count == 66201
     assert miner_transactions_count == 447
+
+class ElasticSearchInternalTransactionsTestCase(InternalTransactionsTestCase, unittest.TestCase):
+  def setUp(self):
+    self.client = TestElasticSearch()
+    self.client.recreate_fast_index(TEST_TRANSACTIONS_INDEX)
+    self.client.recreate_fast_index(TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type='itx')
+    self.client.recreate_index(TEST_MINER_TRANSACTIONS_INDEX)
+    self.client.recreate_index(TEST_BLOCKS_INDEX)
+    self.parity_hosts = [(None, None, "http://localhost:8545")]
+    self.internal_transactions = InternalTransactions({
+      "block": TEST_BLOCKS_INDEX,
+      "transaction": TEST_TRANSACTIONS_INDEX,
+      "internal_transaction": TEST_INTERNAL_TRANSACTIONS_INDEX,
+      "miner_transaction": TEST_MINER_TRANSACTIONS_INDEX
+    }, parity_hosts=self.parity_hosts, client=CustomElasticSearch("http://localhost:9200"))
+
+  def test_iterate_blocks(self):
+    """
+    Test iteration through unprocessed blocks that are presented in given hosts config
+    """
+    self.internal_transactions.parity_hosts = [(0, 4, "http://localhost:8545"), (5, None, "http://localhost:8545")]
+    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 1}, id=1, refresh=True)
+    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 2}, id=2, refresh=True)
+    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 3, 'traces_extracted': True}, id=3, refresh=True)
+    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 4}, id=4, refresh=True)
+    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 5}, id=5, refresh=True)
+    blocks = next(self.internal_transactions._iterate_blocks())
+    blocks = [block["_source"]["number"] for block in blocks]
+    self.assertCountEqual(blocks, [1, 2, 5])
+
+  def test_save_traces(self):
+    """
+    Test save traces_extracted flag for specified blocks
+    """
+    self.client.index(TEST_BLOCKS_INDEX, 'b', {"number": 123}, id=1, refresh=True)
+    self.internal_transactions._save_traces([123])
+    block = self.client.get(TEST_BLOCKS_INDEX, 'b', 1)['_source']
+    assert block['traces_extracted']
+
+class ClickhouseInternalTransactionsTestCase(InternalTransactionsTestCase, unittest.TestCase):
+  def setUp(self):
+    self.client = TestClickhouse()
+    self.parity_hosts = [(None, None, "http://localhost:8545")]
+    self.internal_transactions = InternalTransactions({
+      "block": TEST_BLOCKS_INDEX,
+      "transaction": TEST_TRANSACTIONS_INDEX,
+      "internal_transaction": TEST_INTERNAL_TRANSACTIONS_INDEX,
+      "miner_transaction": TEST_MINER_TRANSACTIONS_INDEX
+    }, parity_hosts=self.parity_hosts, client=CustomClickhouse())
+
+# Add two classes - for clickhouse and elasticsearch
+# Add different realizations for _iterate_blocks method
+# Move make_range_query and update_by_query to utils? Or make it static for ES client?
+
+# Check tests for blocks
 
 REAL_TRANSACTIONS_INDEX = "ethereum-internal-transaction"
 TEST_TRANSACTIONS_NUMBER = 10

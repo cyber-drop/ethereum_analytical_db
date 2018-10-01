@@ -47,4 +47,3 @@ class ClickhouseTestCase(unittest.TestCase):
     formatted_documents = self._add_records()
     result = self.new_client.send_sql_request("SELECT max(x) FROM test")
     assert result == max(doc["_source"]["x"] for doc in formatted_documents)
-

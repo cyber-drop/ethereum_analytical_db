@@ -96,9 +96,9 @@ def _get_traces_sync(parity_hosts, blocks):
   return traces
 
 class InternalTransactions:
-  def __init__(self, elasticsearch_indices, elasticsearch_host="http://localhost:9200", parity_hosts=PARITY_HOSTS):
-    self.indices = elasticsearch_indices
-    self.client = CustomElasticSearch(elasticsearch_host)
+  def __init__(self, indices, client=CustomElasticSearch("http://localhost:9200"), parity_hosts=PARITY_HOSTS):
+    self.indices = indices
+    self.client = client
     self.pool = Pool(processes=NUMBER_OF_PROCESSES)
     self.parity_hosts = parity_hosts
 
