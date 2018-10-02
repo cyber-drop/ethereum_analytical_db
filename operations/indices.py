@@ -1,5 +1,6 @@
 from config import INDICES
 from clients.custom_elastic_search import CustomElasticSearch
+from clients.custom_clickhouse import CustomClickhouse
 from pyelasticsearch.exceptions import ElasticHttpError
 
 STRING_PROPERTIES = {
@@ -26,6 +27,39 @@ TEXT_PROPERTIES = {
 
 FAST_INDICES = {
   "internal_transaction": "itx"
+}
+
+INDEX_FIELDS = {
+  "block": {
+    "number": "Int64",
+    "timestamp": "DateTime"
+  },
+  "internal_transaction": {
+    "blockNumber": "Int64",
+    "from": "Nullable(String)",
+    "to": "Nullable(String)",
+    "value": "Nullable(Float64)",
+    "input": "Nullable(String)",
+    "output": "Nullable(String)",
+    "gas": "Nullable(String)",
+    "gasUsed": "Nullable(String)",
+    "blockHash": "String",
+    "transactionHash": "Nullable(String)",
+    "transactionPosition": "Nullable(Int32)",
+    "subtraces": "Int32",
+    "traceAddress": "Array(Int32)",
+    "type": "String",
+    "callType": "Nullable(String)",
+    "address": "Nullable(String)",
+    "code": "Nullable(String)",
+    "init": "Nullable(String)",
+    "refundAddress": "Nullable(String)",
+    "error": "Nullable(String)",
+    "parent_error": "Nullable(UInt8)",
+    "balance": "Nullable(String)",
+    "author": "Nullable(String)",
+    "rewardType": "Nullable(String)"
+  }
 }
 
 class ElasticSearchIndices:
@@ -196,4 +230,16 @@ class ElasticSearchIndices:
         self._prepare_index(self.indices[index])
 
 class ClickhouseIndices:
-  pass
+  def __init__(self, indices=INDICES):
+    self.client = CustomClickhouse()
+    self.indices = indices
+
+  def _create_index(self, index, fields={}):
+    fields["id"] = "String"
+    fields_string = ", ".join(["{} {}".format(name, type) for name, type in fields.items()])
+    create_sql = "CREATE TABLE IF NOT EXISTS {} ({}) ENGINE = ReplacingMergeTree() ORDER BY id".format(index, fields_string)
+    self.client.send_sql_request(create_sql)
+
+  def prepare_indices(self):
+    for index, fields in INDEX_FIELDS.items():
+      self._create_index(self.indices[index], fields)

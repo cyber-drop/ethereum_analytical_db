@@ -8,7 +8,7 @@ class CustomClickhouse:
 
   def _create_sql_query(self, index, query, fields):
     fields_string = ",".join(fields)
-    sql = 'SELECT {} FROM {}'.format(fields_string, index)
+    sql = 'SELECT {} FROM {} FINAL'.format(fields_string, index)
     if query:
       sql += ' ' + query
     return sql
@@ -36,9 +36,14 @@ class CustomClickhouse:
 
   def bulk_index(self, index, docs, id_field="id", **kwargs):
     for document in docs:
-      document["id"] = str(document[id_field])
+      id = str(document[id_field])
       del document[id_field]
+      document["id"] = id
     fields = list(set([field for doc in docs for field in doc.keys()]))
+    for document in docs:
+      for field in fields:
+        if field not in document:
+          document[field] = None
     fields_string = ",".join(fields)
     self.client.execute(
       'INSERT INTO {} ({}) VALUES'.format(index, fields_string),
@@ -46,4 +51,6 @@ class CustomClickhouse:
     )
 
   def send_sql_request(self, sql):
-    return self.client.execute(sql)[0][0]
+    result = self.client.execute(sql)
+    if result:
+      return result[0][0]

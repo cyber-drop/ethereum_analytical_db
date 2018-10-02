@@ -6,7 +6,7 @@ class ClickhouseTestCase(unittest.TestCase):
   def setUp(self):
     self.client = Client('localhost')
     self.client.execute('DROP TABLE IF EXISTS test')
-    self.client.execute('CREATE TABLE test (id String, x Int32) ENGINE = Memory')
+    self.client.execute('CREATE TABLE test (id String, x Int32) ENGINE = ReplacingMergeTree() ORDER BY id')
     self.new_client = CustomClickhouse()
 
   def _add_records(self):
@@ -20,8 +20,9 @@ class ClickhouseTestCase(unittest.TestCase):
 
   def test_search(self):
     formatted_documents = self._add_records()
+    print(formatted_documents)
     result = self.new_client.search(index="test", fields=["x"])
-    self.assertSequenceEqual(formatted_documents, result)
+    self.assertCountEqual(formatted_documents, result)
 
   def test_search_with_query(self):
     formatted_documents = self._add_records()
