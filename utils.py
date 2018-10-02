@@ -3,6 +3,43 @@ from config import INDICES, PROCESSED_CONTRACTS
 
 client = CustomElasticSearch("http://localhost:9200")
 
+
+def make_range_query(field, range_tuple, *args):
+  """
+  Create SQL request to get all documents with specified field in specified range
+
+  Parameters
+  ----------
+  field : string
+      Contracts info in ElasticSearch JSON format, i.e.
+      {"_id": TRANSACTION_ID, "_source": {"document": "fields"}}
+  range_tuple : int
+      Tuple in a format of (start_block, end_block)
+  *args : list
+      Other tuples, or empty
+
+  Returns
+  -------
+  str
+      SQL query in a form of:
+      (field >= 1 AND field <= 2) OR (field >= 4)
+  """
+  if len(args):
+    requests = ["({})".format(make_range_query(field, range_tuple)) for range_tuple in [range_tuple] + list(args)]
+    result_request = " OR ".join(requests)
+    return result_request
+  else:
+    bottom_line = range_tuple[0]
+    upper_bound = range_tuple[1]
+    if (bottom_line is not None) and (upper_bound is not None):
+      return "{0} >= {1} AND {0} < {2}".format(field, bottom_line, upper_bound)
+    elif (bottom_line is not None):
+      return "{} >= {}".format(field, bottom_line)
+    elif (upper_bound is not None):
+      return "{} < {}".format(field, upper_bound)
+    else:
+      return "{} IS NOT NULL".format(field)
+
 def get_elasticsearch_connection():
   """
   Establish ElasticSearch connection

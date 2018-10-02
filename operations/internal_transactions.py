@@ -3,7 +3,8 @@ import requests
 import json
 from multiprocessing import Pool
 from itertools import repeat
-from config import PARITY_HOSTS, GENESIS
+from config import PARITY_HOSTS, GENESIS, INDICES
+from clients.custom_clickhouse import CustomClickhouse
 import pygtrie as trie
 import utils
 from pyelasticsearch import bulk_chunks
@@ -96,7 +97,7 @@ def _get_traces_sync(parity_hosts, blocks):
   return traces
 
 class InternalTransactions:
-  def __init__(self, indices, client=CustomElasticSearch("http://localhost:9200"), parity_hosts=PARITY_HOSTS):
+  def __init__(self, indices, client, parity_hosts):
     self.indices = indices
     self.client = client
     self.pool = Pool(processes=NUMBER_OF_PROCESSES)
@@ -118,24 +119,6 @@ class InternalTransactions:
         Generator that returns chunk on each iteration
     """
     return utils.split_on_chunks(iterable, size)
-
-  def _iterate_blocks(self):
-    """
-    Iterate through unprocessed blocks that can be found in parity nodes specified in a given config file
-
-    Returns
-    -------
-    generator
-        Generator that iterates through blocks without traces_extracted flag in ElasticSearch
-    """
-    ranges = [host_tuple[0:2] for host_tuple in self.parity_hosts]
-    range_query = self.client.make_range_query("number", *ranges)
-    query = {
-      "query_string": {
-        "query": '!(_exists_:traces_extracted) AND ' + range_query
-      }
-    }
-    return self.client.iterate(self.indices["block"], "b", query)
 
   def _get_traces(self, blocks):
     """
@@ -194,22 +177,6 @@ class InternalTransactions:
         is_node = errors[transaction["transactionHash"]].has_key(transaction["traceAddress"])
         if prefix_exists and not is_node:
           transaction["parent_error"] = True
-
-  def _save_traces(self, blocks):
-    """
-    Save traces_extracted flag for processed blocks in ElasticSearch
-
-    Parameters
-    ----------
-    blocks : list
-        Block numbers to process
-    """
-    query = {
-      "terms": {
-        "number": blocks
-      }
-    }
-    self.client.update_by_query(self.indices["block"], 'b', query, 'ctx._source.traces_extracted = true')
 
   def _preprocess_internal_transaction(self, transaction):
     """
@@ -303,3 +270,59 @@ class InternalTransactions:
     for blocks in self._iterate_blocks():
       blocks = [block["_source"]["number"] for block in blocks]
       self._extract_traces_chunk(blocks)
+
+class ElasticSearchInternalTransactions(InternalTransactions):
+  # TODO add init
+  def _iterate_blocks(self):
+    """
+    Iterate through unprocessed blocks that can be found in parity nodes specified in a given config file
+
+    Returns
+    -------
+    generator
+        Generator that iterates through blocks without traces_extracted flag in ElasticSearch
+    """
+    ranges = [host_tuple[0:2] for host_tuple in self.parity_hosts]
+    range_query = self.client.make_range_query("number", *ranges)
+    query = {
+      "query_string": {
+        "query": '!(_exists_:traces_extracted) AND ' + range_query
+      }
+    }
+    return self.client.iterate(self.indices["block"], "b", query)
+
+  def _save_traces(self, blocks):
+    """
+    Save traces_extracted flag for processed blocks in ElasticSearch
+
+    Parameters
+    ----------
+    blocks : list
+        Block numbers to process
+    """
+    query = {
+      "terms": {
+        "number": blocks
+      }
+    }
+    self.client.update_by_query(self.indices["block"], 'b', query, 'ctx._source.traces_extracted = true')
+
+class ClickhouseInternalTransactions(InternalTransactions):
+  def __init__(self, indices=INDICES, parity_hosts=PARITY_HOSTS):
+    super().__init__(indices, CustomClickhouse(), parity_hosts)
+    self.indices["miner_transaction"] = self.indices["internal_transaction"]
+
+  def _iterate_blocks(self):
+    ranges = [host_tuple[0:2] for host_tuple in self.parity_hosts]
+    return self.client.iterate(
+      index=self.indices["block"],
+      fields=["number"],
+      query="ANY LEFT JOIN {} USING id WHERE traces_extracted IS NULL AND {}".format(
+        self.indices["block_traces_extracted"],
+        utils.make_range_query('number', *ranges)
+      ),
+    )
+
+  def _save_traces(self, blocks):
+    docs = [{"id": block, "traces_extracted": True} for block in blocks]
+    self.client.bulk_index(index=self.indices["block_traces_extracted"], docs=docs, )

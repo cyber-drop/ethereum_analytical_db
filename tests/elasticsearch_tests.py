@@ -10,15 +10,6 @@ class ElasticSearchTestCase(unittest.TestCase):
     self.new_client = NewElasticSearch('http://localhost:9200')
     self.client.recreate_index(TEST_INDEX)
 
-  def test_make_range_query(self):
-    assert self.new_client.make_range_query("block", (0, 3)) == "block:[0 TO 2]"
-    assert self.new_client.make_range_query("block", (None, 3)) == "block:[* TO 2]"
-    assert self.new_client.make_range_query("block", (0, None)) == "block:[0 TO *]"
-    assert self.new_client.make_range_query("block", (None, None)) == "block:[* TO *]"
-
-  def test_make_complex_range_query(self):
-    assert self.new_client.make_range_query("block", (0, 3), (10, 100)) == "(block:[0 TO 2] OR block:[10 TO 99])"
-
   def test_iterate_elasticsearch_data_with_pagination(self):
     for i in range(11):
       self.client.index(TEST_INDEX, 'item', {'paginate': True}, id=i + 1, refresh=True)

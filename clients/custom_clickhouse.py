@@ -11,7 +11,7 @@ class CustomClickhouse(CustomClient):
     fields_string = ",".join(fields)
     sql = 'SELECT {} FROM {} FINAL'.format(fields_string, index)
     if query:
-      sql += ' WHERE ' + query
+      sql += ' ' + query
     return sql
 
   def _convert_values_to_dict(self, values, fields):

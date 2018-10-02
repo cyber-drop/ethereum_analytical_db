@@ -1,48 +1,14 @@
 from pyelasticsearch import ElasticSearch
 from tqdm import *
 from config import NUMBER_OF_JOBS
+from clients.custom_client import CustomClient
 
 class CustomElasticSearch(ElasticSearch):
   def __init__(self, *args, **kwargs):
     kwargs["timeout"] = 600
     super().__init__(*args, **kwargs)
 
-  def make_range_query(self, field, range_tuple, *args):
-    """
-    Create ElasticSearch request to get all documents with specified field in specified range
-
-    Parameters
-    ----------
-    field : string
-        Contracts info in ElasticSearch JSON format, i.e.
-        {"_id": TRANSACTION_ID, "_source": {"document": "fields"}}
-    range_tuple : int
-        Tuple in a format of (start_block, end_block)
-    *args : list
-        Other tuples, or empty
-
-    Returns
-    -------
-    str
-        ElasticSearch query in a form of:
-        (field:[1 TO 2] OR field:[4 TO *])
-    """
-    if len(args):
-      requests = [self.make_range_query(field, range_tuple) for range_tuple in [range_tuple] + list(args)]
-      result_request = " OR ".join(requests)
-      return "({})".format(result_request)
-    else:
-      bottom_line = range_tuple[0]
-      upper_bound = range_tuple[1]
-      if (bottom_line is not None) and (upper_bound is not None):
-        return "{}:[{} TO {}]".format(field, bottom_line, upper_bound - 1)
-      elif (bottom_line is not None):
-        return "{}:[{} TO *]".format(field, bottom_line)
-      elif (upper_bound is not None):
-        return "{}:[* TO {}]".format(field, upper_bound - 1)
-      else:
-        return "{}:[* TO *]".format(field)
-
+  @staticmethod
   def update_by_query(client, index, doc_type, query, script):
     """
     Update ElasticSearch records by specified query with specified script

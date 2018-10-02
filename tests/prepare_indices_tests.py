@@ -316,6 +316,7 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
       "subtraces": 0
     },
     "suicide": {
+      "result": None,
       "hash": 6,
       "refundAddress": "0x6d28515bf27529843f14dc75cc7ee95a4783e3a1",
       "blockHash": "0xffe458f4eb5fddb9c5446e6f5aef2344644e91db13dc7c53aeaebfb9d03efb67",
@@ -379,7 +380,7 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
     self.client.send_sql_request("CREATE TABLE {} (id String) ENGINE = MergeTree() ORDER BY id".format(TEST_INDEX))
     self.indices._create_index(TEST_INDEX)
 
-  def test_prepare_blocks_index(self):
+  def test_create_blocks_index(self):
     self.indices.prepare_indices()
     self.client.bulk_index(index=TEST_INDICES["block"], docs=self._test_blocks, id_field="number")
     result = self.client.search(index=TEST_INDICES["block"], fields=[])
@@ -397,6 +398,13 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
     result = [transaction["_id"] for transaction in result]
     self.assertCountEqual(result, [str(i + 1) for i in range(len(self._test_transactions))])
 
+  def test_create_block_traces_extracted_index(self):
+    self.indices.prepare_indices()
+    self.client.bulk_index(index=TEST_INDICES["block_traces_extracted"], docs=[{"id": 1, "traces_extracted": True}, {"id": 2, "traces_extracted": None}])
+    result = self.client.search(index=TEST_INDICES["block_traces_extracted"], fields=[])
+    result = [flag["_id"] for flag in result]
+    self.assertCountEqual(["1", "2"], result)
+
 CURRENT_ELASTICSEARCH_SIZE = 290659165119
 TEST_INDEX = 'test_ethereum_transactions'
 TEST_INDICES = {
@@ -407,5 +415,7 @@ TEST_INDICES = {
   "token_tx": "test_ethereum_token_transaction",
   "block": "test_ethereum_block",
   "miner_transaction": "test_ethereum_miner_transaction",
-  "token_price": "test_ethereum_token_price"
+  "token_price": "test_ethereum_token_price",
+
+  "block_traces_extracted": "test_block_traces_extracted"
 }

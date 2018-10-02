@@ -58,7 +58,11 @@ INDEX_FIELDS = {
     "parent_error": "Nullable(UInt8)",
     "balance": "Nullable(String)",
     "author": "Nullable(String)",
-    "rewardType": "Nullable(String)"
+    "rewardType": "Nullable(String)",
+    "result": "Nullable(String)"
+  },
+  "block_traces_extracted": {
+    "traces_extracted": "Nullable(UInt8)"
   }
 }
 

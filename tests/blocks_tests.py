@@ -72,7 +72,7 @@ class BlocksTestCase():
     self.blocks._create_blocks(1, 3)
 
     # WHERE statement?! WTF!
-    blocks = self.client.search(index=TEST_BLOCKS_INDEX, query=None, fields=["timestamp"])
+    blocks = self.client.search(index=TEST_BLOCKS_INDEX, fields=["timestamp"])
     for block in [1, 2, 3]:
       self.blocks._extract_block_timestamp.assert_any_call(block)
     blocks = [block["_source"]["timestamp"].timestamp() for block in blocks]

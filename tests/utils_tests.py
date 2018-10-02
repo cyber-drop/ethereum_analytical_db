@@ -1,5 +1,5 @@
 import unittest
-from utils import get_max_block, split_on_chunks, ContractTransactionsIterator
+from utils import get_max_block, split_on_chunks, ContractTransactionsIterator, make_range_query
 from tests.test_utils import TestElasticSearch, CustomElasticSearch
 import config
 from unittest.mock import MagicMock
@@ -279,6 +279,16 @@ class UtilsTestCase(unittest.TestCase):
     }, refresh=True)
     max_block = get_max_block(min_consistent_block=2)
     assert max_block == 3
+
+  def test_make_range_query(self):
+    assert make_range_query("block", (0, 3)) == "block >= 0 AND block < 3"
+    assert make_range_query("block", (None, 3)) == "block < 3"
+    assert make_range_query("block", (0, None)) == "block >= 0"
+    assert make_range_query("block", (None, None)) == "block IS NOT NULL"
+
+  def test_make_complex_range_query(self):
+    assert make_range_query("block", (0, 3), (10, 100)) == "(block >= 0 AND block < 3) OR (block >= 10 AND block < 100)"
+
 
 TEST_BLOCKS_INDEX = "test-ethereum-blocks"
 TEST_CONTRACTS_INDEX = "test-ethereum-contract"
