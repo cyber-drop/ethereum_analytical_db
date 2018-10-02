@@ -1,8 +1,9 @@
 from clickhouse_driver import Client
 from utils import split_on_chunks
 from config import NUMBER_OF_JOBS
+from clients.custom_client import CustomClient
 
-class CustomClickhouse:
+class CustomClickhouse(CustomClient):
   def __init__(self):
     self.client = Client('localhost')
 
@@ -10,7 +11,7 @@ class CustomClickhouse:
     fields_string = ",".join(fields)
     sql = 'SELECT {} FROM {} FINAL'.format(fields_string, index)
     if query:
-      sql += ' ' + query
+      sql += ' WHERE ' + query
     return sql
 
   def _convert_values_to_dict(self, values, fields):
@@ -25,6 +26,10 @@ class CustomClickhouse:
     sql = self._create_sql_query(index, query, fields)
     values = self.client.execute(sql)
     return self._convert_values_to_dict(values, fields)
+
+  def count(self, index, query=None, **kwargs):
+    sql = self._create_sql_query(index, query, ["COUNT(*)"])
+    return self.client.execute(sql)[0][0]
 
   def iterate(self, index, fields, query=None, per=NUMBER_OF_JOBS):
     fields += ["id"]

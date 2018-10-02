@@ -241,5 +241,6 @@ class ClickhouseIndices:
     self.client.send_sql_request(create_sql)
 
   def prepare_indices(self):
-    for index, fields in INDEX_FIELDS.items():
-      self._create_index(self.indices[index], fields)
+    for key, index in self.indices.items():
+      if key in INDEX_FIELDS:
+        self._create_index(index, INDEX_FIELDS[key])

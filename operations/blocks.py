@@ -1,5 +1,6 @@
 from config import INDICES, PARITY_HOSTS, NUMBER_OF_JOBS
 from clients.custom_elastic_search import CustomElasticSearch
+from clients.custom_clickhouse import CustomClickhouse
 import requests
 import json
 import utils
@@ -10,11 +11,7 @@ import datetime
 BLOCKS_PER_CHUNK = NUMBER_OF_JOBS
 
 class Blocks:
-  def __init__(self,
-               indices=INDICES,
-               client=CustomElasticSearch("http://localhost:9200"),
-               parity_host=PARITY_HOSTS[0][-1]
-               ):
+  def __init__(self, indices, client, parity_host):
     self.indices = indices
     self.client = client
     self.parity_host = parity_host
@@ -106,3 +103,11 @@ class Blocks:
     max_parity_block = self._get_max_parity_block()
     max_elasticsearch_block = self._get_max_elasticsearch_block()
     self._create_blocks(max_elasticsearch_block + 1, max_parity_block)
+
+class ElasticSearchBlocks(Blocks):
+  def __init__(self, indices=INDICES, parity_host=PARITY_HOSTS[0][-1]):
+    super().__init__(indices, CustomElasticSearch("http://localhost:9200"), parity_host)
+
+class ClickhouseBlocks(Blocks):
+  def __init__(self, indices=INDICES, parity_host=PARITY_HOSTS[0][-1]):
+    super().__init__(indices, CustomClickhouse(), parity_host)

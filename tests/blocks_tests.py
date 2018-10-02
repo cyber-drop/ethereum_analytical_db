@@ -1,5 +1,6 @@
 import unittest
-from blocks import Blocks
+from operations.blocks import ElasticSearchBlocks, ClickhouseBlocks
+from operations.indices import ClickhouseIndices
 from tests.test_utils import TestElasticSearch, mockify, TestClickhouse
 import httpretty
 import json
@@ -36,7 +37,9 @@ class BlocksTestCase():
   def test_get_max_elasticsearch_block(self):
     """Test getting max block from elasticsearch"""
     docs = [{"number": 1}, {"number": 2}]
-    self.client.bulk_index(index=TEST_BLOCKS_INDEX, doc_type="b", docs=docs, refresh=True, id_field="number")
+    for doc in docs:
+      doc["id"] = doc["number"]
+    self.client.bulk_index(index=TEST_BLOCKS_INDEX, doc_type="b", docs=docs, refresh=True)
     max_block = self.blocks._get_max_elasticsearch_block()
     assert max_block == 2
 
@@ -49,7 +52,7 @@ class BlocksTestCase():
     """Test create blocks in ElasticSearch by range"""
     mockify(self.blocks, {}, "_create_blocks")
     self.blocks._create_blocks(1, 3)
-    blocks = self.client.search(index=TEST_BLOCKS_INDEX, doc_type="b", query="*", fields=["number"])['hits']['hits']
+    blocks = self.client.search(index=TEST_BLOCKS_INDEX, doc_type="b", fields=["number"])
     blocks = [block["_source"]["number"] for block in blocks]
     self.assertCountEqual(blocks, [1, 2, 3])
 
@@ -57,7 +60,8 @@ class BlocksTestCase():
     mockify(self.blocks, {}, "_create_blocks")
     self.blocks._create_blocks(1, 1)
     self.blocks._create_blocks(1, 1)
-    blocks_number = self.client.count(index=TEST_BLOCKS_INDEX, doc_type="b", query="*")['count']
+    blocks_number = self.client.count(index=TEST_BLOCKS_INDEX, doc_type="b")
+    print(blocks_number)
     assert blocks_number == 1
 
   def test_create_blocks_with_timestamp(self):
@@ -67,10 +71,11 @@ class BlocksTestCase():
 
     self.blocks._create_blocks(1, 3)
 
-    blocks = self.client.search(index=TEST_BLOCKS_INDEX, doc_type="b", query="_exists_:timestamp")['hits']['hits']
+    # WHERE statement?! WTF!
+    blocks = self.client.search(index=TEST_BLOCKS_INDEX, query=None, fields=["timestamp"])
     for block in [1, 2, 3]:
       self.blocks._extract_block_timestamp.assert_any_call(block)
-    blocks = [block["_source"]["timestamp"] for block in blocks]
+    blocks = [block["_source"]["timestamp"].timestamp() for block in blocks]
     self.assertCountEqual(blocks, [1, 2, 3])
 
   def test_extract_block_timestamp(self):
@@ -111,22 +116,21 @@ class BlocksTestCase():
 
 class ElasticSearchBlocksTestCase(BlocksTestCase, unittest.TestCase):
   def setUp(self):
-    self.blocks = Blocks(
+    self.blocks = ElasticSearchBlocks(
       {"block": TEST_BLOCKS_INDEX},
-      parity_host="http://localhost:8545",
-      client=CustomElasticSearch("http://localhost:9200")
+      parity_host="http://localhost:8545"
     )
     self.client = TestElasticSearch()
     self.client.recreate_index(TEST_BLOCKS_INDEX)
 
 class ClickhouseBlocksTestCase(BlocksTestCase, unittest.TestCase):
   def setUp(self):
-    self.blocks = Blocks(
+    self.blocks = ClickhouseBlocks(
       {"block": TEST_BLOCKS_INDEX},
-      parity_host="http://localhost:8545",
-      client=CustomClickhouse()
+      parity_host="http://localhost:8545"
     )
     self.client = TestClickhouse()
-    self.client.recreate_index(TEST_BLOCKS_INDEX, "id String, number Int32, timestamp Int32")
+    self.client.send_sql_request("DROP TABLE IF EXISTS {}".format(TEST_BLOCKS_INDEX))
+    ClickhouseIndices({"block": TEST_BLOCKS_INDEX}).prepare_indices()
 
 TEST_BLOCKS_INDEX = "test_ethereum_blocks"

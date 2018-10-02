@@ -20,21 +20,26 @@ class ClickhouseTestCase(unittest.TestCase):
 
   def test_search(self):
     formatted_documents = self._add_records()
-    print(formatted_documents)
     result = self.new_client.search(index="test", fields=["x"])
     self.assertCountEqual(formatted_documents, result)
 
   def test_search_with_query(self):
     formatted_documents = self._add_records()
     formatted_documents = [doc for doc in formatted_documents if doc["_source"]['x'] < 3]
-    result = self.new_client.search(index="test", query="WHERE x < 3", fields=["x"])
+    result = self.new_client.search(index="test", query="x < 3", fields=["x"])
     self.assertSequenceEqual(formatted_documents, result)
+
+  def test_count(self):
+    formatted_documents = self._add_records()
+    formatted_documents = [doc for doc in formatted_documents if doc["_source"]['x'] < 3]
+    result = self.new_client.count(index="test", query="x < 3")
+    assert result == len(formatted_documents)
 
   def test_iterate(self):
     test_per = 2
     formatted_documents = self._add_records()
     formatted_documents = [doc for doc in formatted_documents if doc["_source"]['x'] < 4]
-    result = self.new_client.iterate(index="test", fields=["x"], query="WHERE x < 4", per=test_per)
+    result = self.new_client.iterate(index="test", fields=["x"], query="x < 4", per=test_per)
     self.assertSequenceEqual(formatted_documents[0:test_per], next(result))
     self.assertSequenceEqual(formatted_documents[test_per:2*test_per], next(result))
 
