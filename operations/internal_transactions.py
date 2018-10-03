@@ -8,6 +8,7 @@ from clients.custom_clickhouse import CustomClickhouse
 import pygtrie as trie
 import utils
 from pyelasticsearch import bulk_chunks
+import pdb
 
 BYTES_PER_CHUNK = 1000000
 NUMBER_OF_PROCESSES = 10

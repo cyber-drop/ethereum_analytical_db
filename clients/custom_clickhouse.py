@@ -2,10 +2,12 @@ from clickhouse_driver import Client
 from utils import split_on_chunks
 from config import NUMBER_OF_JOBS
 from clients.custom_client import CustomClient
+from tqdm import tqdm
 
 class CustomClickhouse(CustomClient):
   def __init__(self):
     self.client = Client('localhost')
+    self.iterate_client = Client('localhost')
 
   def _create_sql_query(self, index, query, fields):
     fields_string = ",".join(fields)
@@ -35,8 +37,11 @@ class CustomClickhouse(CustomClient):
     fields += ["id"]
     settings = {'max_block_size': per}
     sql = self._create_sql_query(index, query, fields)
-    generator = self.client.execute_iter(sql, settings=settings)
+    generator = self.iterate_client.execute_iter(sql, settings=settings)
+    count = self.count(index, query)
+    progress_bar = tqdm(total=count)
     for chunk in split_on_chunks(generator, per):
+      progress_bar.update(per)
       yield self._convert_values_to_dict(chunk, fields)
 
   def bulk_index(self, index, docs, id_field="id", **kwargs):

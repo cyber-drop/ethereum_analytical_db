@@ -8,7 +8,9 @@ OPERATIONS = {
     "prepare-indices": elasticsearch.prepare_indices
   },
   "clickhouse": {
-    "prepare-indices": clickhouse.prepare_indices
+    "prepare-indices": clickhouse.prepare_indices,
+    "prepare-blocks": clickhouse.prepare_blocks,
+    "extract-traces": clickhouse.extract_traces
   }
 }
 

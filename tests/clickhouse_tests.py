@@ -43,6 +43,14 @@ class ClickhouseTestCase(unittest.TestCase):
     self.assertSequenceEqual(formatted_documents[0:test_per], next(result))
     self.assertSequenceEqual(formatted_documents[test_per:2*test_per], next(result))
 
+  def test_iterate_with_other_processes(self):
+    test_per = 2
+    formatted_documents = self._add_records()
+    result = self.new_client.iterate(index="test", fields=["x"], per=test_per)
+    next(result)
+    self.new_client.bulk_index(index="test", docs=[{"id": "test", "x": 0}])
+    next(result)
+
   def test_bulk_index(self):
     documents = [{"x": i} for i in range(10)]
     self.new_client.bulk_index(index="test", docs=[d.copy() for d in documents], id_field="x")
