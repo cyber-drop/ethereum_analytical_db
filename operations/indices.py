@@ -50,7 +50,7 @@ INDEX_FIELDS = {
     "traceAddress": "Array(Int32)",
     "type": "String",
     "callType": "Nullable(String)",
-    "address": "Nullable(String)",
+    "address": "String",
     "code": "Nullable(String)",
     "init": "Nullable(String)",
     "refundAddress": "Nullable(String)",
@@ -63,6 +63,10 @@ INDEX_FIELDS = {
   },
   "block_traces_extracted": {
     "traces_extracted": "Nullable(UInt8)"
+  },
+  "contract_abi": {
+    "abi_extracted": "Nullable(UInt8)",
+    "abi": "Nullable(String)"
   }
 }
 

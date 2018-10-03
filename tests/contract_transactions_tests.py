@@ -1,13 +1,14 @@
 import unittest 
-from contract_transactions import ContractTransactions
+from operations.contract_transactions import ElasticSearchContractTransactions, ClickhouseContractTransactions
 from pyelasticsearch import ElasticSearch
 from time import sleep
 from tqdm import *
-from tests.test_utils import TestElasticSearch
+from tests.test_utils import TestElasticSearch, TestClickhouse
 from unittest.mock import MagicMock, Mock, call, ANY, patch
+from operations.indices import ClickhouseIndices
 
-class InternalContractTransactionsTestCase(unittest.TestCase):
-  contract_transactions_class = ContractTransactions
+class ElasticSearchContractTransactionsTestCase(unittest.TestCase):
+  contract_transactions_class = ElasticSearchContractTransactions
   index = "internal_transaction"
   doc_type = "itx"
 
@@ -200,8 +201,90 @@ class InternalContractTransactionsTestCase(unittest.TestCase):
                                  call.iterate(test_max_block)
                                ] + call_part)
 
-TEST_TRANSACTIONS_INDEX = 'test-ethereum-transactions'
-TEST_CONTRACTS_INDEX = 'test-ethereum-contracts'
+class ClickhouseContractTransactionsTestCase(unittest.TestCase):
+  def setUp(self):
+    self.indices = {
+      "internal_transaction": TEST_TRANSACTIONS_INDEX,
+      "contract": TEST_CONTRACTS_INDEX
+    }
+    self.client = TestClickhouse()
+    for index in self.indices.values():
+      self.client.send_sql_request("DROP TABLE IF EXISTS {}".format(index))
+    ClickhouseIndices(self.indices).prepare_indices()
+    self.contract_transactions = ClickhouseContractTransactions(self.indices)
+    self.contract_transactions.extract_contract_addresses()
+
+  def test_extract_contract_addresses(self):
+    transaction = {
+      "id": "0x12345",
+      "type": "create",
+      "address": "0x0",
+      "blockNumber": 1000,
+      "from": "0x01",
+      "code": "0x12345678"
+    }
+    self.client.bulk_index(index=TEST_TRANSACTIONS_INDEX, docs=[transaction])
+    result = self.client.search(index=TEST_CONTRACTS_INDEX, fields=[
+      "address",
+      "blockNumber",
+      "owner",
+      "bytecode"
+    ])
+    contract = result[0]
+    print(contract)
+    assert contract["_id"] == transaction["address"]
+    assert contract['_source']["address"] == transaction["address"]
+    assert contract['_source']["blockNumber"] == transaction["blockNumber"]
+    assert contract['_source']["owner"] == transaction["from"]
+    assert contract['_source']["bytecode"] == transaction["code"]
+
+  def test_extract_contract_addresses_if_exists(self):
+    self.contract_transactions.extract_contract_addresses()
+
+  def test_extract_contract_addresses_ignore_transactions(self):
+    transactions = [{
+      "id": 1,
+      "type": "call"
+    }, {
+      "id": 2,
+      "type": "create",
+      "error": "Out of gas"
+    }, {
+      "id": 3,
+      "type": "create",
+      "parent_error": True,
+    }]
+    self.client.bulk_index(index=TEST_TRANSACTIONS_INDEX, docs=transactions)
+    count = self.client.count(index=TEST_CONTRACTS_INDEX)
+    assert not count
+
+  def test_extract_contract_addresses_ignore_duplicates(self):
+    transaction = {
+      "id": 1,
+      "type": "create"
+    }
+    self.client.bulk_index(index=TEST_TRANSACTIONS_INDEX, docs=[transaction, transaction])
+    count = self.client.count(index=TEST_CONTRACTS_INDEX)
+    assert count == 1
+
+  # Cases:
+  # self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "call"}, id=1, refresh=True)
+  # self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create"}, id=2, refresh=True)
+  # self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create", "error": "Out of gas"}, id=3, refresh=True)
+  # self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'type': "create"}, id=4, refresh=True)
+  # self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create", "contract_created": True}, id=5, refresh=True)
+
+  # Fields:
+  # assert contract["owner"] == transaction["from"]
+  # assert contract["blockNumber"] == transaction["blockNumber"]
+  # assert contract["parent_transaction"] == transaction_id
+  # assert contract["address"] == transaction["address"]
+  # assert contract["id"] == transaction["address"]
+  # assert contract["bytecode"] == transaction["code"]
+  pass
+
+TEST_TRANSACTIONS_INDEX = 'test_ethereum_transactions'
+TEST_CONTRACTS_INDEX = 'test_ethereum_contracts'
 TEST_TRANSACTION_INPUT = '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a'
 TEST_TRANSACTION_TO = '0xb1631db29e09ec5581a0ec398f1229abaf105d3524c49727621841af947bdc44'
 TEST_TRANSACTION_TO_COMMON = '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a'

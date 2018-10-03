@@ -1,8 +1,9 @@
 from clients.custom_elastic_search import CustomElasticSearch
+from clients.custom_clickhouse import CustomClickhouse
 from config import INDICES
 import utils
 
-class ContractTransactions(utils.ContractTransactionsIterator):
+class ElasticSearchContractTransactions(utils.ContractTransactionsIterator):
   """
   Treat detect-contract and detect-contract-transaction operations
   """
@@ -131,3 +132,36 @@ class ContractTransactions(utils.ContractTransactionsIterator):
     for contracts in self._iterate_contracts_without_detected_transactions(max_block):
       self._detect_transactions_by_contracts(contracts, max_block)
       self._save_max_block([contract["_source"]["address"] for contract in contracts], max_block)
+
+class ClickhouseContractTransactions:
+  def __init__(self, indices=INDICES):
+    self.indices = indices
+    self.client = CustomClickhouse()
+
+  def _get_fields(self):
+    fields = {
+      "id": "address",
+      "blockNumber": "blockNumber",
+      "address": "address",
+      "owner": "from",
+      "bytecode": "code"
+    }
+    fields_string = ", ".join([
+      "{}.{} AS {}".format(self.indices["internal_transaction"], field, alias)
+      for alias, field in fields.items()
+    ])
+    return fields_string
+
+  def extract_contract_addresses(self):
+    fields_string = self._get_fields()
+    print(fields_string)
+    engine_string = 'ENGINE = ReplacingMergeTree() ORDER BY id'
+    condition = "type = 'create' AND error IS NULL AND parent_error IS NULL"
+    sql = "CREATE MATERIALIZED VIEW IF NOT EXISTS {} {} AS (SELECT {} FROM {} WHERE {})".format(
+      self.indices["contract"],
+      engine_string,
+      fields_string,
+      self.indices["internal_transaction"],
+      condition
+    )
+    self.client.send_sql_request(sql)

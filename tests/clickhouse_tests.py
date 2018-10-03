@@ -1,12 +1,13 @@
 import unittest
 from clickhouse_driver import Client
 from clients.custom_clickhouse import CustomClickhouse
+import json
 
 class ClickhouseTestCase(unittest.TestCase):
   def setUp(self):
     self.client = Client('localhost')
     self.client.execute('DROP TABLE IF EXISTS test')
-    self.client.execute('CREATE TABLE test (id String, x Int32) ENGINE = ReplacingMergeTree() ORDER BY id')
+    self.client.execute('CREATE TABLE test (id String, x Int32, dict String) ENGINE = ReplacingMergeTree() ORDER BY id')
     self.new_client = CustomClickhouse()
 
   def _add_records(self):
@@ -56,6 +57,12 @@ class ClickhouseTestCase(unittest.TestCase):
     self.new_client.bulk_index(index="test", docs=[d.copy() for d in documents], id_field="x")
     result = self.client.execute('SELECT id FROM test')
     self.assertCountEqual(result, [(str(doc["x"]), ) for doc in documents])
+
+  def test_bulk_index_dict_values(self):
+    documents = [{"x": i, "dict": {"test": i}} for i in range(10)]
+    self.new_client.bulk_index(index="test", docs=[d.copy() for d in documents], id_field="x")
+    result = self.client.execute('SELECT dict FROM test')
+    self.assertCountEqual(result, [(json.dumps(doc["dict"]),) for doc in documents])
 
   def test_send_sql_request(self):
     formatted_documents = self._add_records()

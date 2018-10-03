@@ -405,6 +405,15 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
     result = [flag["_id"] for flag in result]
     self.assertCountEqual(["1", "2"], result)
 
+  def test_create_contract_abi_index(self):
+    self.indices.prepare_indices()
+    self.client.bulk_index(index=TEST_INDICES["contract_abi"],
+                           docs=[{"id": 1, "abi_extracted": True}, {"id": 2, "abi_extracted": None}, {"id": 3, "abi": {"test": 1}, "abi_extracted": True}])
+    result = self.client.search(index=TEST_INDICES["contract_abi"], fields=[])
+    result = [flag["_id"] for flag in result]
+    self.assertCountEqual(["1", "2", "3"], result)
+
+
 CURRENT_ELASTICSEARCH_SIZE = 290659165119
 TEST_INDEX = 'test_ethereum_transactions'
 TEST_INDICES = {
@@ -417,5 +426,6 @@ TEST_INDICES = {
   "miner_transaction": "test_ethereum_miner_transaction",
   "token_price": "test_ethereum_token_price",
 
-  "block_traces_extracted": "test_block_traces_extracted"
+  "block_traces_extracted": "test_block_traces_extracted",
+  "contract_abi": "test_contract_abi"
 }

@@ -3,6 +3,7 @@ from utils import split_on_chunks
 from config import NUMBER_OF_JOBS
 from clients.custom_client import CustomClient
 from tqdm import tqdm
+import json
 
 class CustomClickhouse(CustomClient):
   def __init__(self):
@@ -44,16 +45,21 @@ class CustomClickhouse(CustomClient):
       progress_bar.update(per)
       yield self._convert_values_to_dict(chunk, fields)
 
+  def _prepare_fields(self, docs, fields):
+    for document in docs:
+      for field in fields:
+        if field not in document:
+          document[field] = None
+        elif type(document[field]) == dict:
+          document[field] = json.dumps(document[field])
+
   def bulk_index(self, index, docs, id_field="id", **kwargs):
     for document in docs:
       id = str(document[id_field])
       del document[id_field]
       document["id"] = id
     fields = list(set([field for doc in docs for field in doc.keys()]))
-    for document in docs:
-      for field in fields:
-        if field not in document:
-          document[field] = None
+    self._prepare_fields(docs, fields)
     fields_string = ",".join(fields)
     self.client.execute(
       'INSERT INTO {} ({}) VALUES'.format(index, fields_string),
