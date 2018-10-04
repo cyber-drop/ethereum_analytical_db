@@ -10,6 +10,7 @@ OPERATIONS = {
   "clickhouse": {
     "prepare-indices": clickhouse.prepare_indices,
     "prepare-blocks": clickhouse.prepare_blocks,
+    "prepare-contracts-view": clickhouse.prepare_contracts_view,
     "extract-traces": clickhouse.extract_traces
   }
 }

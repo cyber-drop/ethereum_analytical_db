@@ -1,6 +1,7 @@
 from operations.indices import ClickhouseIndices
 from operations.internal_transactions import ClickhouseInternalTransactions
 from operations.blocks import ClickhouseBlocks
+from operations.contract_transactions import ClickhouseContractTransactions
 
 def prepare_indices():
   print("Preparing indices...")
@@ -11,6 +12,11 @@ def prepare_blocks():
   print("Preparing blocks...")
   blocks = ClickhouseBlocks()
   blocks.create_blocks()
+
+def prepare_contracts_view():
+  print("Preparing contracts view...")
+  contract_transactions = ClickhouseContractTransactions()
+  contract_transactions.extract_contract_addresses()
 
 def extract_traces():
   print("Extracting internal transactions...")
