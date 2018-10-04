@@ -58,6 +58,13 @@ class ClickhouseTestCase(unittest.TestCase):
     result = self.client.execute('SELECT id FROM test')
     self.assertCountEqual(result, [(str(doc["x"]), ) for doc in documents])
 
+  def test_bulk_index_empty_fields(self):
+    # , {"id": 2, "dict": {"x": 1}}
+    documents = [{"id": 1, "x": 1}]
+    self.new_client.bulk_index(index="test", docs=[d for d in documents])
+    # result = self.client.execute('SELECT id FROM test')
+    # self.assertCountEqual(result, [("1", ), ("2", )])
+
   def test_bulk_index_dict_values(self):
     documents = [{"x": i, "dict": {"test": i}} for i in range(10)]
     self.new_client.bulk_index(index="test", docs=[d.copy() for d in documents], id_field="x")

@@ -50,7 +50,7 @@ INDEX_FIELDS = {
     "traceAddress": "Array(Int32)",
     "type": "String",
     "callType": "Nullable(String)",
-    "address": "String",
+    "address": "Nullable(String)",
     "code": "Nullable(String)",
     "init": "Nullable(String)",
     "refundAddress": "Nullable(String)",

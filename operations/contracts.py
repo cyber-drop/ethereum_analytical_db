@@ -7,8 +7,9 @@ from ethereum.abi import (
     method_id as get_abi_method_id)
 from ethereum.utils import encode_int, zpad, decode_hex
 from multiprocessing import Pool
-from config import PARITY_HOSTS
+from config import PARITY_HOSTS, INDICES
 import utils
+from clients.custom_clickhouse import CustomClickhouse
 
 GRAB_ABI_PATH = "/usr/local/qblocks/bin/grabABI {} > /dev/null 2>&1"
 GRAB_ABI_CACHE_PATH = "/home/{}/.quickBlocks/cache/abis/{}.json"
@@ -103,9 +104,9 @@ class Contracts(utils.ContractTransactionsIterator):
   blocks_query = "traces_extracted:true"
   block_prefix = "inputs_decoded"
 
-  def __init__(self, indices, host="http://localhost:9200", parity_hosts=PARITY_HOSTS):
+  def __init__(self, indices, client, parity_hosts):
     self.indices = indices
-    self.client = CustomElasticSearch(host)
+    self.client = client
     self.pool = Pool(processes=NUMBER_OF_PROCESSES)
     self.parity_hosts = parity_hosts
 
@@ -178,7 +179,7 @@ class Contracts(utils.ContractTransactionsIterator):
         (blockNumber:[1 TO 2] OR blockNumber:[4 TO *])
     """
     ranges = [range_tuple[0:2] for range_tuple in self.parity_hosts]
-    range_query = self.client.make_range_query("blockNumber", *ranges)
+    range_query = utils.make_range_query("blockNumber", *ranges)
     return range_query
 
   def _iterate_contracts_without_abi(self):
@@ -191,12 +192,11 @@ class Contracts(utils.ContractTransactionsIterator):
     generator
         Generator that iterates through contracts by conditions above
     """
-    query = {
-      "query_string": {
-        "query": 'address:* AND !(_exists_:abi_extracted) AND ' + self._get_range_query()
-      }
-    }
-    return self._iterate_contracts(partial_query=query)
+    query =  'ANY LEFT JOIN {} USING id WHERE abi_extracted IS NULL AND {}'.format(
+      self.indices["contract_abi"],
+      self._get_range_query()
+    )
+    return self.client.iterate(index=self.indices["contract"], query=query, fields=["address"])
 
   def save_contracts_abi(self):
     """
@@ -206,8 +206,8 @@ class Contracts(utils.ContractTransactionsIterator):
     """
     for contracts in self._iterate_contracts_without_abi():
       abis = self._get_contracts_abi([contract["_source"]["address"] for contract in contracts])
-      operations = [self.client.update_op(doc={'abi': abis[index], 'abi_extracted': True}, id=contract["_id"]) for index, contract in enumerate(contracts)]
-      self.client.bulk(operations, doc_type='contract', index=self.indices["contract"], refresh=True)
+      documents = [{'abi': json.dumps(abis[index]), 'abi_extracted': True, "id": contract["_id"]} for index, contract in enumerate(contracts)]
+      self.client.bulk_index(index=self.indices["contract_abi"], docs=documents)
 
   def _iterate_contracts_with_abi(self, max_block):
     """
@@ -306,3 +306,12 @@ class Contracts(utils.ContractTransactionsIterator):
       self._set_contracts_abi({contract["_source"]["address"]: contract["_source"]["abi"] for contract in contracts})
       self._decode_inputs_for_contracts(contracts, max_block)
       self._save_max_block([contract["_source"]["address"] for contract in contracts], max_block)
+
+class ElasticSearchContracts(Contracts):
+  pass
+
+class ClickhouseContracts(Contracts):
+  def __init__(self, indices=INDICES, parity_hosts=PARITY_HOSTS):
+    super().__init__(indices, CustomClickhouse(), parity_hosts)
+  # _iterate_contracts_without_abi - change query
+  # save_contracts_abi - change save mechanism

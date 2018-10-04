@@ -1,13 +1,104 @@
 import unittest
 from utils import get_max_block, split_on_chunks, ContractTransactionsIterator, make_range_query
-from tests.test_utils import TestElasticSearch, CustomElasticSearch
+from tests.test_utils import TestElasticSearch, CustomElasticSearch, TestClickhouse
 import config
 from unittest.mock import MagicMock
+from clients.custom_clickhouse import CustomClickhouse
+from operations.indices import ClickhouseIndices
 
 class UtilsTestCase(unittest.TestCase):
+  def test_split_on_chunks(self):
+    test_list = list(range(10))
+    test_chunks = list(split_on_chunks(test_list, 3))
+    self.assertSequenceEqual(test_chunks, [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]])
+
+  def test_get_max_block(self):
+    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
+      "number": 0
+    }, refresh=True)
+    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
+      "number": 1
+    }, refresh=True)
+    max_block = get_max_block()
+    assert max_block == 1
+    assert type(max_block) == int
+
+  def test_get_max_block_by_a_query(self):
+    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
+      "number": 0,
+      "trace": True
+    }, refresh=True)
+    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
+      "number": 1
+    }, refresh=True)
+    max_block = get_max_block("trace:true")
+    assert max_block == 0
+
+  def test_get_max_block_in_empty_index(self):
+    max_block = get_max_block("*", 1)
+    assert max_block == 1
+
+  def xtest_get_max_consistent_block(self):
+    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
+      "number": 0,
+    }, refresh=True)
+    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
+      "number": 1,
+    }, refresh=True)
+    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
+      "number": 2
+    }, refresh=True)
+    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
+      "number": 4
+    }, refresh=True)
+    max_block = get_max_block()
+    assert max_block == 2
+
+  def xtest_get_max_consistent_block_return_min_consistent_block_if_ended(self):
+    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
+      "number": 0,
+    }, refresh=True)
+    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
+      "number": 1,
+    }, refresh=True)
+    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
+      "number": 3
+    }, refresh=True)
+    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
+      "number": 5
+    }, refresh=True)
+    max_block = get_max_block(min_consistent_block=3)
+    assert max_block == 3
+
+  def xtest_get_max_consistent_block_ignore_inconsistency_before_min_block(self):
+    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
+      "number": 0,
+    }, refresh=True)
+    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
+      "number": 2,
+    }, refresh=True)
+    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
+      "number": 3
+    }, refresh=True)
+    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
+      "number": 5
+    }, refresh=True)
+    max_block = get_max_block(min_consistent_block=2)
+    assert max_block == 3
+
+  def test_make_range_query(self):
+    assert make_range_query("block", (0, 3)) == "block >= 0 AND block < 3"
+    assert make_range_query("block", (None, 3)) == "block < 3"
+    assert make_range_query("block", (0, None)) == "block >= 0"
+    assert make_range_query("block", (None, None)) == "block IS NOT NULL"
+
+  def test_make_complex_range_query(self):
+    assert make_range_query("block", (0, 3), (10, 100)) == "(block >= 0 AND block < 3) OR (block >= 10 AND block < 100)"
+
+class IteratorTestCase():
   def _create_contracts_iterator(self):
     self.contracts_iterator = ContractTransactionsIterator()
-    self.contracts_iterator.client = CustomElasticSearch("http://localhost:9200")
+    self.contracts_iterator.client = self.client_class
     self.contracts_iterator.indices = {
       "contract": TEST_CONTRACTS_INDEX,
       "transaction": TEST_TRANSACTIONS_INDEX
@@ -15,12 +106,6 @@ class UtilsTestCase(unittest.TestCase):
     self.contracts_iterator.doc_type = "tx"
     self.contracts_iterator.block_prefix = "test"
     self.contracts_iterator.index = "transaction"
-
-  def setUp(self):
-    self.client = TestElasticSearch()
-    self.client.recreate_index(TEST_BLOCKS_INDEX)
-    self.client.recreate_index(TEST_CONTRACTS_INDEX)
-    self._create_contracts_iterator()
 
   def tearDown(self):
     config.PROCESSED_CONTRACTS.clear()
@@ -82,33 +167,35 @@ class UtilsTestCase(unittest.TestCase):
 
   def test_iterate_contracts(self):
     test_max_block = 2
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
+    test_contracts = [{
+      "id": 1,
       "tx_test_block": 1,
       "address": "0x1",
       "test": True,
       "blockNumber": 1,
-    }, refresh=True, id=1)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
+    }, {
+      "id": 2,
       "tx_test_block": 2,
       "address": "0x2",
       "test": True,
       "blockNumber": 1
-    }, refresh=True, id=2)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
+    }, {
+      "id": 3,
       "tx_test_block": 3,
       "address": "0x3",
       "test": True,
       "blockNumber": 1
-    }, refresh=True, id=3)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
+    }, {
+      "id": 4,
       "address": "0x4",
       "test": True,
       "blockNumber": 1
-    }, refresh=True, id=4)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
+    }, {
+      "id": 5,
       "address": "0x4",
       "blockNumber": 1
-    }, refresh=True, id=5)
+    }]
+    self.client.bulk_index(index=TEST_CONTRACTS_INDEX, docs=test_contracts)
     contracts = [
       c["_id"] for contracts in self.contracts_iterator._iterate_contracts(test_max_block, {"term": {"test": True}})
       for c in contracts
@@ -201,98 +288,32 @@ class UtilsTestCase(unittest.TestCase):
     print(transactions)
     self.assertCountEqual(transactions, ['2'])
 
-  def test_split_on_chunks(self):
-    test_list = list(range(10))
-    test_chunks = list(split_on_chunks(test_list, 3))
-    self.assertSequenceEqual(test_chunks, [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]])
 
-  def test_get_max_block(self):
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 0
-    }, refresh=True)
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 1
-    }, refresh=True)
-    max_block = get_max_block()
-    assert max_block == 1
-    assert type(max_block) == int
+class ElasticSearchIteratorTestCase(IteratorTestCase, unittest.TestCase):
+  client_class = CustomElasticSearch
+  def setUp(self):
+    self.client = TestElasticSearch()
+    self.client.recreate_index(TEST_BLOCKS_INDEX)
+    self.client.recreate_index(TEST_CONTRACTS_INDEX)
+    self._create_contracts_iterator()
 
-  def test_get_max_block_by_a_query(self):
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 0,
-      "trace": True
-    }, refresh=True)
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 1
-    }, refresh=True)
-    max_block = get_max_block("trace:true")
-    assert max_block == 0
+class ClickhouseIteratorTestCase(IteratorTestCase, unittest.TestCase):
+  client_class = CustomClickhouse
 
-  def test_get_max_block_in_empty_index(self):
-    max_block = get_max_block("*", 1)
-    assert max_block == 1
+  def setUp(self):
+    self.client = TestClickhouse()
+    self.indices = {
+      "block": TEST_BLOCKS_INDEX,
+      "contract": TEST_CONTRACTS_INDEX,
+      "transaction": TEST_TRANSACTIONS_INDEX
+    }
 
-  def xtest_get_max_consistent_block(self):
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 0,
-    }, refresh=True)
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 1,
-    }, refresh=True)
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 2
-    }, refresh=True)
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 4
-    }, refresh=True)
-    max_block = get_max_block()
-    assert max_block == 2
+    ClickhouseIndices(self.indices).prepare_indices()
+    self._create_contracts_iterator()
 
-  def xtest_get_max_consistent_block_return_min_consistent_block_if_ended(self):
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 0,
-    }, refresh=True)
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 1,
-    }, refresh=True)
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 3
-    }, refresh=True)
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 5
-    }, refresh=True)
-    max_block = get_max_block(min_consistent_block=3)
-    assert max_block == 3
-
-  def xtest_get_max_consistent_block_ignore_inconsistency_before_min_block(self):
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 0,
-    }, refresh=True)
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 2,
-    }, refresh=True)
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 3
-    }, refresh=True)
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 5
-    }, refresh=True)
-    max_block = get_max_block(min_consistent_block=2)
-    assert max_block == 3
-
-  def test_make_range_query(self):
-    assert make_range_query("block", (0, 3)) == "block >= 0 AND block < 3"
-    assert make_range_query("block", (None, 3)) == "block < 3"
-    assert make_range_query("block", (0, None)) == "block >= 0"
-    assert make_range_query("block", (None, None)) == "block IS NOT NULL"
-
-  def test_make_complex_range_query(self):
-    assert make_range_query("block", (0, 3), (10, 100)) == "(block >= 0 AND block < 3) OR (block >= 10 AND block < 100)"
-
-
-TEST_BLOCKS_INDEX = "test-ethereum-blocks"
-TEST_CONTRACTS_INDEX = "test-ethereum-contract"
-TEST_TRANSACTIONS_INDEX = "test-ethereum-transaction"
+TEST_BLOCKS_INDEX = "test_ethereum_blocks"
+TEST_CONTRACTS_INDEX = "test_ethereum_contract"
+TEST_TRANSACTIONS_INDEX = "test_ethereum_transaction"
 config.INDICES.update({
   "block": TEST_BLOCKS_INDEX
 })

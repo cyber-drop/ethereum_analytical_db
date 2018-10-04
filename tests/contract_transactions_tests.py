@@ -232,7 +232,7 @@ class ClickhouseContractTransactionsTestCase(unittest.TestCase):
     ])
     contract = result[0]
     print(contract)
-    assert contract["_id"] == transaction["address"]
+    assert contract["_id"] == transaction["id"]
     assert contract['_source']["address"] == transaction["address"]
     assert contract['_source']["blockNumber"] == transaction["blockNumber"]
     assert contract['_source']["owner"] == transaction["from"]
@@ -248,10 +248,12 @@ class ClickhouseContractTransactionsTestCase(unittest.TestCase):
     }, {
       "id": 2,
       "type": "create",
+      "address": "0x0",
       "error": "Out of gas"
     }, {
       "id": 3,
       "type": "create",
+      "address": "0x0",
       "parent_error": True,
     }]
     self.client.bulk_index(index=TEST_TRANSACTIONS_INDEX, docs=transactions)

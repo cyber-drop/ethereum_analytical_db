@@ -16,7 +16,11 @@ def mockify(object, mocks, not_mocks):
           setattr(object, attr, MagicMock(side_effect=cat))
 
 class TestClickhouse(CustomClickhouse):
-  pass
+  def prepare_views_as_indices(self, indices):
+    # Contracts index
+    engine = 'ENGINE = ReplacingMergeTree() ORDER BY id'
+    contract_fields = 'id String, address String, blockNumber Int64'
+    self.send_sql_request("CREATE TABLE IF NOT EXISTS {} ({}) {}".format(indices["contract"], contract_fields, engine))
 
 class TestElasticSearch(ElasticSearch):
   def __init__(self):

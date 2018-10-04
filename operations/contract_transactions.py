@@ -140,7 +140,7 @@ class ClickhouseContractTransactions:
 
   def _get_fields(self):
     fields = {
-      "id": "address",
+      "id": "id",
       "blockNumber": "blockNumber",
       "address": "address",
       "owner": "from",
@@ -154,7 +154,6 @@ class ClickhouseContractTransactions:
 
   def extract_contract_addresses(self):
     fields_string = self._get_fields()
-    print(fields_string)
     engine_string = 'ENGINE = ReplacingMergeTree() ORDER BY id'
     condition = "type = 'create' AND error IS NULL AND parent_error IS NULL"
     sql = "CREATE MATERIALIZED VIEW IF NOT EXISTS {} {} AS (SELECT {} FROM {} WHERE {})".format(
