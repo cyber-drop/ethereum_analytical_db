@@ -1,5 +1,5 @@
 PARITY_HOSTS = [
-  (3900000, 3901000, "http://localhost:8545")
+  (None, None, "http://localhost:8545")
 ]
 
 DATABASE = "clickhouse"
@@ -13,6 +13,7 @@ INDICES = {
   "token_price": "ethereum_token_price",
 
   "block_traces_extracted": "ethereum_block_traces_extracted",
+  "contract_abi": "ethereum_contract_abi",
 
   "miner_transaction": "ethereum_miner_transaction",
 
