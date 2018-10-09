@@ -400,8 +400,8 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
 
   def test_create_block_traces_extracted_index(self):
     self.indices.prepare_indices()
-    self.client.bulk_index(index=TEST_INDICES["block_traces_extracted"], docs=[{"id": 1, "traces_extracted": True}, {"id": 2, "traces_extracted": None}])
-    result = self.client.search(index=TEST_INDICES["block_traces_extracted"], fields=[])
+    self.client.bulk_index(index=TEST_INDICES["block_flag"], docs=[{"id": 1, "name": "traces_extracted", "value": True}, {"id": 2, "name": "traces_extracted", "value": None}])
+    result = self.client.search(index=TEST_INDICES["block_flag"], fields=[])
     result = [flag["_id"] for flag in result]
     self.assertCountEqual(["1", "2"], result)
 
@@ -413,6 +413,19 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
     result = [flag["_id"] for flag in result]
     self.assertCountEqual(["1", "2", "3"], result)
 
+  def test_create_contract_block_index(self):
+    self.indices.prepare_indices()
+    self.client.bulk_index(index=TEST_INDICES["contract_block"], docs=[{"id": 1, "name": "flag_1", "value": 1234}])
+    result = self.client.search(index=TEST_INDICES["contract_block"], fields=[])
+    result = [flag["_id"] for flag in result]
+    self.assertCountEqual(["1"], result)
+
+  def test_create_transaction_fee_index(self):
+    self.indices.prepare_indices()
+    self.client.bulk_index(index=TEST_INDICES["transaction_fee"], docs=[{"id": "0x1", "gasUsed": 2100, "gasPrice": 20.12}])
+    result = self.client.search(index=TEST_INDICES["transaction_fee"], fields=[])
+    result = [flag["_id"] for flag in result]
+    self.assertCountEqual(["0x1"], result)
 
 CURRENT_ELASTICSEARCH_SIZE = 290659165119
 TEST_INDEX = 'test_ethereum_transactions'
@@ -426,6 +439,8 @@ TEST_INDICES = {
   "miner_transaction": "test_ethereum_miner_transaction",
   "token_price": "test_ethereum_token_price",
 
-  "block_traces_extracted": "test_block_traces_extracted",
-  "contract_abi": "test_contract_abi"
+  "block_flag": "test_block_traces_extracted",
+  "contract_abi": "test_contract_abi",
+  "contract_block": "test_contract_block",
+  "transaction_fee": "test_transaction_fee"
 }

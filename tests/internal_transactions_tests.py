@@ -456,21 +456,22 @@ class ClickhouseInternalTransactionsTestCase(InternalTransactionsTestCase, unitt
       "transaction": TEST_TRANSACTIONS_INDEX,
       "internal_transaction": TEST_INTERNAL_TRANSACTIONS_INDEX,
       "miner_transaction": TEST_MINER_TRANSACTIONS_INDEX,
-      "block_traces_extracted": TEST_BLOCKS_TRACES_EXTRACTED_INDEX
+      "block_flag": TEST_BLOCKS_TRACES_EXTRACTED_INDEX
     }
-    for index in self.indices.values():
-      self.client.send_sql_request("DROP TABLE IF EXISTS {}".format(index))
-    ClickhouseIndices(self.indices).prepare_indices()
+    self.client.prepare_indices(self.indices)
     self.parity_hosts = [(None, None, "http://localhost:8545")]
     self.internal_transactions = ClickhouseInternalTransactions(self.indices, parity_hosts=self.parity_hosts)
 
   def test_iterate_blocks(self):
     self.internal_transactions.parity_hosts = [(0, 4, "http://localhost:8545"), (5, None, "http://localhost:8545")]
     blocks = [{'number': i, 'id': i} for i in range(1, 6)]
-    flags = [{'traces_extracted': True, "id": 3}, {'traces_extracted': True, "id": 2}]
+    flags = [
+      {'name': 'traces_extracted', 'value': True, "id": 3},
+      {'name': 'traces_extracted', 'value': True, "id": 2},
+      {"name": "other_flag", "value": True, "id": 1}]
     self.client.bulk_index(index=TEST_BLOCKS_INDEX, docs=blocks)
     self.client.bulk_index(index=TEST_BLOCKS_TRACES_EXTRACTED_INDEX, docs=flags)
-    self.client.bulk_index(index=TEST_BLOCKS_TRACES_EXTRACTED_INDEX, docs=[{'traces_extracted': None, "id": 2}])
+    self.client.bulk_index(index=TEST_BLOCKS_TRACES_EXTRACTED_INDEX, docs=[{'name': 'traces_extracted', 'value': None, 'id': 2}])
     iterator = self.internal_transactions._iterate_blocks()
     blocks = next(iterator)
     blocks = [block["_source"]["number"] for block in blocks]
@@ -478,8 +479,9 @@ class ClickhouseInternalTransactionsTestCase(InternalTransactionsTestCase, unitt
 
   def test_save_traces(self):
     self.internal_transactions._save_traces([123])
-    block = self.client.search(index=TEST_BLOCKS_TRACES_EXTRACTED_INDEX, query="WHERE id = '123'", fields=["traces_extracted"])[0]['_source']
-    assert block['traces_extracted']
+    block = self.client.search(index=TEST_BLOCKS_TRACES_EXTRACTED_INDEX, query="WHERE id = '123'", fields=["name", "value"])[0]['_source']
+    assert block['value']
+    assert block['name'] == 'traces_extracted'
 
 # Add two classes - for clickhouse and elasticsearch
 # Add different realizations for _iterate_blocks method

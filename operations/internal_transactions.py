@@ -315,15 +315,16 @@ class ClickhouseInternalTransactions(InternalTransactions):
 
   def _iterate_blocks(self):
     ranges = [host_tuple[0:2] for host_tuple in self.parity_hosts]
+    flags_sql = "SELECT id, value FROM {} WHERE name = 'traces_extracted'".format(self.indices["block_flag"])
     return self.client.iterate(
       index=self.indices["block"],
       fields=["number"],
-      query="ANY LEFT JOIN {} USING id WHERE traces_extracted IS NULL AND {}".format(
-        self.indices["block_traces_extracted"],
+      query="ANY LEFT JOIN ({}) USING id WHERE value IS NULL AND {}".format(
+        flags_sql,
         utils.make_range_query('number', *ranges)
       ),
     )
 
   def _save_traces(self, blocks):
-    docs = [{"id": block, "traces_extracted": True} for block in blocks]
-    self.client.bulk_index(index=self.indices["block_traces_extracted"], docs=docs, )
+    docs = [{"id": block, "name": "traces_extracted", "value": True} for block in blocks]
+    self.client.bulk_index(index=self.indices["block_flag"], docs=docs)

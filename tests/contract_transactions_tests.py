@@ -232,7 +232,7 @@ class ClickhouseContractTransactionsTestCase(unittest.TestCase):
     ])
     contract = result[0]
     print(contract)
-    assert contract["_id"] == transaction["id"]
+    assert contract["_id"] == transaction["address"]
     assert contract['_source']["address"] == transaction["address"]
     assert contract['_source']["blockNumber"] == transaction["blockNumber"]
     assert contract['_source']["owner"] == transaction["from"]

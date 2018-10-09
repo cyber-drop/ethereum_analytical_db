@@ -61,12 +61,21 @@ INDEX_FIELDS = {
     "rewardType": "Nullable(String)",
     "result": "Nullable(String)"
   },
-  "block_traces_extracted": {
-    "traces_extracted": "Nullable(UInt8)"
+  "block_flag": {
+    "name": "String",
+    "value": "Nullable(UInt8)"
   },
   "contract_abi": {
     "abi_extracted": "Nullable(UInt8)",
     "abi": "Nullable(String)"
+  },
+  "contract_block": {
+    "name": "String",
+    "value": "Int64"
+  },
+  "transaction_fee": {
+    "gasUsed": "Int32",
+    "gasPrice": "Float64"
   }
 }
 

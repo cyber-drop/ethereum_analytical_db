@@ -12,7 +12,7 @@ INDICES = {
   "block": "ethereum_block",
   "token_price": "ethereum_token_price",
 
-  "block_traces_extracted": "ethereum_block_traces_extracted",
+  "block_flag": "ethereum_block_flag",
   "contract_abi": "ethereum_contract_abi",
 
   "miner_transaction": "ethereum_miner_transaction",

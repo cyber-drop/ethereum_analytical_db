@@ -1,8 +1,8 @@
-from clients.custom_elastic_search import CustomElasticSearch
 from config import INDICES, PARITY_HOSTS
 from web3 import Web3, HTTPProvider
 from multiprocessing import Pool
 import utils
+from clients.custom_clickhouse import CustomClickhouse
 
 NUMBER_OF_PROCESSES = 10
 
@@ -23,14 +23,14 @@ def _extract_transactions_for_blocks_sync(blocks, parity_host=PARITY_HOSTS[0][-1
   return result
 
 class TransactionFees:
-  def __init__(self, indices=INDICES, elasticsearch_host="http://localhost:9200", parity_host=PARITY_HOSTS[0][-1]):
-    self.client = CustomElasticSearch(elasticsearch_host)
+  def __init__(self, indices, client, parity_host):
+    self.client = client
     self.indices = indices
     self.w3 = Web3(HTTPProvider(parity_host))
     self.pool = Pool(processes=NUMBER_OF_PROCESSES)
 
   def _iterate_blocks(self):
-    return self.client.iterate(index=self.indices["block"], doc_type="b", query="!(_exists_:transactionFees)")
+    return self.client.iterate(index=self.indices["block"], fields=[])
 
   def _extract_transactions_for_blocks(self, blocks):
     chunks = utils.split_on_chunks(blocks, NUMBER_OF_PROCESSES)
@@ -43,12 +43,13 @@ class TransactionFees:
     return dict([gas for gas_used_chunk in gas_used for gas in gas_used_chunk.items()])
 
   def _update_transactions(self, transactions):
-    operations = [self.client.update_op({
+    transaction_fees = [{
+      "id": transaction["hash"] + ".0",
       "gasPrice": transaction["gasPrice"],
       "gasUsed": transaction["gasUsed"]
-    }, id=transaction["hash"] + ".0") for transaction in transactions]
-    if operations:
-      self.client.bulk(operations, index=self.indices["internal_transaction"], doc_type="itx", refresh=True)
+    } for transaction in transactions]
+    if transaction_fees:
+      self.client.bulk_index(index=self.indices["transaction_fee"], docs=transaction_fees)
 
   def _count_transaction_fees(self, transactions, blocks):
     transaction_fees = {}
@@ -76,3 +77,6 @@ class TransactionFees:
       transaction_fees = self._count_transaction_fees(transactions, [block["_source"]["number"] for block in blocks])
       self._update_blocks(transaction_fees)
 
+class ClickhouseTransactionFees(TransactionFees):
+  def __init__(self, indices=INDICES, parity_host=PARITY_HOSTS[0][-1]):
+    super().__init__(indices, CustomClickhouse(), parity_host)

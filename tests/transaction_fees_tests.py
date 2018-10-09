@@ -1,34 +1,36 @@
-from tests.test_utils import TestElasticSearch, mockify
+from tests.test_utils import TestClickhouse, mockify
 import unittest
-from transaction_fees import TransactionFees, _extract_gas_used_sync, _extract_transactions_for_blocks_sync
+from operations.transaction_fees import ClickhouseTransactionFees, _extract_gas_used_sync, _extract_transactions_for_blocks_sync
 import httpretty
 from unittest.mock import MagicMock, call, Mock, patch
 import json
 from web3 import Web3
-import transaction_fees
+from operations import transaction_fees
+
+TEST_BLOCK_INDEX = 'test_block'
+TEST_TRANSACTION_INDEX = 'test_transaction'
+TEST_TRANSACTION_FEE_INDEX = 'test_transaction_fee'
+TEST_CONTRACT_INDEX = 'test_contract'
 
 class TransactionFeesTestCase(unittest.TestCase):
   def setUp(self):
-    self.client = TestElasticSearch()
-    self.client.recreate_index(TEST_BLOCK_INDEX)
-    self.client.recreate_fast_index(TEST_TRANSACTION_INDEX, "itx")
-    self.transaction_fees = TransactionFees({
+    self.client = TestClickhouse()
+    self.indices = {
       "block": TEST_BLOCK_INDEX,
-      "internal_transaction": TEST_TRANSACTION_INDEX
-    }, parity_host="http://localhost:8545")
+      "internal_transaction": TEST_TRANSACTION_INDEX,
+      "transaction_fee": TEST_TRANSACTION_FEE_INDEX,
+      "contract": TEST_CONTRACT_INDEX
+    }
+    self.client.prepare_indices(self.indices)
+    self.transaction_fees = ClickhouseTransactionFees(self.indices, parity_host="http://localhost:8545")
 
   def test_iterate_blocks(self):
-    self.client.index(index=TEST_BLOCK_INDEX, doc_type="b", doc={
-      "number": 1
-    }, id=1, refresh=True)
-    self.client.index(index=TEST_BLOCK_INDEX, doc_type="b", doc={
-      "number": 2,
-      "transactionFees": 1
-    }, id=2, refresh=True)
-    self.client.index(index=TEST_BLOCK_INDEX, doc_type="b", doc={
-      "number": 2,
-      "transactionFees": 0
-    }, id=2, refresh=True)
+    blocks = [
+      {"id": 1, "number": 1},
+      # {"id": 2, "number": 2, "transactionFees": 1},
+      # {"id": 3, "number": 3, "transactionFees": 1}
+    ]
+    self.client.bulk_index(self.indices["block"], blocks)
     blocks = next(self.transaction_fees._iterate_blocks())
     blocks = [block["_id"] for block in blocks]
     self.assertCountEqual(blocks, ['1'])
@@ -104,13 +106,14 @@ class TransactionFeesTestCase(unittest.TestCase):
       self.assertSequenceEqual({"hash1": "gas1", "hash2": "gas2"}, response)
 
   def test_update_transactions(self):
-    test_transactions = [{"hash": "0x01", "gasPrice": 10, "gasUsed": 100, "test": False}]
-    test_elasticsearch_transactions = [{"hash": t["hash"], "id": t["hash"] + ".0"} for t in test_transactions]
-    self.client.bulk_index(docs=test_elasticsearch_transactions, index=TEST_TRANSACTION_INDEX, doc_type="itx", refresh=True)
-    self.transaction_fees._update_transactions(test_transactions)
-    result = self.client.search(index=TEST_TRANSACTION_INDEX, doc_type="itx", query="_exists_:gasPrice")["hits"]['hits']
+    test_transaction_fees = [{"hash": "0x01", "gasUsed": 100, "gasPrice": 2.1, "test": True}]
+    test_database_transactions = [{"id": t["hash"] + ".0", "gasUsed": t["gasUsed"], "gasPrice": t["gasPrice"]} for t in test_transaction_fees]
+    self.client.bulk_index(docs=test_database_transactions, index=TEST_TRANSACTION_FEE_INDEX)
+    self.transaction_fees._update_transactions(test_transaction_fees)
+    result = self.client.search(index=TEST_TRANSACTION_FEE_INDEX, fields=["gasPrice", "gasUsed"])
     assert len(result) == 1
-    assert result[0]["_source"]["gasPrice"] == 10
+    assert result[0]["_id"] == "0x01.0"
+    assert result[0]["_source"]["gasPrice"] == 2.1
     assert result[0]["_source"]["gasUsed"] == 100
     assert "test" not in result[0]["_source"]
 
@@ -140,6 +143,7 @@ class TransactionFeesTestCase(unittest.TestCase):
     })
 
   def test_update_blocks(self):
+    # Add index for ...
     test_blocks = [{"number": 1234, "id": 1234}]
     test_transaction_fees = {1234: 30}
     self.client.bulk_index(docs=test_blocks, index=TEST_BLOCK_INDEX, doc_type="b", refresh=True)
@@ -186,6 +190,3 @@ class TransactionFeesTestCase(unittest.TestCase):
       assert transaction["gasUsed"] == test_gas_used[transaction["hash"]]
 
     process.assert_has_calls(calls)
-
-TEST_BLOCK_INDEX = 'test-block'
-TEST_TRANSACTION_INDEX = 'test-transaction'

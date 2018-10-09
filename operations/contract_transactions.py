@@ -140,14 +140,14 @@ class ClickhouseContractTransactions:
 
   def _get_fields(self):
     fields = {
-      "id": "id",
+      "id": "coalesce(address, id)",
       "blockNumber": "blockNumber",
       "address": "address",
       "owner": "from",
       "bytecode": "code"
     }
     fields_string = ", ".join([
-      "{}.{} AS {}".format(self.indices["internal_transaction"], field, alias)
+      "{} AS {}".format(field, alias)
       for alias, field in fields.items()
     ])
     return fields_string
