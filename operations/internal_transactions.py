@@ -315,7 +315,7 @@ class ClickhouseInternalTransactions(InternalTransactions):
 
   def _iterate_blocks(self):
     ranges = [host_tuple[0:2] for host_tuple in self.parity_hosts]
-    flags_sql = "SELECT id, value FROM {} WHERE name = 'traces_extracted'".format(self.indices["block_flag"])
+    flags_sql = "SELECT id, value FROM {} FINAL WHERE name = 'traces_extracted'".format(self.indices["block_flag"])
     return self.client.iterate(
       index=self.indices["block"],
       fields=["number"],

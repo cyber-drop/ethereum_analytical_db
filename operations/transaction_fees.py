@@ -30,7 +30,11 @@ class TransactionFees:
     self.pool = Pool(processes=NUMBER_OF_PROCESSES)
 
   def _iterate_blocks(self):
-    return self.client.iterate(index=self.indices["block"], fields=[])
+    flags_sql = "SELECT id, value FROM {} FINAL WHERE name = 'fees_extracted'".format(self.indices["block_flag"])
+    query = "ANY LEFT JOIN ({}) USING id WHERE value IS NULL".format(
+      flags_sql
+    )
+    return self.client.iterate(index=self.indices["block"], query=query, fields=[])
 
   def _extract_transactions_for_blocks(self, blocks):
     chunks = utils.split_on_chunks(blocks, NUMBER_OF_PROCESSES)
@@ -59,12 +63,9 @@ class TransactionFees:
       transaction_fees[block] = transaction_fees.get(block, 0)
     return transaction_fees
 
-  def _update_blocks(self, transaction_fees):
-    operations = [self.client.update_op({
-      "transactionFees": fee,
-    }, id=block) for block, fee in transaction_fees.items()]
-    if operations:
-      self.client.bulk(operations, index=self.indices["block"], doc_type="b", refresh=True)
+  def _update_blocks(self, blocks):
+    docs = [{"id": block, "name": "fees_extracted", "value": True} for block in blocks]
+    self.client.bulk_index(index=self.indices["block_flag"], docs=docs)
 
   def extract_transaction_fees(self):
     for blocks in self._iterate_blocks():
@@ -74,8 +75,7 @@ class TransactionFees:
       for transaction in transactions:
         transaction["gasUsed"] = gas_used[transaction["hash"]]
       self._update_transactions(transactions)
-      transaction_fees = self._count_transaction_fees(transactions, [block["_source"]["number"] for block in blocks])
-      self._update_blocks(transaction_fees)
+      self._update_blocks(block_numbers)
 
 class ClickhouseTransactionFees(TransactionFees):
   def __init__(self, indices=INDICES, parity_host=PARITY_HOSTS[0][-1]):

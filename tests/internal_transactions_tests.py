@@ -468,10 +468,11 @@ class ClickhouseInternalTransactionsTestCase(InternalTransactionsTestCase, unitt
     flags = [
       {'name': 'traces_extracted', 'value': True, "id": 3},
       {'name': 'traces_extracted', 'value': True, "id": 2},
-      {"name": "other_flag", "value": True, "id": 1}]
+      {'name': 'traces_extracted', 'value': None, 'id': 2},
+      {"name": "other_flag", "value": True, "id": 1}
+    ]
     self.client.bulk_index(index=TEST_BLOCKS_INDEX, docs=blocks)
     self.client.bulk_index(index=TEST_BLOCKS_TRACES_EXTRACTED_INDEX, docs=flags)
-    self.client.bulk_index(index=TEST_BLOCKS_TRACES_EXTRACTED_INDEX, docs=[{'name': 'traces_extracted', 'value': None, 'id': 2}])
     iterator = self.internal_transactions._iterate_blocks()
     blocks = next(iterator)
     blocks = [block["_source"]["number"] for block in blocks]
