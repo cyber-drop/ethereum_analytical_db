@@ -3,6 +3,7 @@ from operations.internal_transactions import ClickhouseInternalTransactions
 from operations.blocks import ClickhouseBlocks
 from operations.contract_transactions import ClickhouseContractTransactions
 from operations.contracts import ClickhouseContracts
+from operations.transaction_fees import ClickhouseTransactionFees
 
 def prepare_indices():
   print("Preparing indices...")
@@ -28,3 +29,8 @@ def extract_contracts_abi():
   print("Extracting ABIs...")
   contracts = ClickhouseContracts()
   contracts.save_contracts_abi()
+
+def extract_transaction_fees():
+  print("Extracting transaction fees...")
+  transaction_fees = ClickhouseTransactionFees()
+  transaction_fees.extract_transaction_fees()
