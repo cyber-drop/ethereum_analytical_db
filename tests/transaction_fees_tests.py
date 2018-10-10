@@ -40,8 +40,8 @@ class TransactionFeesTestCase(unittest.TestCase):
     self.client.bulk_index(self.indices["block"], blocks)
     self.client.bulk_index(self.indices["block_flag"], block_flags)
     blocks = next(self.transaction_fees._iterate_blocks())
-    blocks = [block["_id"] for block in blocks]
-    self.assertCountEqual(blocks, ['1', '3'])
+    blocks = [block["_source"]["number"] for block in blocks]
+    self.assertCountEqual(blocks, [1, 3])
 
   @httpretty.activate
   def test_extract_transactions_for_blocks_sync(self):

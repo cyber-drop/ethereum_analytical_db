@@ -34,7 +34,7 @@ class TransactionFees:
     query = "ANY LEFT JOIN ({}) USING id WHERE value IS NULL".format(
       flags_sql
     )
-    return self.client.iterate(index=self.indices["block"], query=query, fields=[])
+    return self.client.iterate(index=self.indices["block"], query=query, fields=["number"])
 
   def _extract_transactions_for_blocks(self, blocks):
     chunks = utils.split_on_chunks(blocks, NUMBER_OF_PROCESSES)
