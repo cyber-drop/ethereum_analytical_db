@@ -1,12 +1,26 @@
 import unittest
-from utils import get_max_block, split_on_chunks, ContractTransactionsIterator, make_range_query
+from utils import get_max_block, split_on_chunks, make_range_query
+from utils import ElasticSearchContractTransactionsIterator, ClickhouseContractTransactionsIterator
 from tests.test_utils import TestElasticSearch, CustomElasticSearch, TestClickhouse
 import config
 from unittest.mock import MagicMock
 from clients.custom_clickhouse import CustomClickhouse
-from operations.indices import ClickhouseIndices
 
-class UtilsTestCase(unittest.TestCase):
+class UtilsTestCase():
+  client_class = CustomClickhouse
+  iterator_class = ClickhouseContractTransactionsIterator
+
+  def setUp(self):
+    self.client = TestClickhouse()
+    self.indices = {
+      "block": TEST_BLOCKS_INDEX,
+      "contract": TEST_CONTRACTS_INDEX,
+      "internal_transaction": TEST_TRANSACTIONS_INDEX,
+      "contract_block": TEST_CONTRACT_BLOCK_INDEX
+    }
+    self.client.prepare_indices(self.indices)
+    self._create_contracts_iterator()
+
   def test_split_on_chunks(self):
     test_list = list(range(10))
     test_chunks = list(split_on_chunks(test_list, 3))
@@ -95,14 +109,11 @@ class UtilsTestCase(unittest.TestCase):
   def test_make_complex_range_query(self):
     assert make_range_query("block", (0, 3), (10, 100)) == "(block >= 0 AND block < 3) OR (block >= 10 AND block < 100)"
 
-class IteratorTestCase():
+class ClickhouseIteratorTestCase(UtilsTestCase, unittest.TestCase):
   def _create_contracts_iterator(self):
-    self.contracts_iterator = ContractTransactionsIterator()
-    self.contracts_iterator.client = self.client_class
-    self.contracts_iterator.indices = {
-      "contract": TEST_CONTRACTS_INDEX,
-      "transaction": TEST_TRANSACTIONS_INDEX
-    }
+    self.contracts_iterator = self.iterator_class()
+    self.contracts_iterator.client = self.client_class()
+    self.contracts_iterator.indices = self.indices
     self.contracts_iterator.doc_type = "tx"
     self.contracts_iterator.block_prefix = "test"
     self.contracts_iterator.index = "transaction"
@@ -153,54 +164,6 @@ class IteratorTestCase():
       test_max_block
     )
     self.assertCountEqual(["0x1", "0x2"], transactions_request["bool"]["should"][0]["bool"]["must"][0]["terms"]["to"])
-
-  def test_save_inputs_decoded(self):
-    test_max_block = 100
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': "0x1"}, id=1, refresh=True)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': "0x2"}, id=2, refresh=True)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': "0x3"}, id=3, refresh=True)
-    self.contracts_iterator._save_max_block(["0x1", "0x3"], test_max_block)
-
-    contracts = self.client.search(index=TEST_CONTRACTS_INDEX, doc_type='contract', query="tx_test_block:" + str(test_max_block))['hits']['hits']
-    contracts = [contract["_source"]["address"] for contract in contracts]
-    self.assertCountEqual(contracts, ["0x1", "0x3"])
-
-  def test_iterate_contracts(self):
-    test_max_block = 2
-    test_contracts = [{
-      "id": 1,
-      "tx_test_block": 1,
-      "address": "0x1",
-      "test": True,
-      "blockNumber": 1,
-    }, {
-      "id": 2,
-      "tx_test_block": 2,
-      "address": "0x2",
-      "test": True,
-      "blockNumber": 1
-    }, {
-      "id": 3,
-      "tx_test_block": 3,
-      "address": "0x3",
-      "test": True,
-      "blockNumber": 1
-    }, {
-      "id": 4,
-      "address": "0x4",
-      "test": True,
-      "blockNumber": 1
-    }, {
-      "id": 5,
-      "address": "0x4",
-      "blockNumber": 1
-    }]
-    self.client.bulk_index(index=TEST_CONTRACTS_INDEX, docs=test_contracts)
-    contracts = [
-      c["_id"] for contracts in self.contracts_iterator._iterate_contracts(test_max_block, {"term": {"test": True}})
-      for c in contracts
-    ]
-    self.assertCountEqual(contracts, ['1', '4'])
 
   def test_iterate_contracts_from_list(self):
     config.PROCESSED_CONTRACTS.append("0x1")
@@ -288,32 +251,65 @@ class IteratorTestCase():
     print(transactions)
     self.assertCountEqual(transactions, ['2'])
 
+  def test_save_inputs_decoded(self):
+    test_max_block = 100
+    contracts = [{'address': "0x{}".format(i), "id": i} for i in range(1, 4)]
+    self.client.bulk_index(TEST_CONTRACTS_INDEX, contracts)
+    self.contracts_iterator._save_max_block(["0x1", "0x3"], test_max_block)
 
-class ElasticSearchIteratorTestCase(IteratorTestCase, unittest.TestCase):
-  client_class = CustomElasticSearch
-  def setUp(self):
-    self.client = TestElasticSearch()
-    self.client.recreate_index(TEST_BLOCKS_INDEX)
-    self.client.recreate_index(TEST_CONTRACTS_INDEX)
-    self._create_contracts_iterator()
+    flags = self.client.search(TEST_CONTRACT_BLOCK_INDEX, fields=[], query="WHERE name = '{}' AND value = {}".format(
+      "tx_test_block",
+      test_max_block
+    ))
+    flags = [flag["_id"] for flag in flags]
+    self.assertCountEqual(flags, ["0x1", "0x3"])
 
-class ClickhouseIteratorTestCase(IteratorTestCase, unittest.TestCase):
-  client_class = CustomClickhouse
+  def test_iterate_contracts(self):
+    test_max_block = 2
+    test_contracts = [{
+      "id": 1,
+      "address": "0x1",
+      "test": True,
+      "blockNumber": 1,
+    }, {
+      "id": 2,
+      "address": "0x2",
+      "test": True,
+      "blockNumber": 1
+    }, {
+      "id": 3,
+      "address": "0x3",
+      "test": True,
+      "blockNumber": 1
+    }, {
+      "id": 4,
+      "address": "0x4",
+      "test": True,
+      "blockNumber": 1
+    }, {
+      "id": 5,
+      "address": "0x4",
+      "test": False,
+      "blockNumber": 1
+    }]
+    test_contract_blocks = [
+      {"id": 1, "name": "tx_test_block", "value": 1},
+      {"id": 2, "name": "tx_test_block", "value": 2},
+      {"id": 3, "name": "tx_test_block", "value": 3}
+    ]
+    self.client.bulk_index(index=TEST_CONTRACTS_INDEX, docs=test_contracts)
+    self.client.bulk_index(index=TEST_CONTRACT_BLOCK_INDEX, docs=test_contract_blocks)
+    contracts = [
+      c["_id"] for contracts in self.contracts_iterator._iterate_contracts(test_max_block, "test = 1")
+      for c in contracts
+    ]
+    self.assertCountEqual(contracts, ['1', '4'])
 
-  def setUp(self):
-    self.client = TestClickhouse()
-    self.indices = {
-      "block": TEST_BLOCKS_INDEX,
-      "contract": TEST_CONTRACTS_INDEX,
-      "transaction": TEST_TRANSACTIONS_INDEX
-    }
-
-    ClickhouseIndices(self.indices).prepare_indices()
-    self._create_contracts_iterator()
 
 TEST_BLOCKS_INDEX = "test_ethereum_blocks"
 TEST_CONTRACTS_INDEX = "test_ethereum_contract"
 TEST_TRANSACTIONS_INDEX = "test_ethereum_transaction"
+TEST_CONTRACT_BLOCK_INDEX = "test_ethereum_contract_flags"
 config.INDICES.update({
   "block": TEST_BLOCKS_INDEX
 })

@@ -114,44 +114,6 @@ def get_max_block(query="*", min_consistent_block=0):
     return min_consistent_block
 
 class ContractTransactionsIterator():
-  def _iterate_contracts(self, max_block=None, partial_query=None):
-    """
-    Iterate through contracts with unprocessed transactions before specified block
-
-    Parameters
-    ----------
-    max_block : int
-        Block number
-    partial_query : dict
-        Additional ElasticSearch query
-
-    Returns
-    -------
-    generator
-        Generator that returns contracts with unprocessed transactions
-    """
-    query = {
-      "bool": {
-        "must": [
-          partial_query,
-        ]
-      }
-    }
-    if max_block is not None:
-      query["bool"]["must"].append({"bool": {
-        "should": [
-          {"range": {
-            self._get_flag_name(): {
-              "lt": max_block
-            }
-          }},
-          {"bool": {"must_not": [{"exists": {"field": self._get_flag_name()}}]}},
-        ]
-      }})
-    if PROCESSED_CONTRACTS:
-      query["bool"]["must"].append({"terms": {"address": PROCESSED_CONTRACTS}})
-    return self.client.iterate(self.indices["contract"], 'contract', query)
-
   def _create_transactions_request(self, contracts, max_block):
     """
     Create ElasticSearch request to get transactions for all contracts
@@ -217,6 +179,56 @@ class ContractTransactionsIterator():
     }
     return self.client.iterate(self.indices[self.index], self.doc_type, query)
 
+  def _get_flag_name(self):
+    """
+    Get name of field in which max block number should be stored
+
+    Returns
+    -------
+    str
+        Name of field
+    """
+    return "{}_{}_block".format(self.doc_type, self.block_prefix)
+
+class ElasticSearchContractTransactionsIterator(ContractTransactionsIterator):
+  def _iterate_contracts(self, max_block=None, partial_query=None):
+    """
+    Iterate through contracts with unprocessed transactions before specified block
+
+    Parameters
+    ----------
+    max_block : int
+        Block number
+    partial_query : dict
+        Additional ElasticSearch query
+
+    Returns
+    -------
+    generator
+        Generator that returns contracts with unprocessed transactions
+    """
+    query = {
+      "bool": {
+        "must": [
+          partial_query,
+        ]
+      }
+    }
+    if max_block is not None:
+      query["bool"]["must"].append({"bool": {
+        "should": [
+          {"range": {
+            self._get_flag_name(): {
+              "lt": max_block
+            }
+          }},
+          {"bool": {"must_not": [{"exists": {"field": self._get_flag_name()}}]}},
+        ]
+      }})
+    if PROCESSED_CONTRACTS:
+      query["bool"]["must"].append({"terms": {"address": PROCESSED_CONTRACTS}})
+    return self.client.iterate(self.indices["contract"], 'contract', query)
+
   def _save_max_block(self, contracts, max_block):
     """
     Save specified block value for specified contracts
@@ -240,13 +252,18 @@ class ContractTransactionsIterator():
       script='ctx._source.' + self._get_flag_name() + ' = ' + str(max_block)
     )
 
-  def _get_flag_name(self):
-    """
-    Get name of field in which max block number should be stored
+class ClickhouseContractTransactionsIterator(ContractTransactionsIterator):
+  def _iterate_contracts(self, max_block=None, partial_query=None):
+    query = "ANY LEFT JOIN (SELECT id, value FROM {} WHERE name = '{}') USING id WHERE value <= {} AND ".format(
+      self.indices["contract_block"],
+      self._get_flag_name(),
+      1,
+      max_block,
+      partial_query
+    )
+    query += partial_query
+    return self.client.iterate(index=self.indices["contract"], query=query, fields=[])
 
-    Returns
-    -------
-    str
-        Name of field
-    """
-    return "{}_{}_block".format(self.doc_type, self.block_prefix)
+  def _save_max_block(self, contracts, max_block):
+    docs = [{"id": contract, "name": self._get_flag_name(), "value": max_block} for contract in contracts]
+    self.client.bulk_index(self.indices["contract_block"], docs)
