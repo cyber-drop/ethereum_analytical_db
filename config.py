@@ -1,5 +1,5 @@
 PARITY_HOSTS = [
-  (None, None, "http://localhost:8545")
+  (None, None, "http://localhost:8550")
 ]
 
 DATABASE = "clickhouse"
@@ -20,7 +20,7 @@ INDICES = {
 }
 
 GENESIS = "genesis.json"
-NUMBER_OF_JOBS = 100
+NUMBER_OF_JOBS = 1000
 PROCESSED_CONTRACTS = []
 
 # Uncomment this line if you want to process only top_100 tokens
