@@ -12,7 +12,8 @@ OPERATIONS = {
     "prepare-blocks": clickhouse.prepare_blocks,
     "prepare-contracts-view": clickhouse.prepare_contracts_view,
     "extract-traces": clickhouse.extract_traces,
-    "extract-contracts-abi": clickhouse.extract_contracts_abi
+    "extract-contracts-abi": clickhouse.extract_contracts_abi,
+    "extract-transaction-fees": clickhouse.extract_transaction_fees,
   }
 }
 
