@@ -400,10 +400,14 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
 
   def test_create_block_traces_extracted_index(self):
     self.indices.prepare_indices()
-    self.client.bulk_index(index=TEST_INDICES["block_flag"], docs=[{"id": 1, "name": "traces_extracted", "value": True}, {"id": 2, "name": "traces_extracted", "value": None}])
+    self.client.bulk_index(index=TEST_INDICES["block_flag"], docs=[
+      {"id": 1, "name": "traces_extracted", "value": True},
+      {"id": 2, "name": "traces_extracted", "value": None},
+      {"id": 1, "name": "something_else", "value": True},
+    ])
     result = self.client.search(index=TEST_INDICES["block_flag"], fields=[])
     result = [flag["_id"] for flag in result]
-    self.assertCountEqual(["1", "2"], result)
+    self.assertCountEqual(["1", "2", "1"], result)
 
   def test_create_contract_abi_index(self):
     self.indices.prepare_indices()
@@ -415,10 +419,13 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
 
   def test_create_contract_block_index(self):
     self.indices.prepare_indices()
-    self.client.bulk_index(index=TEST_INDICES["contract_block"], docs=[{"id": 1, "name": "flag_1", "value": 1234}])
+    self.client.bulk_index(index=TEST_INDICES["contract_block"], docs=[
+      {"id": 1, "name": "flag_1", "value": 1234},
+      {"id": 1, "name": "flag_2", "value": 1235},
+    ])
     result = self.client.search(index=TEST_INDICES["contract_block"], fields=[])
     result = [flag["_id"] for flag in result]
-    self.assertCountEqual(["1"], result)
+    self.assertCountEqual(["1", "1"], result)
 
   def test_create_transaction_fee_index(self):
     self.indices.prepare_indices()
