@@ -79,6 +79,11 @@ INDEX_FIELDS = {
   }
 }
 
+PRIMARY_KEYS = {
+  "block_flag": ["id", "name"],
+  "contract_block": ["id", "name"]
+}
+
 class ElasticSearchIndices:
   def __init__(self, indices=INDICES):
     self.indices = indices
@@ -251,13 +256,13 @@ class ClickhouseIndices:
     self.client = CustomClickhouse()
     self.indices = indices
 
-  def _create_index(self, index, fields={}):
+  def _create_index(self, index, fields={}, primary_key=["id"]):
     fields["id"] = "String"
     fields_string = ", ".join(["{} {}".format(name, type) for name, type in fields.items()])
-    create_sql = "CREATE TABLE IF NOT EXISTS {} ({}) ENGINE = ReplacingMergeTree() ORDER BY id".format(index, fields_string)
+    create_sql = "CREATE TABLE IF NOT EXISTS {} ({}) ENGINE = ReplacingMergeTree() ORDER BY ({})".format(index, fields_string, ",".join(primary_key))
     self.client.send_sql_request(create_sql)
 
   def prepare_indices(self):
     for key, index in self.indices.items():
       if key in INDEX_FIELDS:
-        self._create_index(index, INDEX_FIELDS[key])
+        self._create_index(index, INDEX_FIELDS[key], PRIMARY_KEYS.get(key, ["id"]))
