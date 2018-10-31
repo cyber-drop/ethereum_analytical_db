@@ -7,8 +7,8 @@ import json
 
 class CustomClickhouse(CustomClient):
   def __init__(self):
-    self.client = Client('localhost')
-    self.iterate_client = Client('localhost')
+    self.client = Client('localhost', send_receive_timeout=10000)
+    self.iterate_client = Client('localhost', send_receive_timeout=10000)
 
   def _create_sql_query(self, index, query, fields):
     fields_string = ",".join(fields)
