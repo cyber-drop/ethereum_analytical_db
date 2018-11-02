@@ -1,9 +1,9 @@
 from clients.custom_clickhouse import CustomClickhouse
-from config import EVENTS_RANGE_SIZE
+from config import EVENTS_RANGE_SIZE, INDICES, PARITY_HOSTS
 from web3 import Web3, HTTPProvider
 
 class Events:
-  def __init__(self, indices, parity_hosts):
+  def __init__(self, indices=INDICES, parity_hosts=PARITY_HOSTS):
     self.client = CustomClickhouse()
     self.indices = indices
     self.web3 = Web3(HTTPProvider(parity_hosts[0][-1]))
