@@ -16,7 +16,7 @@ INDICES = {
   "contract_abi": "ethereum_contract_abi",
 
   "miner_transaction": "ethereum_miner_transaction",
-
+  "event": "ethereum_event"
 }
 
 GENESIS = "genesis.json"
