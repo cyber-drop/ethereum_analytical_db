@@ -136,10 +136,10 @@ class EventsTestCase(unittest.TestCase):
     self.events._save_events([])
 
   def test_save_processed_blocks(self):
-    test_ranges = [(0, 10), (20, 30)]
-    self.events._save_processed_blocks(test_ranges)
+    test_range = (0, 10)
+    test_flags = [str(i) for i in range(0, 10)]
+    self.events._save_processed_blocks(test_range)
     flags = self.client.search(index=TEST_BLOCKS_TRACES_EXTRACTED_INDEX, fields=[], query="WHERE name = 'events_extracted' AND value IS NOT NULL", size=1000)
-    test_flags = [str(i) for i in range(0, 10)] + [str(i) for i in range(20, 30)]
     self.assertCountEqual([flag["_id"] for flag in flags], test_flags)
 
   def test_extract_events(self):
@@ -155,14 +155,15 @@ class EventsTestCase(unittest.TestCase):
     process = Mock(
       iterate_blocks=self.events._iterate_block_ranges,
       get_events=self.events._get_events,
-      save_events=self.events._save_events
+      save_events=self.events._save_events,
+      save_blocks=self.events._save_processed_blocks
     )
 
     self.events.extract_events()
 
     event_calls = []
     for i, events in enumerate(test_parity_events):
-      event_calls += [call.get_events(test_ranges[i]), call.save_events(events)]
+      event_calls += [call.get_events(test_ranges[i]), call.save_events(events), call.save_blocks(test_ranges[i])]
     process.assert_has_calls([
       call.iterate_blocks()
     ] + event_calls)

@@ -39,17 +39,16 @@ class Events:
     processed_event["topics"] = [topic.hex() for topic in event["topics"]]
     return processed_event
 
-  def _save_processed_blocks(self, block_ranges):
-    block_flags = []
-    for block_range in block_ranges:
-      block_flags += [{
-        "id": block,
-        "name": "events_extracted",
-        "value": 1
-      } for block in range(*block_range)]
+  def _save_processed_blocks(self, block_range):
+    block_flags = [{
+      "id": block,
+      "name": "events_extracted",
+      "value": 1
+    } for block in range(*block_range)]
     self.client.bulk_index(index=self.indices["block_flag"], docs=block_flags)
 
   def extract_events(self):
     for block_range in self._iterate_block_ranges():
       events = self._get_events(block_range)
       self._save_events(events)
+      self._save_processed_blocks(block_range)
