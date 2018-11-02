@@ -254,14 +254,16 @@ class ElasticSearchContractTransactionsIterator(ContractTransactionsIterator):
 
 class ClickhouseContractTransactionsIterator(ContractTransactionsIterator):
   def _iterate_contracts(self, max_block=None, partial_query=None):
-    query = "ANY LEFT JOIN (SELECT id, value FROM {} WHERE name = '{}') USING id WHERE value <= {} AND ".format(
+    query = "ANY LEFT JOIN (SELECT id, value FROM {} WHERE name = '{}') USING id WHERE {}".format(
       self.indices["contract_block"],
       self._get_flag_name(),
-      1,
-      max_block,
       partial_query
     )
-    query += partial_query
+    if max_block:
+      query += " AND value < {}".format(max_block)
+    if PROCESSED_CONTRACTS:
+      addresses = ",".join(["'{}'".format(address) for address in PROCESSED_CONTRACTS])
+      query += " AND address in({})".format(addresses)
     return self.client.iterate(index=self.indices["contract"], query=query, fields=[])
 
   def _save_max_block(self, contracts, max_block):

@@ -288,49 +288,6 @@ class InputParsingTestCase():
   #     transactions = self.client.search(index=TEST_TRANSACTIONS_INDEX, doc_type=self.doc_type, query="*")['hits']['hits']
   #     assert len([transaction["_source"]["decoded_input"] for transaction in transactions]) == 10
 
-class ElasticSearchInputParsingTestCase(InputParsingTestCase, unittest.TestCase):
-  contracts_class = ElasticSearchContracts
-
-  def add_contracts_with_and_without_abi(self):
-    """Add 10 contracts with no ABI at all, 10 contracts with abi_extracted flag and 5 contracts with ABI"""
-    for i in tqdm(range(10)):
-      self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS, "blockNumber": i},
-                        id=i + 1, refresh=True)
-    for i in tqdm(range(10)):
-      self.client.index(TEST_CONTRACTS_INDEX, 'contract',
-                        {'address': TEST_CONTRACT_ADDRESS, "blockNumber": i, 'abi_extracted': True}, id=i + 11,
-                        refresh=True)
-    for i in tqdm(range(5)):
-      self.client.index(TEST_CONTRACTS_INDEX, 'contract',
-                        {'address': TEST_CONTRACT_ADDRESS, "blockNumber": i, 'abi_extracted': True, 'abi': True},
-                        id=i + 21, refresh=True)
-
-  def setUp(self):
-    self.contracts = self.contracts_class(
-      {"contract": TEST_CONTRACTS_INDEX, self.index: TEST_TRANSACTIONS_INDEX},
-      parity_hosts=[(None, None, "http://localhost:8545")]
-    )
-    self.client = TestElasticSearch()
-    self.client.recreate_index(TEST_CONTRACTS_INDEX)
-    self.client.recreate_fast_index(TEST_TRANSACTIONS_INDEX)
-
-  def test_save_contracts_abi(self):
-    """Test saving ABI for each contract in ElasticSearch"""
-    test_contracts = [{"blockNumber": i, 'address': TEST_CONTRACT_ADDRESS, 'id': i + 1} for i in range(10)]
-    self.client.bulk_index(TEST_CONTRACTS_INDEX, test_contracts)
-    self.contracts.save_contracts_abi()
-    contracts = self.client.search(index=TEST_CONTRACTS_INDEX, doc_type='contract', query="abi:*", size=100)['hits']['hits']
-    abis = [contract["_source"]["abi"] for contract in contracts]
-    self.assertCountEqual(abis, [TEST_CONTRACT_ABI] * 10)
-
-  def test_save_contracts_abi_status(self):
-    """Test saving abi_extracted flag for each contract in ElasticSearch"""
-    for i in tqdm(range(10)):
-      self.client.index(TEST_CONTRACTS_INDEX, 'contract', {"blockNumber": i, 'address': TEST_CONTRACT_ADDRESS}, id=i + 1, refresh=True)
-    self.contracts.save_contracts_abi()
-    contracts_count = self.client.count(index=TEST_CONTRACTS_INDEX, doc_type='contract', query="abi_extracted:true")['count']
-    assert contracts_count == 10
-
 class ClickhouseInputParsingTestCase(InputParsingTestCase, unittest.TestCase):
   contracts_class = ClickhouseContracts
   def setUp(self):
@@ -340,14 +297,11 @@ class ClickhouseInputParsingTestCase(InputParsingTestCase, unittest.TestCase):
       self.index: TEST_TRANSACTIONS_INDEX,
       "contract_abi": TEST_CONTRACTS_ABI_INDEX
     }
-    for index in self.indices.values():
-      self.client.send_sql_request("DROP TABLE IF EXISTS {}".format(index))
     self.contracts = self.contracts_class(
       self.indices,
       parity_hosts=[(None, None, "http://localhost:8545")]
     )
-    ClickhouseIndices(self.indices).prepare_indices()
-    self.client.prepare_views_as_indices(self.indices)
+    self.client.prepare_indices(self.indices)
 
   def add_contracts_with_and_without_abi(self):
     """Add 10 contracts with no ABI at all, 10 contracts with abi_extracted flag and 5 contracts with ABI"""

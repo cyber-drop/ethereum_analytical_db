@@ -52,6 +52,12 @@ class ClickhouseTestCase(unittest.TestCase):
     self.new_client.bulk_index(index="test", docs=[{"id": "test", "x": 0}])
     next(result)
 
+  def test_iterate_without_id(self):
+    self._add_records()
+    result = self.new_client.iterate(index="test", fields=["distinct(ceiling(x / 10))"], return_id=False)
+    result = next(result)
+    assert len(result) == 2
+
   def test_bulk_index(self):
     documents = [{"x": i} for i in range(10)]
     self.new_client.bulk_index(index="test", docs=[d.copy() for d in documents], id_field="x")

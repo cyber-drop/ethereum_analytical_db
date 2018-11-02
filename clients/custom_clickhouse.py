@@ -20,8 +20,9 @@ class CustomClickhouse(CustomClient):
   def _convert_values_to_dict(self, values, fields):
     documents = [{"_source": dict(zip(fields, value))} for value in values]
     for document in documents:
-      document["_id"] = document["_source"]["id"]
-      del document["_source"]["id"]
+      if "id" in document["_source"]:
+        document["_id"] = document["_source"]["id"]
+        del document["_source"]["id"]
     return documents
 
   def search(self, index, fields, query=None, **kwargs):
@@ -34,8 +35,9 @@ class CustomClickhouse(CustomClient):
     sql = self._create_sql_query(index, query, ["COUNT(*)"])
     return self.client.execute(sql)[0][0]
 
-  def iterate(self, index, fields, query=None, per=NUMBER_OF_JOBS):
-    fields += ["id"]
+  def iterate(self, index, fields, query=None, per=NUMBER_OF_JOBS, return_id=True):
+    if return_id:
+      fields += ["id"]
     settings = {'max_block_size': per}
     sql = self._create_sql_query(index, query, fields)
     generator = self.iterate_client.execute_iter(sql, settings=settings)

@@ -27,13 +27,16 @@ class UtilsTestCase():
     self.assertSequenceEqual(test_chunks, [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]])
 
   def test_get_max_block(self):
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 0
-    }, refresh=True)
-    self.client.index(index=TEST_BLOCKS_INDEX, doc_type="b", doc={
-      "number": 1
-    }, refresh=True)
+    test_contracts = [{
+      "number": 0,
+      "id": 0
+    }, {
+      "number": 1,
+      "id": 1
+    }]
+    self.client.bulk_index(index=TEST_BLOCKS_INDEX, docs=test_contracts)
     max_block = get_max_block()
+    print(max_block)
     assert max_block == 1
     assert type(max_block) == int
 
@@ -165,43 +168,29 @@ class ClickhouseIteratorTestCase(UtilsTestCase, unittest.TestCase):
     )
     self.assertCountEqual(["0x1", "0x2"], transactions_request["bool"]["should"][0]["bool"]["must"][0]["terms"]["to"])
 
-  def test_iterate_contracts_from_list(self):
-    config.PROCESSED_CONTRACTS.append("0x1")
-    test_max_block = 2
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
-      "tx_test_block": 1,
-      "address": "0x1",
-      "blockNumber": 1,
-    }, refresh=True, id=1)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
-      "tx_test_block": 1,
-      "address": "0x2",
-      "blockNumber": 1
-    }, refresh=True, id=2)
-    contracts = [
-      c["_id"] for contracts in self.contracts_iterator._iterate_contracts(test_max_block, {"query_string": {"query": "*"}})
-      for c in contracts
-    ]
-    self.assertCountEqual(contracts, ['1'])
-
   def test_iterate_contracts_without_specified_block(self):
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
-      "tx_test_block": 1,
+    test_contracts = [{
       "address": "0x1",
       "blockNumber": 1,
-    }, refresh=True, id=1)
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {
+      "id": 1
+    }, {
       "address": "0x2",
       "blockNumber": 1,
-    }, refresh=True, id=2)
+      "id": 2
+    }]
+    test_contract_blocks = [
+      {"id": 1, "name": "tx_test_block", "value": 1},
+    ]
+    self.client.bulk_index(index=TEST_CONTRACT_BLOCK_INDEX, docs=test_contract_blocks)
+    self.client.bulk_index(index=TEST_CONTRACTS_INDEX, docs=test_contracts)
 
     contracts_without_max_block = [
-      c["_id"] for contracts in self.contracts_iterator._iterate_contracts(partial_query={"query_string": {"query": "*"}})
+      c["_id"] for contracts in self.contracts_iterator._iterate_contracts(partial_query="address IS NOT NULL")
       for c in contracts
     ]
     contracts_with_zero_max_block = [
       c["_id"] for contracts in
-      self.contracts_iterator._iterate_contracts(0, {"query_string": {"query": "*"}})
+      self.contracts_iterator._iterate_contracts(0, "address IS NOT NULL")
       for c in contracts
     ]
 
@@ -305,6 +294,29 @@ class ClickhouseIteratorTestCase(UtilsTestCase, unittest.TestCase):
     ]
     self.assertCountEqual(contracts, ['1', '4'])
 
+  def test_iterate_contracts_from_list(self):
+    config.PROCESSED_CONTRACTS.append("0x1")
+    test_max_block = 2
+    test_contracts = [{
+      "address": "0x1",
+      "blockNumber": 1,
+      "id": 1
+    }, {
+      "address": "0x2",
+      "blockNumber": 1,
+      "id": 2
+    }]
+    test_contract_blocks = [
+      {"id": 1, "name": "tx_test_block", "value": 1},
+      {"id": 2, "name": "tx_test_block", "value": 1},
+    ]
+    self.client.bulk_index(index=TEST_CONTRACT_BLOCK_INDEX, docs=test_contract_blocks)
+    self.client.bulk_index(index=TEST_CONTRACTS_INDEX, docs=test_contracts)
+    contracts = [
+      c["_id"] for contracts in self.contracts_iterator._iterate_contracts(test_max_block, "address IS NOT NULL")
+      for c in contracts
+    ]
+    self.assertCountEqual(contracts, ['1'])
 
 TEST_BLOCKS_INDEX = "test_ethereum_blocks"
 TEST_CONTRACTS_INDEX = "test_ethereum_contract"

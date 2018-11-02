@@ -21,6 +21,7 @@ INDICES = {
 
 GENESIS = "genesis.json"
 NUMBER_OF_JOBS = 1000
+EVENTS_RANGE_SIZE = 10
 PROCESSED_CONTRACTS = []
 
 # Uncomment this line if you want to process only top_100 tokens
