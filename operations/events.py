@@ -26,7 +26,8 @@ class Events:
 
   def _save_events(self, events):
     events = [self._process_event(event) for event in events]
-    self.client.bulk_index(index=self.indices["event"], docs=events)
+    if events:
+      self.client.bulk_index(index=self.indices["event"], docs=events)
 
   def _process_event(self, event):
     processed_event = event.copy()

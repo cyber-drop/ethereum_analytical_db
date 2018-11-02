@@ -132,6 +132,9 @@ class EventsTestCase(unittest.TestCase):
     saved_events = self.client.search(index=TEST_EVENTS_INDEX, fields=["id", "type"], query="WHERE type = 'processed'")
     self.assertCountEqual([event["_id"] for event in saved_events], [event["id"] for event in test_processed_events])
 
+  def test_save_empty_events(self):
+    self.events._save_events([])
+
   def test_save_processed_blocks(self):
     test_ranges = [(0, 10), (20, 30)]
     self.events._save_processed_blocks(test_ranges)
