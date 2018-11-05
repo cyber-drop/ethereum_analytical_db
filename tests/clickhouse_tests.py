@@ -58,6 +58,12 @@ class ClickhouseTestCase(unittest.TestCase):
     result = next(result)
     assert len(result) == 2
 
+  def test_iterate_with_derived_fields(self):
+    self._add_records()
+    result = self.new_client.iterate(index="test", fields=["x - 1 AS y"])
+    result_record = next(result)[0]
+    assert "y" in result_record["_source"]
+
   def test_bulk_index(self):
     documents = [{"x": i} for i in range(10)]
     self.new_client.bulk_index(index="test", docs=[d.copy() for d in documents], id_field="x")
