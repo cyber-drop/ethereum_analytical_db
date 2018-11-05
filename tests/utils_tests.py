@@ -224,6 +224,13 @@ class ClickhouseIteratorTestCase(unittest.TestCase):
     transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
     self.assertCountEqual(transactions, ['2'])
 
+  def test_iterate_transactions_use_fields(self):
+    test_fields = ["field1", "field2"]
+    self.contracts_iterator._create_transactions_request = MagicMock()
+    self.contracts_iterator.client.iterate = MagicMock()
+    self.contracts_iterator._iterate_transactions([], 0, partial_query="WHERE to IS NOT NULL", fields=test_fields)
+    self.contracts_iterator.client.iterate.assert_called_with(index=ANY, query=ANY, fields=test_fields)
+
   def test_save_max_block(self):
     test_max_block = 100
     contracts = [{'address': "0x{}".format(i), "id": i} for i in range(1, 4)]

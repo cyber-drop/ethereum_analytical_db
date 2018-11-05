@@ -88,6 +88,11 @@ INDEX_FIELDS = {
     'blockHash': 'String',
     'blockNumber': 'Int32',
     'topics': 'Array(String)'
+  },
+  "transaction_input": {
+    "name": "String",
+    "types": "Array(String)",
+    "arguments": "Array(String)"
   }
 }
 

@@ -112,7 +112,10 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
 
   def _set_contracts_abi(self, abis):
     """Sets current contracts ABI"""
-    self._contracts_abi = abis
+    self._contracts_abi = {
+      address: json.loads(abi)
+      for address, abi in abis.items()
+    }
 
   def _split_on_chunks(self, iterable, size):
     """
@@ -225,15 +228,19 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
     generator
         Generator that iterates through contracts by conditions above
     """
-    query = {
-      "bool": {
-        "must": [
-          {"exists": {"field": "address"}},
-          {"exists": {"field": "abi"}},
-          {"query_string": {"query": self._get_range_query()}},
-        ]
-      }
-    }
+    # query = {
+    #   "bool": {
+    #     "must": [
+    #       {"exists": {"field": "address"}},
+    #       {"exists": {"field": "abi"}},
+    #       {"query_string": {"query": self._get_range_query()}},
+    #     ]
+    #   }
+    # }
+    query = "ANY INNER JOIN {} USING id WHERE abi IS NOT NULL AND {}".format(
+      self.indices["contract_abi"],
+      self._get_range_query()
+    )
     return self._iterate_contracts(max_block, query)
 
   def _iterate_transactions_by_targets(self, contracts, max_block):
@@ -254,17 +261,7 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
     generator
         Generator that iterates through transactions by conditions above
     """
-    query = {
-      "bool": {
-        "must": [
-          {"term": {"callType": "call"}},
-        ],
-        "must_not": [
-          {"exists": {"field": "error"}}
-        ]
-      }
-    }
-    return self._iterate_transactions(contracts, max_block, query)
+    return self._iterate_transactions(contracts, max_block, "WHERE error IS NULL AND callType = 'call'")
 
   def _decode_inputs_for_contracts(self, contracts, max_block):
     """
@@ -301,7 +298,7 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
 
     This function is an entry point for parse-inputs operation
     """
-    max_block = utils.get_max_block(self.blocks_query)
+    max_block = self._get_max_block(self.blocks_query)
     for contracts in self._iterate_contracts_with_abi(max_block):
       self._set_contracts_abi({contract["_source"]["address"]: contract["_source"]["abi"] for contract in contracts})
       self._decode_inputs_for_contracts(contracts, max_block)

@@ -135,7 +135,7 @@ class ClickhouseContractTransactionsIterator():
       query.append(subquery)
     return " OR ".join(query)
 
-  def _iterate_transactions(self, contracts, max_block, partial_query):
+  def _iterate_transactions(self, contracts, max_block, partial_query, fields=[]):
     """
     Iterate through unprocessed transactions for specified contracts before specified block
 
@@ -155,8 +155,9 @@ class ClickhouseContractTransactionsIterator():
         Generator that returns unprocessed transactions
     """
     query = partial_query
+    print(self._create_transactions_request(contracts, max_block))
     query += " AND " + self._create_transactions_request(contracts, max_block)
-    return self.client.iterate(index=self.indices[self.index], fields=[], query=query)
+    return self.client.iterate(index=self.indices[self.index], fields=fields, query=query)
 
   def _get_flag_name(self):
     """

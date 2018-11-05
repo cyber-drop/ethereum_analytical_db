@@ -454,6 +454,19 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
     result = [flag["_id"] for flag in result]
     self.assertCountEqual(["0x1"], result)
 
+  def test_create_transactions_inputs_index(self):
+    self.indices.prepare_indices()
+    test_input = {
+      "id": 1,
+      "name": "transfer",
+      "types": ["string", "integer", "string"],
+      "arguments": ["1000", "2000", "3000"]
+    }
+    self.client.bulk_index(index=TEST_INDICES["transaction_input"], docs=[test_input])
+    result = self.client.search(index=TEST_INDICES["transaction_input"], fields=[])
+    result = [flag["_id"] for flag in result]
+    self.assertCountEqual(["1"], result)
+
 CURRENT_ELASTICSEARCH_SIZE = 290659165119
 TEST_INDEX = 'test_ethereum_transactions'
 TEST_INDICES = {
@@ -470,5 +483,6 @@ TEST_INDICES = {
   "block_flag": "test_block_traces_extracted",
   "contract_abi": "test_contract_abi",
   "contract_block": "test_contract_block",
-  "transaction_fee": "test_transaction_fee"
+  "transaction_fee": "test_transaction_fee",
+  "transaction_input": "test_transaction_input"
 }

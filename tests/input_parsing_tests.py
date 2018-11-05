@@ -16,6 +16,8 @@ TEST_CONTRACT_DECODED_PARAMETERS = {'name': 'transfer', 'params': [{'type': 'add
 TEST_TRANSACTIONS_INDEX = 'test_ethereum_transactions'
 TEST_CONTRACTS_INDEX = 'test_ethereum_contracts'
 TEST_CONTRACTS_ABI_INDEX = 'test_ethereum_contracts_abi'
+TEST_CONTRACT_BLOCK_INDEX = 'test_ethereum_contract_block'
+TEST_TRANSACTIONS_INPUT_INDEX = 'test_transactions_input'
 
 class ClickhouseInputParsingTestCase(unittest.TestCase):
   contracts_class = ClickhouseContracts
@@ -29,7 +31,8 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
     self.indices = {
       "contract": TEST_CONTRACTS_INDEX,
       self.index: TEST_TRANSACTIONS_INDEX,
-      "contract_abi": TEST_CONTRACTS_ABI_INDEX
+      "contract_abi": TEST_CONTRACTS_ABI_INDEX,
+      "contract_block": TEST_CONTRACT_BLOCK_INDEX
     }
     self.contracts = self.contracts_class(
       self.indices,
@@ -39,9 +42,12 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
 
   def test_set_contracts_abi(self):
     """Test setting contracts ABI"""
-    contracts_abi = {"0x0": TEST_CONTRACT_ABI, "0x1": TEST_CONTRACT_ABI}
+    contracts_abi = {"0x0": json.dumps(TEST_CONTRACT_ABI), "0x1": json.dumps(TEST_CONTRACT_ABI)}
     self.contracts._set_contracts_abi(contracts_abi)
-    self.assertSequenceEqual(self.contracts._contracts_abi, contracts_abi)
+    self.assertSequenceEqual(self.contracts._contracts_abi, {
+      "0x0": TEST_CONTRACT_ABI,
+      "0x1": TEST_CONTRACT_ABI
+    })
 
   def test_decode_inputs_batch_sync(self):
     """Test decode inputs batch"""
@@ -69,11 +75,19 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
     self.contracts.pool.map.assert_called_with(contracts._decode_inputs_batch_sync, [dict(chunk) for chunk in chunks])
     self.assertSequenceEqual({"0x0": "decoded_input1", "0x1": "decoded_input2"}, response)
 
+  def add_contracts_with_and_without_abi(self):
+    """Add 10 contracts with no ABI at all, 10 contracts with abi_extracted flag and 5 contracts with ABI"""
+    contracts = [{'address': TEST_CONTRACT_ADDRESS, "blockNumber": i % 5, "id": i + 1} for i in range(25)]
+    contracts_abi = [{'abi_extracted': True, 'id': i} for i in range(11, 21)]
+    contracts_abi += [{'abi_extracted': True, 'abi': json.dumps({"test": 1}), 'id': i} for i in range(21, 26)]
+    self.client.bulk_index(TEST_CONTRACTS_INDEX, contracts)
+    self.client.bulk_index(TEST_CONTRACTS_ABI_INDEX, contracts_abi)
+
   def test_iterate_contracts_with_abi(self):
     """Test iterations through contracts with ABI"""
     test_max_block = 100
     self.contracts = self.contracts_class(
-      {"contract": TEST_CONTRACTS_INDEX, self.index: TEST_TRANSACTIONS_INDEX},
+      self.indices,
       parity_hosts=[(0, 4, "http://localhost:8545")]
     )
     self.add_contracts_with_and_without_abi()
@@ -94,17 +108,20 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
 
   def test_iterate_transactions_by_targets_ignore_transactions_with_error(self):
     """Test iterations through CALL EVM transactions without errors"""
-    self.contracts._create_transactions_request = MagicMock(return_value={"query_string": {"query": "*"}})
-    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
-      'callType': 'call',
-    }, id=1, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
-      'callType': 'delegatecall',
-    }, id=2, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, {
-      'callType': 'call',
-      "error": "Out of gas",
-    }, id=3, refresh=True)
+    self.contracts._create_transactions_request = MagicMock(return_value="id IS NOT NULL")
+    test_transactions = [{
+      "id": 1,
+      "callType": "call"
+    }, {
+      "id": 2,
+      "callType": "delegatecall"
+    }, {
+      "id": 3,
+      "callType": "call",
+      "error": "Out of gas"
+    }]
+
+    self.client.bulk_index(index=TEST_TRANSACTIONS_INDEX, docs=test_transactions)
     targets = [{"_source": {"address": TEST_CONTRACT_ADDRESS}}]
     transactions = self.contracts._iterate_transactions_by_targets(targets, 0)
     transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
@@ -125,13 +142,21 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
   def test_decode_inputs_for_contracts(self):
     """Test decoding inputs for contracts chunk from elasticsearch"""
     test_max_block = 1000
-    self.contracts._set_contracts_abi({TEST_CONTRACT_ADDRESS: TEST_CONTRACT_ABI})
-    self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS, 'abi': TEST_CONTRACT_ABI}, id=1, refresh=True)
+    self.contracts._set_contracts_abi({TEST_CONTRACT_ADDRESS: json.dumps(TEST_CONTRACT_ABI)})
+    self.client.index(TEST_CONTRACTS_INDEX, {'address': TEST_CONTRACT_ADDRESS}, id=1)
+    self.client.index(TEST_CONTRACTS_ABI_INDEX, {"abi": json.dumps(TEST_CONTRACT_ABI)}, id=1)
     for i in tqdm(range(10)):
-      self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, self.doc, id=i + 1, refresh=True)
-    contracts = self.client.search(index=TEST_CONTRACTS_INDEX, doc_type='contract', query="abi:*")['hits']['hits']
+      self.client.index(TEST_TRANSACTIONS_INDEX, self.doc, id=i + 1)
+    contracts = self.client.search(
+      index=TEST_CONTRACTS_INDEX,
+      query="ANY INNER JOIN {} USING id".format(TEST_CONTRACTS_ABI_INDEX),
+      fields=["address"]
+    )
     self.contracts._decode_inputs_for_contracts(contracts, test_max_block)
-    transactions = self.client.search(index=TEST_TRANSACTIONS_INDEX, doc_type=self.doc_type, query="*")['hits']['hits']
+    transactions = self.client.search(
+      index=TEST_TRANSACTIONS_INPUT_INDEX,
+      fields=[]
+    )
     decoded_inputs = [t["_source"]["decoded_input"] for t in transactions]
     self.assertCountEqual(decoded_inputs, [TEST_CONTRACT_DECODED_PARAMETERS] * 10)
 
@@ -181,20 +206,20 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
     test_contracts = ["contract1", "contract2", "contract3"]
     test_contracts_from_elasticsearch = [{"_source": {"abi": contract, "address": contract}} for contract in test_contracts]
     mockify(self.contracts, {
-      "_iterate_contracts_with_abi": MagicMock(return_value=[test_contracts_from_elasticsearch])
+      "_iterate_contracts_with_abi": MagicMock(return_value=[test_contracts_from_elasticsearch]),
+      "_get_max_block": MagicMock()
     }, ["decode_inputs"])
     process = Mock(
       decode=self.contracts._decode_inputs_for_contracts,
       save=self.contracts._save_max_block
     )
 
-    with patch('utils.get_max_block'):
-      self.contracts.decode_inputs()
+    self.contracts.decode_inputs()
 
-      process.assert_has_calls([
-        call.decode(test_contracts_from_elasticsearch, ANY),
-        call.save(test_contracts, ANY)
-      ])
+    process.assert_has_calls([
+      call.decode(test_contracts_from_elasticsearch, ANY),
+      call.save(test_contracts, ANY)
+    ])
 
   def test_decode_inputs_save_max_block_for_query(self):
     """Test saving max block parameter during all operation"""
@@ -202,29 +227,28 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
     test_contracts_from_elasticsearch = [{"_source": {"abi": "contract", "address": "contract" + str(i)}} for i in range(3)]
     mockify(self.contracts, {
       "_iterate_contracts_with_abi": MagicMock(return_value=[test_contracts_from_elasticsearch]),
+      "_get_max_block": MagicMock(side_effect=[test_max_block])
     }, ["decode_inputs"])
     process = Mock(
       iterate=self.contracts._iterate_contracts_with_abi,
       decode=self.contracts._decode_inputs_for_contracts,
       save=self.contracts._save_max_block
     )
-    test_max_block_mock = MagicMock(side_effect=[test_max_block])
-    with patch('utils.get_max_block', test_max_block_mock):
-      self.contracts.decode_inputs()
+    self.contracts.decode_inputs()
 
-      test_max_block_mock.assert_called_with(self.blocks_query)
-      process.assert_has_calls([
-        call.iterate(test_max_block),
-        call.decode(ANY, test_max_block),
-        call.save(ANY, test_max_block)
-      ])
+    self.contracts._get_max_block.assert_called_with(self.blocks_query)
+    process.assert_has_calls([
+      call.iterate(test_max_block),
+      call.decode(ANY, test_max_block),
+      call.save(ANY, test_max_block)
+    ])
 
   def test_decode_inputs_for_big_portion_of_contracts(self):
     """Test decoding inputs for big portion of contracts in ElasticSearch"""
     for i in tqdm(range(10)):
-      self.client.index(TEST_CONTRACTS_INDEX, 'contract', {'address': TEST_CONTRACT_ADDRESS, 'blockNumber': i}, id=i + 1, refresh=True)
+      self.client.index(TEST_CONTRACTS_INDEX, {'address': TEST_CONTRACT_ADDRESS, 'blockNumber': i}, id=i + 1)
     for i in tqdm(range(10)):
-      self.client.index(TEST_TRANSACTIONS_INDEX, self.doc_type, self.doc, id=i + 1, refresh=True)
+      self.client.index(TEST_TRANSACTIONS_INDEX, self.doc, id=i + 1)
     with patch('utils.get_max_block', return_value=1000):
       self.contracts.save_contracts_abi()
       self.contracts.decode_inputs()
