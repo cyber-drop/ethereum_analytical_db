@@ -19,7 +19,6 @@ class CustomClickhouse(CustomClient):
 
   def _convert_values_to_dict(self, values, fields):
     converted_fields = [field.split(" AS ")[-1] for field in fields]
-    print(converted_fields)
     documents = [{"_source": dict(zip(converted_fields, value))} for value in values]
     for document in documents:
       if "id" in document["_source"]:

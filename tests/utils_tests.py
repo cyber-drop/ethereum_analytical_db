@@ -1,26 +1,12 @@
 import unittest
 from utils import get_max_block, split_on_chunks, make_range_query
-from utils import ElasticSearchContractTransactionsIterator, ClickhouseContractTransactionsIterator
+from utils import ClickhouseContractTransactionsIterator
 from tests.test_utils import TestElasticSearch, CustomElasticSearch, TestClickhouse
 import config
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, ANY
 from clients.custom_clickhouse import CustomClickhouse
 
 class UtilsTestCase():
-  client_class = CustomClickhouse
-  iterator_class = ClickhouseContractTransactionsIterator
-
-  def setUp(self):
-    self.client = TestClickhouse()
-    self.indices = {
-      "block": TEST_BLOCKS_INDEX,
-      "contract": TEST_CONTRACTS_INDEX,
-      "internal_transaction": TEST_TRANSACTIONS_INDEX,
-      "contract_block": TEST_CONTRACT_BLOCK_INDEX
-    }
-    self.client.prepare_indices(self.indices)
-    self._create_contracts_iterator()
-
   def test_split_on_chunks(self):
     test_list = list(range(10))
     test_chunks = list(split_on_chunks(test_list, 3))
@@ -112,146 +98,31 @@ class UtilsTestCase():
   def test_make_complex_range_query(self):
     assert make_range_query("block", (0, 3), (10, 100)) == "(block >= 0 AND block < 3) OR (block >= 10 AND block < 100)"
 
-class ClickhouseIteratorTestCase(UtilsTestCase, unittest.TestCase):
+class ClickhouseIteratorTestCase(unittest.TestCase):
+  client_class = CustomClickhouse
+  iterator_class = ClickhouseContractTransactionsIterator
+
+  def setUp(self):
+    self.client = TestClickhouse()
+    self.indices = {
+      "block": TEST_BLOCKS_INDEX,
+      "contract": TEST_CONTRACTS_INDEX,
+      "internal_transaction": TEST_TRANSACTIONS_INDEX,
+      "contract_block": TEST_CONTRACT_BLOCK_INDEX
+    }
+    self.client.prepare_indices(self.indices)
+    self._create_contracts_iterator()
+
   def _create_contracts_iterator(self):
     self.contracts_iterator = self.iterator_class()
     self.contracts_iterator.client = self.client_class()
     self.contracts_iterator.indices = self.indices
     self.contracts_iterator.doc_type = "tx"
     self.contracts_iterator.block_prefix = "test"
-    self.contracts_iterator.index = "transaction"
+    self.contracts_iterator.index = "internal_transaction"
 
   def tearDown(self):
     config.PROCESSED_CONTRACTS.clear()
-
-  def test_create_transactions_request(self):
-    test_max_block = 40
-    test_contracts = [
-      {"_source": {"address": "0x1", "tx_test_block": 10}},
-      {"_source": {"address": "0x2", "tx_test_block": 30}},
-    ]
-    transactions_request = self.contracts_iterator._create_transactions_request(
-      test_contracts,
-      test_max_block
-    )
-    self.assertCountEqual([
-      {"bool": {"must": [
-        {"terms": {"to": ["0x1"]}},
-        {"range": {"blockNumber": {"gt": 10, "lte": 40}}}
-      ]}},
-      {"bool": {"must": [
-        {"terms": {"to": ["0x2"]}},
-        {"range": {"blockNumber": {"gt": 30, "lte": 40}}}
-      ]}},
-    ], transactions_request["bool"]["should"])
-
-  def test_create_transactions_request_empty_block(self):
-    test_max_block = 40
-    test_contracts = [
-      {"_source": {"address": "0x1"}},
-    ]
-    transactions_request = self.contracts_iterator._create_transactions_request(
-      test_contracts,
-      test_max_block
-    )
-    self.assertCountEqual(["0x1"], transactions_request["bool"]["should"][0]["bool"]["must"][0]["terms"]["to"])
-
-  def test_create_transactions_request_multiple_blocks(self):
-    test_max_block = 40
-    test_contracts = [
-      {"_source": {"address": "0x1", "tx_test_block": 10}},
-      {"_source": {"address": "0x2", "tx_test_block": 10}},
-    ]
-    transactions_request = self.contracts_iterator._create_transactions_request(
-      test_contracts,
-      test_max_block
-    )
-    self.assertCountEqual(["0x1", "0x2"], transactions_request["bool"]["should"][0]["bool"]["must"][0]["terms"]["to"])
-
-  def test_iterate_contracts_without_specified_block(self):
-    test_contracts = [{
-      "address": "0x1",
-      "blockNumber": 1,
-      "id": 1
-    }, {
-      "address": "0x2",
-      "blockNumber": 1,
-      "id": 2
-    }]
-    test_contract_blocks = [
-      {"id": 1, "name": "tx_test_block", "value": 1},
-    ]
-    self.client.bulk_index(index=TEST_CONTRACT_BLOCK_INDEX, docs=test_contract_blocks)
-    self.client.bulk_index(index=TEST_CONTRACTS_INDEX, docs=test_contracts)
-
-    contracts_without_max_block = [
-      c["_id"] for contracts in self.contracts_iterator._iterate_contracts(partial_query="address IS NOT NULL")
-      for c in contracts
-    ]
-    contracts_with_zero_max_block = [
-      c["_id"] for contracts in
-      self.contracts_iterator._iterate_contracts(0, "address IS NOT NULL")
-      for c in contracts
-    ]
-
-    self.assertCountEqual(contracts_without_max_block, ['1', '2'])
-    self.assertCountEqual(contracts_with_zero_max_block, ['2'])
-
-  def test_iterate_transactions_by_query(self):
-    self.contracts_iterator._create_transactions_request = MagicMock(return_value={
-      "query_string": {"query": "*"}
-    })
-    self.client.index(TEST_TRANSACTIONS_INDEX, "tx", {
-      'to': "0x1",
-      "test": True,
-    }, id=1, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, "tx", {
-      'to': "0x1",
-      "test": False,
-    }, id=2, refresh=True)
-    targets = [{"_source": {"address": "0x1"}}]
-    transactions = self.contracts_iterator._iterate_transactions(targets, 0, {
-      "term": {
-        "test": True
-      }
-    })
-    transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
-    self.assertCountEqual(transactions, ['1'])
-
-  def test_iterate_transactions_by_targets_select_unprocessed_transactions(self):
-    self.client.index(TEST_TRANSACTIONS_INDEX, "tx", {
-      'to': "0x1",
-      "blockNumber": 1
-    }, id=1, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, "tx", {
-      'to': "0x1",
-      "blockNumber": 2
-    }, id=2, refresh=True)
-    self.client.index(TEST_TRANSACTIONS_INDEX, "tx", {
-      'to': "0x1",
-      "blockNumber": 3
-    }, id=3, refresh=True)
-    targets = [{"_source": {"address": "0x1", "tx_test_block": 1}}]
-    test_query = {
-      "query_string": {"query": "*"}
-    }
-    transactions = [c for c in self.contracts_iterator._iterate_transactions(targets, 2, test_query)]
-    transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
-    print(transactions)
-    self.assertCountEqual(transactions, ['2'])
-
-  def test_save_inputs_decoded(self):
-    test_max_block = 100
-    contracts = [{'address': "0x{}".format(i), "id": i} for i in range(1, 4)]
-    self.client.bulk_index(TEST_CONTRACTS_INDEX, contracts)
-    self.contracts_iterator._save_max_block(["0x1", "0x3"], test_max_block)
-
-    flags = self.client.search(TEST_CONTRACT_BLOCK_INDEX, fields=[], query="WHERE name = '{}' AND value = {}".format(
-      "tx_test_block",
-      test_max_block
-    ))
-    flags = [flag["_id"] for flag in flags]
-    self.assertCountEqual(flags, ["0x1", "0x3"])
 
   def test_iterate_contracts(self):
     test_max_block = 2
@@ -289,7 +160,7 @@ class ClickhouseIteratorTestCase(UtilsTestCase, unittest.TestCase):
     self.client.bulk_index(index=TEST_CONTRACTS_INDEX, docs=test_contracts)
     self.client.bulk_index(index=TEST_CONTRACT_BLOCK_INDEX, docs=test_contract_blocks)
     contracts = [
-      c["_id"] for contracts in self.contracts_iterator._iterate_contracts(test_max_block, "test = 1")
+      c["_id"] for contracts in self.contracts_iterator._iterate_contracts(test_max_block, "WHERE test = 1")
       for c in contracts
     ]
     self.assertCountEqual(contracts, ['1', '4'])
@@ -313,10 +184,138 @@ class ClickhouseIteratorTestCase(UtilsTestCase, unittest.TestCase):
     self.client.bulk_index(index=TEST_CONTRACT_BLOCK_INDEX, docs=test_contract_blocks)
     self.client.bulk_index(index=TEST_CONTRACTS_INDEX, docs=test_contracts)
     contracts = [
-      c["_id"] for contracts in self.contracts_iterator._iterate_contracts(test_max_block, "address IS NOT NULL")
+      c["_id"] for contracts in self.contracts_iterator._iterate_contracts(test_max_block, "WHERE address IS NOT NULL")
       for c in contracts
     ]
     self.assertCountEqual(contracts, ['1'])
+
+  def test_iterate_contracts_without_specified_block(self):
+    test_contracts = [{
+      "address": "0x1",
+      "blockNumber": 1,
+      "id": 1
+    }, {
+      "address": "0x2",
+      "blockNumber": 1,
+      "id": 2
+    }]
+    test_contract_blocks = [
+      {"id": 1, "name": "tx_test_block", "value": 1},
+    ]
+    self.client.bulk_index(index=TEST_CONTRACT_BLOCK_INDEX, docs=test_contract_blocks)
+    self.client.bulk_index(index=TEST_CONTRACTS_INDEX, docs=test_contracts)
+
+    contracts_without_max_block = [
+      c["_id"]
+      for contracts in self.contracts_iterator._iterate_contracts(partial_query="WHERE address IS NOT NULL")
+      for c in contracts
+    ]
+    contracts_with_zero_max_block = [
+      c["_id"]
+      for contracts in self.contracts_iterator._iterate_contracts(0, partial_query="WHERE address IS NOT NULL")
+      for c in contracts
+    ]
+
+    self.assertCountEqual(contracts_without_max_block, ['1', '2'])
+    self.assertCountEqual(contracts_with_zero_max_block, ['2'])
+
+  def test_iterate_contracts_use_fields(self):
+    test_fields = ["field1", "field2"]
+    self.contracts_iterator.client.iterate = MagicMock()
+    self.contracts_iterator._iterate_contracts(partial_query="WHERE address IS NOT NULL", fields=test_fields)
+    self.contracts_iterator.client.iterate.assert_called_with(index=ANY, query=ANY, fields=test_fields)
+
+  def test_create_transactions_request(self):
+    test_max_block = 40
+    test_contracts = [
+      {"_source": {"address": "0x1", "tx_test_block": 10}},
+      {"_source": {"address": "0x2", "tx_test_block": 30}},
+    ]
+    transactions_request = self.contracts_iterator._create_transactions_request(
+      test_contracts,
+      test_max_block
+    )
+    assert transactions_request == \
+      "(to = '0x1' AND (blockNumber > 10 OR blockNumber <= 40))" + \
+      " OR (to = '0x2' AND (blockNumber > 30 OR blockNumber <= 40))"
+
+  def test_create_transactions_request_empty_block(self):
+    test_max_block = 40
+    test_contracts = [
+      {"_source": {"address": "0x1"}},
+    ]
+    transactions_request = self.contracts_iterator._create_transactions_request(
+      test_contracts,
+      test_max_block
+    )
+    assert transactions_request == "(to = '0x1')"
+
+  def test_create_transactions_request_multiple_blocks(self):
+    test_max_block = 40
+    test_contracts = [
+      {"_source": {"address": "0x1", "tx_test_block": 10}},
+      {"_source": {"address": "0x2", "tx_test_block": 10}},
+    ]
+    transactions_request = self.contracts_iterator._create_transactions_request(
+      test_contracts,
+      test_max_block
+    )
+    assert transactions_request == \
+      "(to in('0x1', '0x2') AND (blockNumber > 10 OR blockNumber <= 40))"
+
+  def test_iterate_transactions_by_query(self):
+    self.contracts_iterator._create_transactions_request = MagicMock(return_value={
+      "query_string": {"query": "*"}
+    })
+    documents = [{
+      "id": 1,
+      'to': "0x1",
+      "from": "0x1",
+    }, {
+      "id": 2,
+      'to': "0x1",
+      "from": "0x2",
+    }]
+    self.client.bulk_index(index=TEST_TRANSACTIONS_INDEX, docs=documents)
+    targets = [{"_source": {"address": "0x1"}}]
+    transactions = self.contracts_iterator._iterate_transactions(targets, 0, "WHERE from = '0x1'")
+    transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
+    self.assertCountEqual(transactions, ['1'])
+
+  def test_iterate_transactions_by_targets_select_unprocessed_transactions(self):
+    test_contracts = [{
+      'to': "0x1",
+      "blockNumber": 1,
+      "id": 1
+    }, {
+      'to': "0x1",
+      "blockNumber": 2,
+      "id": 2
+    }, {
+      'to': "0x1",
+      "blockNumber": 3,
+      "id": 3
+    }]
+    self.client.bulk_index(index=TEST_TRANSACTIONS_INDEX, docs=test_contracts)
+    targets = [{"_source": {"address": "0x1", "tx_test_block": 1}}]
+    test_query = "WHERE address IS NOT NULL"
+    transactions = [c for c in self.contracts_iterator._iterate_transactions(targets, 2, test_query)]
+    transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
+    print(transactions)
+    self.assertCountEqual(transactions, ['2'])
+
+  def test_save_max_block(self):
+    test_max_block = 100
+    contracts = [{'address': "0x{}".format(i), "id": i} for i in range(1, 4)]
+    self.client.bulk_index(TEST_CONTRACTS_INDEX, contracts)
+    self.contracts_iterator._save_max_block(["0x1", "0x3"], test_max_block)
+
+    flags = self.client.search(TEST_CONTRACT_BLOCK_INDEX, fields=[], query="WHERE name = '{}' AND value = {}".format(
+      "tx_test_block",
+      test_max_block
+    ))
+    flags = [flag["_id"] for flag in flags]
+    self.assertCountEqual(flags, ["0x1", "0x3"])
 
 TEST_BLOCKS_INDEX = "test_ethereum_blocks"
 TEST_CONTRACTS_INDEX = "test_ethereum_contract"

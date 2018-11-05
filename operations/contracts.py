@@ -97,16 +97,16 @@ def _decode_inputs_batch_sync(encoded_params):
     for hash, (contract_abi, call_data) in encoded_params.items()
   }
 
-class Contracts(utils.ContractTransactionsIterator):
+class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
   _contracts_abi = {}
   doc_type = "itx"
   index = "internal_transaction"
   blocks_query = "traces_extracted:true"
   block_prefix = "inputs_decoded"
 
-  def __init__(self, indices, client, parity_hosts):
+  def __init__(self, indices, parity_hosts):
     self.indices = indices
-    self.client = client
+    self.client = CustomClickhouse()
     self.pool = Pool(processes=NUMBER_OF_PROCESSES)
     self.parity_hosts = parity_hosts
 
@@ -196,7 +196,7 @@ class Contracts(utils.ContractTransactionsIterator):
       self.indices["contract_abi"],
       self._get_range_query()
     )
-    return self.client.iterate(index=self.indices["contract"], query=query, fields=["address"])
+    return self._iterate_contracts(partial_query=query, fields=["address"])
 
   def save_contracts_abi(self):
     """
@@ -307,11 +307,5 @@ class Contracts(utils.ContractTransactionsIterator):
       self._decode_inputs_for_contracts(contracts, max_block)
       self._save_max_block([contract["_source"]["address"] for contract in contracts], max_block)
 
-class ElasticSearchContracts(Contracts):
-  pass
-
-class ClickhouseContracts(Contracts):
-  def __init__(self, indices=INDICES, parity_hosts=PARITY_HOSTS):
-    super().__init__(indices, CustomClickhouse(), parity_hosts)
   # _iterate_contracts_without_abi - change query
   # save_contracts_abi - change save mechanism
