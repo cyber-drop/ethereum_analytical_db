@@ -3,7 +3,6 @@ from config import INDICES, PROCESSED_CONTRACTS
 
 client = CustomElasticSearch("http://localhost:9200")
 
-
 def make_range_query(field, range_tuple, *args):
   """
   Create SQL request to get all documents with specified field in specified range
@@ -78,41 +77,6 @@ def split_on_chunks(iterable, size):
       pass
     yield elements
 
-def get_max_block(query="*", min_consistent_block=0):
-  """
-  Get last block in ElasticSearch
-  TODO should return max consistent block, i.e. block with max number N, for which N-1 blocks are presented in ElasticSearch
-
-  Returns
-  -------
-  int:
-      Last block number
-      0 if there are no blocks in ElasticSearch
-  """
-  aggregation = {
-    "size": 0,
-    "query": {
-      "bool": {
-        "must": [
-          {"query_string": {"query": query}},
-          {"range": {"number": {"gte": min_consistent_block}}}
-        ]
-      }
-    },
-    "aggs": {
-      "max_block": {
-        "max": {
-          "field": "number"
-        }
-      }
-    }
-  }
-  result = client.send_request("GET", [INDICES["block"], "b", "_search"], aggregation, {})
-  if result["aggregations"]["max_block"]["value"]:
-    return int(result["aggregations"]["max_block"]["value"])
-  else:
-    return min_consistent_block
-
 class ClickhouseContractTransactionsIterator():
   def _iterate_contracts(self, max_block=None, partial_query=None, fields=[]):
     query = partial_query
@@ -154,15 +118,22 @@ class ClickhouseContractTransactionsIterator():
         max_blocks_contracts[block] = []
       max_blocks_contracts[block].append(contract)
 
-    filters = [{
-      "bool": {
-        "must": [
-          {"terms": {"to": contracts}},
-          {"range": {"blockNumber": {"gt": max_synced_block, "lte": max_block}}}
-        ]
-      }
-    } for max_synced_block, contracts in max_blocks_contracts.items()]
-    return {"bool": {"should": filters}}
+    query = []
+    for max_synced_block, contracts in max_blocks_contracts.items():
+      if len(contracts) == 1:
+        contracts_string = "= '{}'".format(contracts[0])
+      else:
+        contracts_string = "in({})".format(", ".join(["'{}'".format(contract) for contract in contracts]))
+      if max_synced_block > 0:
+        subquery = "(to {} AND blockNumber > {} AND blockNumber <= {})".format(
+          contracts_string,
+          max_synced_block,
+          max_block
+        )
+      else:
+        subquery = "(to {})".format(contracts_string)
+      query.append(subquery)
+    return " OR ".join(query)
 
   def _iterate_transactions(self, contracts, max_block, partial_query):
     """
@@ -184,6 +155,7 @@ class ClickhouseContractTransactionsIterator():
         Generator that returns unprocessed transactions
     """
     query = partial_query
+    query += " AND " + self._create_transactions_request(contracts, max_block)
     return self.client.iterate(index=self.indices[self.index], fields=[], query=query)
 
   def _get_flag_name(self):
@@ -200,3 +172,12 @@ class ClickhouseContractTransactionsIterator():
   def _save_max_block(self, contracts, max_block):
     docs = [{"id": contract, "name": self._get_flag_name(), "value": max_block} for contract in contracts]
     self.client.bulk_index(self.indices["contract_block"], docs)
+
+  def _get_max_block(self, query={}, min_consistent_block=0):
+    query_string = " OR ".join(["(name = '{}' AND value = {})".format(field, value) for field, value in query.items()])
+    sql = "SELECT MAX(toInt32(id))"
+    if query_string:
+      sql += " FROM {} WHERE {}".format(self.indices["block_flag"], query_string)
+    else:
+      sql += " FROM {}".format(self.indices["block"])
+    return max(self.client.send_sql_request(sql), min_consistent_block)

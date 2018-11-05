@@ -43,12 +43,6 @@ class ClickhouseContractABITestCase(unittest.TestCase):
     """Test pool size"""
     assert self.contracts.pool._processes == 10
 
-  def test_set_contracts_abi(self):
-    """Test setting contracts ABI"""
-    contracts_abi = {"0x0": TEST_CONTRACT_ABI, "0x1": TEST_CONTRACT_ABI}
-    self.contracts._set_contracts_abi(contracts_abi)
-    self.assertSequenceEqual(self.contracts._contracts_abi, contracts_abi)
-
   def test_get_contract_abi(self):
     """Test getting contract ABI by address"""
     response = _get_contracts_abi_sync({1: TEST_CONTRACT_ADDRESS})
