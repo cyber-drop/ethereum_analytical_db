@@ -28,7 +28,6 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
   doc_type = "itx"
   index = "internal_transaction"
   doc = {'to': TEST_CONTRACT_ADDRESS, 'input': TEST_CONTRACT_PARAMETERS, "callType": "call", 'blockNumber': 10}
-  blocks_query = "traces_extracted:true"
 
   def setUp(self):
     self.client = TestClickhouse()
@@ -108,7 +107,7 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
 
     contracts = self.contracts._iterate_contracts_with_abi(test_max_block)
 
-    self.contracts._iterate_contracts.assert_any_call(test_max_block, ANY)
+    self.contracts._iterate_contracts.assert_any_call(test_max_block, ANY, fields=ANY)
     assert contracts == test_iterator
 
   def test_iterate_transactions_by_targets_ignore_transactions_with_error(self):
@@ -242,7 +241,7 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
     )
     self.contracts.decode_inputs()
 
-    self.contracts._get_max_block.assert_called_with(self.blocks_query)
+    self.contracts._get_max_block.assert_called_with()
     process.assert_has_calls([
       call.iterate(test_max_block),
       call.decode(ANY, test_max_block),

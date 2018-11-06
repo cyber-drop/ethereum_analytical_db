@@ -105,7 +105,6 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
   _contracts_abi = {}
   doc_type = "itx"
   index = "internal_transaction"
-  blocks_query = "traces_extracted:true"
   block_prefix = "inputs_decoded"
 
   def __init__(self, indices, parity_hosts):
@@ -299,11 +298,8 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
 
     This function is an entry point for parse-inputs operation
     """
-    max_block = self._get_max_block(self.blocks_query)
+    max_block = self._get_max_block()
     for contracts in self._iterate_contracts_with_abi(max_block):
       self._set_contracts_abi({contract["_source"]["address"]: contract["_source"]["abi"] for contract in contracts})
       self._decode_inputs_for_contracts(contracts, max_block)
       self._save_max_block([contract["_source"]["address"] for contract in contracts], max_block)
-
-  # _iterate_contracts_without_abi - change query
-  # save_contracts_abi - change save mechanism
