@@ -76,7 +76,11 @@ def _decode_input(contract_abi, call_data):
         args = [{'type': arg_types[index], 'value': str(value)} for index, value in enumerate(args)]
       except AssertionError:
         continue
-      return {'name': method_name, 'params': args}
+      return {
+        'name': method_name,
+        'params.type': [arg["type"] for arg in args],
+        'params.value': [arg["value"] for arg in args]
+      }
 
 def _decode_inputs_batch_sync(encoded_params):
   """
@@ -228,20 +232,11 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
     generator
         Generator that iterates through contracts by conditions above
     """
-    # query = {
-    #   "bool": {
-    #     "must": [
-    #       {"exists": {"field": "address"}},
-    #       {"exists": {"field": "abi"}},
-    #       {"query_string": {"query": self._get_range_query()}},
-    #     ]
-    #   }
-    # }
     query = "ANY INNER JOIN {} USING id WHERE abi IS NOT NULL AND {}".format(
       self.indices["contract_abi"],
       self._get_range_query()
     )
-    return self._iterate_contracts(max_block, query)
+    return self._iterate_contracts(max_block, query, fields=["abi", "address"])
 
   def _iterate_transactions_by_targets(self, contracts, max_block):
     """
@@ -261,7 +256,13 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
     generator
         Generator that iterates through transactions by conditions above
     """
-    return self._iterate_transactions(contracts, max_block, "WHERE error IS NULL AND callType = 'call'")
+    return self._iterate_transactions(contracts, max_block, "WHERE error IS NULL AND callType = 'call'", fields=["input", "to"])
+
+  def _add_id_to_inputs(self, decoded_inputs):
+    for hash, input in decoded_inputs.items():
+      input.update({
+        "id": hash
+      })
 
   def _decode_inputs_for_contracts(self, contracts, max_block):
     """
@@ -287,9 +288,9 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
           for transaction in transactions
         }
         decoded_inputs = self._decode_inputs_batch(inputs)
-        operations = [self.client.update_op(doc={'decoded_input': input}, id=hash) for hash, input in decoded_inputs.items()]
-        self.client.bulk(operations, doc_type=self.doc_type, index=self.indices[self.index], refresh=True)
-      except:
+        self._add_id_to_inputs(decoded_inputs)
+        self.client.bulk_index(index=self.indices['transaction_input'], docs=list(decoded_inputs.values()))
+      except Exception as e:
         pass
 
   def decode_inputs(self):

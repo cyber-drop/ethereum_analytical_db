@@ -458,9 +458,9 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
     self.indices.prepare_indices()
     test_input = {
       "id": 1,
-      "name": "transfer",
-      "types": ["string", "integer", "string"],
-      "arguments": ["1000", "2000", "3000"]
+      'name': 'transfer',
+      'params.type': ['address', '0xd11b80088ce2623a9c017b93008405511cd951d2'],
+      'params.value': ['0xd11b80088ce2623a9c017b93008405511cd951d2', '243571300000000000000']
     }
     self.client.bulk_index(index=TEST_INDICES["transaction_input"], docs=[test_input])
     result = self.client.search(index=TEST_INDICES["transaction_input"], fields=[])

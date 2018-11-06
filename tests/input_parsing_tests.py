@@ -12,7 +12,11 @@ from operations.indices import ClickhouseIndices
 TEST_CONTRACT_ABI = json.loads('[{"constant":true,"inputs":[],"name":"name","outputs":[{"name":"","type":"bytes32"}],"payable":false,"type":"function"},{"constant":false,"inputs":[],"name":"stop","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"guy","type":"address"},{"name":"wad","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"owner_","type":"address"}],"name":"setOwner","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"src","type":"address"},{"name":"dst","type":"address"},{"name":"wad","type":"uint256"}],"name":"transferFrom","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"dst","type":"address"},{"name":"wad","type":"uint128"}],"name":"push","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"name_","type":"bytes32"}],"name":"setName","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"wad","type":"uint128"}],"name":"mint","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"src","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"stopped","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"authority_","type":"address"}],"name":"setAuthority","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"src","type":"address"},{"name":"wad","type":"uint128"}],"name":"pull","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"owner","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"wad","type":"uint128"}],"name":"burn","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"bytes32"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"dst","type":"address"},{"name":"wad","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":false,"inputs":[],"name":"start","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"authority","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"src","type":"address"},{"name":"guy","type":"address"}],"name":"allowance","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"inputs":[{"name":"symbol_","type":"bytes32"}],"payable":false,"type":"constructor"},{"anonymous":true,"inputs":[{"indexed":true,"name":"sig","type":"bytes4"},{"indexed":true,"name":"guy","type":"address"},{"indexed":true,"name":"foo","type":"bytes32"},{"indexed":true,"name":"bar","type":"bytes32"},{"indexed":false,"name":"wad","type":"uint256"},{"indexed":false,"name":"fax","type":"bytes"}],"name":"LogNote","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"authority","type":"address"}],"name":"LogSetAuthority","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"owner","type":"address"}],"name":"LogSetOwner","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"from","type":"address"},{"indexed":true,"name":"to","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Transfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"owner","type":"address"},{"indexed":true,"name":"spender","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Approval","type":"event"}]')
 TEST_CONTRACT_ADDRESS = '0x86fa049857e0209aa7d9e616f7eb3b3b78ecfdb0'
 TEST_CONTRACT_PARAMETERS = '0xa9059cbb000000000000000000000000d11b80088ce2623a9c017b93008405511cd951d200000000000000000000000000000000000000000000000d343b16da9c1a4000'
-TEST_CONTRACT_DECODED_PARAMETERS = {'name': 'transfer', 'params': [{'type': 'address', 'value': '0xd11b80088ce2623a9c017b93008405511cd951d2'}, {'type': 'uint256', 'value': '243571300000000000000'}]}
+TEST_CONTRACT_DECODED_PARAMETERS = {
+  'name': 'transfer',
+  'params.type': ['address', 'uint256'],
+  'params.value': ['0xd11b80088ce2623a9c017b93008405511cd951d2', '243571300000000000000'],
+}
 TEST_TRANSACTIONS_INDEX = 'test_ethereum_transactions'
 TEST_CONTRACTS_INDEX = 'test_ethereum_contracts'
 TEST_CONTRACTS_ABI_INDEX = 'test_ethereum_contracts_abi'
@@ -32,7 +36,8 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
       "contract": TEST_CONTRACTS_INDEX,
       self.index: TEST_TRANSACTIONS_INDEX,
       "contract_abi": TEST_CONTRACTS_ABI_INDEX,
-      "contract_block": TEST_CONTRACT_BLOCK_INDEX
+      "contract_block": TEST_CONTRACT_BLOCK_INDEX,
+      "transaction_input": TEST_TRANSACTIONS_INPUT_INDEX
     }
     self.contracts = self.contracts_class(
       self.indices,
@@ -136,7 +141,7 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
 
     transactions = self.contracts._iterate_transactions_by_targets(test_contracts, test_max_block)
 
-    self.contracts._iterate_transactions.assert_any_call(test_contracts, test_max_block, ANY)
+    self.contracts._iterate_transactions.assert_any_call(test_contracts, test_max_block, ANY, fields=ANY)
     assert transactions == test_iterator
 
   def test_decode_inputs_for_contracts(self):
@@ -155,9 +160,10 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
     self.contracts._decode_inputs_for_contracts(contracts, test_max_block)
     transactions = self.client.search(
       index=TEST_TRANSACTIONS_INPUT_INDEX,
-      fields=[]
+      fields=["params.type", "params.value", "name"]
     )
-    decoded_inputs = [t["_source"]["decoded_input"] for t in transactions]
+    # TODO remove a JSON convertation hack to replace tuples with arrays
+    decoded_inputs = [json.loads(json.dumps(t["_source"])) for t in transactions]
     self.assertCountEqual(decoded_inputs, [TEST_CONTRACT_DECODED_PARAMETERS] * 10)
 
   def test_decode_inputs_for_contracts_iterate_arguments(self):
@@ -191,15 +197,15 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
         "input": "input" + str(j)
       }
     } for i in range(10)] for j in range(10)]
-    self.contracts._set_contracts_abi({i: "abi" + str(i) for i in range(10)})
+    self.contracts._set_contracts_abi({i: json.dumps({"abi": i}) for i in range(10)})
     self.contracts._iterate_transactions_by_targets = MagicMock(return_value=test_transactions)
-    self.contracts.client.bulk = MagicMock()
+    self.contracts._add_id_to_inputs = MagicMock()
+    self.contracts.client.bulk_index = MagicMock()
     self.contracts._decode_inputs_batch = MagicMock(side_effect=exception_on_seven)
 
     self.contracts._decode_inputs_for_contracts([], ANY)
-    print(self.contracts.client.bulk.call_count)
 
-    assert self.contracts.client.bulk.call_count == 9
+    assert self.contracts.client.bulk_index.call_count == 9
 
   def test_decode_inputs_save_inputs_decoded(self):
     """Test saving decoded inputs in process"""
@@ -249,8 +255,8 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
       self.client.index(TEST_CONTRACTS_INDEX, {'address': TEST_CONTRACT_ADDRESS, 'blockNumber': i}, id=i + 1)
     for i in tqdm(range(10)):
       self.client.index(TEST_TRANSACTIONS_INDEX, self.doc, id=i + 1)
-    with patch('utils.get_max_block', return_value=1000):
-      self.contracts.save_contracts_abi()
-      self.contracts.decode_inputs()
-      transactions = self.client.search(index=TEST_TRANSACTIONS_INDEX, doc_type=self.doc_type, query="*")['hits']['hits']
-      assert len([transaction["_source"]["decoded_input"] for transaction in transactions]) == 10
+    self.contracts._get_max_block = MagicMock(return_value=1000)
+    self.contracts.save_contracts_abi()
+    self.contracts.decode_inputs()
+    transactions = self.client.search(index=TEST_TRANSACTIONS_INPUT_INDEX, fields=["name"])
+    assert len([transaction["_source"] for transaction in transactions]) == 10

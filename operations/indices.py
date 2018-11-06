@@ -92,7 +92,7 @@ INDEX_FIELDS = {
   "transaction_input": {
     "name": "String",
     "types": "Array(String)",
-    "arguments": "Array(String)"
+    "params": "Nested(type String, value String)"
   }
 }
 
