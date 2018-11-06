@@ -298,7 +298,7 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
 
     This function is an entry point for parse-inputs operation
     """
-    max_block = self._get_max_block()
+    max_block = self._get_max_block({"traces_extracted": 1})
     for contracts in self._iterate_contracts_with_abi(max_block):
       self._set_contracts_abi({contract["_source"]["address"]: contract["_source"]["abi"] for contract in contracts})
       self._decode_inputs_for_contracts(contracts, max_block)

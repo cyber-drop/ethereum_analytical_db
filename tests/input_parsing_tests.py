@@ -22,6 +22,8 @@ TEST_CONTRACTS_INDEX = 'test_ethereum_contracts'
 TEST_CONTRACTS_ABI_INDEX = 'test_ethereum_contracts_abi'
 TEST_CONTRACT_BLOCK_INDEX = 'test_ethereum_contract_block'
 TEST_TRANSACTIONS_INPUT_INDEX = 'test_transactions_input'
+TEST_BLOCKS_INDEX = 'test_ethereum_blocks'
+TEST_BLOCKS_FLAG_INDEX = 'test_ethereum_blocks_flag'
 
 class ClickhouseInputParsingTestCase(unittest.TestCase):
   contracts_class = ClickhouseContracts
@@ -36,7 +38,9 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
       self.index: TEST_TRANSACTIONS_INDEX,
       "contract_abi": TEST_CONTRACTS_ABI_INDEX,
       "contract_block": TEST_CONTRACT_BLOCK_INDEX,
-      "transaction_input": TEST_TRANSACTIONS_INPUT_INDEX
+      "transaction_input": TEST_TRANSACTIONS_INPUT_INDEX,
+      "block": TEST_BLOCKS_INDEX,
+      "block_flag": TEST_BLOCKS_FLAG_INDEX
     }
     self.contracts = self.contracts_class(
       self.indices,
@@ -241,12 +245,34 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
     )
     self.contracts.decode_inputs()
 
-    self.contracts._get_max_block.assert_called_with()
+    self.contracts._get_max_block.assert_called_with(ANY)
     process.assert_has_calls([
       call.iterate(test_max_block),
       call.decode(ANY, test_max_block),
       call.save(ANY, test_max_block)
     ])
+
+  def test_decode_inputs_use_block_query_for_max_block(self):
+    test_blocks = [{
+      "id": 1,
+      "number": 1
+    }, {
+      "id": 2,
+      "number": 2
+    }]
+    test_block_flags = [{
+      "id": 1,
+      "name": "traces_extracted",
+      "value": 1
+    }]
+    test_max_block = 1
+    self.client.bulk_index(index=TEST_BLOCKS_INDEX, docs=test_blocks)
+    self.client.bulk_index(index=TEST_BLOCKS_FLAG_INDEX, docs=test_block_flags)
+    self.contracts._iterate_contracts_with_abi = MagicMock(return_value=[])
+
+    self.contracts.decode_inputs()
+
+    self.contracts._iterate_contracts_with_abi.assert_called_with(test_max_block)
 
   def test_decode_inputs_for_big_portion_of_contracts(self):
     """Test decoding inputs for big portion of contracts in ElasticSearch"""
