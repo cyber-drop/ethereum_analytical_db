@@ -107,7 +107,7 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
   index = "internal_transaction"
   block_prefix = "inputs_decoded"
 
-  def __init__(self, indices, parity_hosts):
+  def __init__(self, indices=INDICES, parity_hosts=PARITY_HOSTS):
     self.indices = indices
     self.client = CustomClickhouse()
     self.pool = Pool(processes=NUMBER_OF_PROCESSES)

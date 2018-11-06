@@ -40,3 +40,8 @@ def extract_events():
   print("Extracting events...")
   events = Events()
   events.extract_events()
+
+def parse_transactions_inputs():
+  print("Parsing transactions inputs...")
+  contracts = ClickhouseContracts()
+  contracts.decode_inputs()

@@ -14,7 +14,8 @@ OPERATIONS = {
     "extract-traces": clickhouse.extract_traces,
     "extract-contracts-abi": clickhouse.extract_contracts_abi,
     "extract-transaction-fees": clickhouse.extract_transaction_fees,
-    "extract-events": clickhouse.extract_events
+    "extract-events": clickhouse.extract_events,
+    "parse-transactions-inputs": clickhouse.parse_transactions_inputs,
   }
 }
 
