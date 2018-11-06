@@ -1,4 +1,4 @@
-from operations.inputs import ClickhouseInputs
+from operations.inputs import ClickhouseEventsInputs, ClickhouseTransactionsInputs
 from operations import inputs
 import os
 import unittest
@@ -25,12 +25,7 @@ TEST_TRANSACTIONS_INPUT_INDEX = 'test_transactions_input'
 TEST_BLOCKS_INDEX = 'test_ethereum_blocks'
 TEST_BLOCKS_FLAG_INDEX = 'test_ethereum_blocks_flag'
 
-class ClickhouseInputParsingTestCase(unittest.TestCase):
-  contracts_class = ClickhouseInputs
-  doc_type = "itx"
-  index = "internal_transaction"
-  doc = {'to': TEST_CONTRACT_ADDRESS, 'input': TEST_CONTRACT_PARAMETERS, "callType": "call", 'blockNumber': 10}
-
+class ClickhouseInputParsingTestCase():
   def setUp(self):
     self.client = TestClickhouse()
     self.indices = {
@@ -38,7 +33,7 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
       self.index: TEST_TRANSACTIONS_INDEX,
       "contract_abi": TEST_CONTRACTS_ABI_INDEX,
       "contract_block": TEST_CONTRACT_BLOCK_INDEX,
-      "transaction_input": TEST_TRANSACTIONS_INPUT_INDEX,
+      self.input_index: TEST_TRANSACTIONS_INPUT_INDEX,
       "block": TEST_BLOCKS_INDEX,
       "block_flag": TEST_BLOCKS_FLAG_INDEX
     }
@@ -46,6 +41,9 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
       self.indices,
       parity_hosts=[(None, None, "http://localhost:8545")]
     )
+    self.contracts.doc_type = self.doc_type
+    self.contracts.index = self.index
+    self.contracts.input_index = self.input_index
     self.client.prepare_indices(self.indices)
 
   def test_set_contracts_abi(self):
@@ -114,35 +112,15 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
     self.contracts._iterate_contracts.assert_any_call(test_max_block, ANY, fields=ANY)
     assert contracts == test_iterator
 
-  def test_iterate_transactions_by_targets_ignore_transactions_with_error(self):
-    """Test iterations through CALL EVM transactions without errors"""
-    self.contracts._create_transactions_request = MagicMock(return_value="id IS NOT NULL")
-    test_transactions = [{
-      "id": 1,
-      "callType": "call"
-    }, {
-      "id": 2,
-      "callType": "delegatecall"
-    }, {
-      "id": 3,
-      "callType": "call",
-      "error": "Out of gas"
-    }]
-
-    self.client.bulk_index(index=TEST_TRANSACTIONS_INDEX, docs=test_transactions)
-    targets = [{"_source": {"address": TEST_CONTRACT_ADDRESS}}]
-    transactions = self.contracts._iterate_transactions_by_targets(targets, 0)
-    transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
-    self.assertCountEqual(transactions, ['1'])
-
   def test_iterate_transactions_by_targets_select_unprocessed_transactions(self):
     """Test iterations through transactions before specified block"""
-    test_iterator = "iterator"
+    test_iterator = []
     test_max_block = 0
     test_contracts = ["contract"]
     self.contracts._iterate_transactions = MagicMock(return_value=test_iterator)
 
     transactions = self.contracts._iterate_transactions_by_targets(test_contracts, test_max_block)
+    transactions = [t for t in transactions]
 
     self.contracts._iterate_transactions.assert_any_call(test_contracts, test_max_block, ANY, fields=ANY)
     assert transactions == test_iterator
@@ -195,12 +173,11 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
 
     test_transactions = [[{
       "_id": i*10 + j,
-      "_source": {
-        "to": i,
+      "_source": {**self.doc, **{
         "input": "input" + str(j)
-      }
+      }}
     } for i in range(10)] for j in range(10)]
-    self.contracts._set_contracts_abi({i: json.dumps({"abi": i}) for i in range(10)})
+    self.contracts._set_contracts_abi({TEST_CONTRACT_ADDRESS: json.dumps({"abi": i}) for i in range(10)})
     self.contracts._iterate_transactions_by_targets = MagicMock(return_value=test_transactions)
     self.contracts._add_id_to_inputs = MagicMock()
     self.contracts.client.bulk_index = MagicMock()
@@ -262,7 +239,7 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
     }]
     test_block_flags = [{
       "id": 1,
-      "name": "traces_extracted",
+      "name": self.block_flag_name,
       "value": 1
     }]
     test_max_block = 1
@@ -287,3 +264,63 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
 
     transactions = self.client.search(index=TEST_TRANSACTIONS_INPUT_INDEX, fields=["name"])
     assert len([transaction["_source"] for transaction in transactions]) == 10
+
+class ClickhouseTransactionsInputParsingTestCase(ClickhouseInputParsingTestCase, unittest.TestCase):
+  doc = {
+    'to': TEST_CONTRACT_ADDRESS,
+    'input': TEST_CONTRACT_PARAMETERS,
+    "callType": "call",
+    'blockNumber': 10
+  }
+  contracts_class = ClickhouseTransactionsInputs
+  doc_type = "itx"
+  index = "internal_transaction"
+  input_index = "transaction_input"
+  block_flag_name = "traces_extracted"
+
+  def test_iterate_transactions_by_targets_ignore_transactions_with_error(self):
+    """Test iterations through CALL EVM transactions without errors"""
+    self.contracts._create_transactions_request = MagicMock(return_value="id IS NOT NULL")
+    test_transactions = [{
+      "id": 1,
+      "callType": "call"
+    }, {
+      "id": 2,
+      "callType": "delegatecall"
+    }, {
+      "id": 3,
+      "callType": "call",
+      "error": "Out of gas"
+    }]
+
+    self.client.bulk_index(index=TEST_TRANSACTIONS_INDEX, docs=test_transactions)
+    targets = [{"_source": {"address": TEST_CONTRACT_ADDRESS}}]
+    transactions = self.contracts._iterate_transactions_by_targets(targets, 0)
+    transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
+    self.assertCountEqual(transactions, ['1'])
+
+class ClickhouseEventsInputParsingTestCase(ClickhouseInputParsingTestCase, unittest.TestCase):
+  doc = {
+    'address': TEST_CONTRACT_ADDRESS,
+    'topics': [
+      TEST_CONTRACT_PARAMETERS[0:10],
+      "0x" + TEST_CONTRACT_PARAMETERS[10:32+10],
+      "0x" + TEST_CONTRACT_PARAMETERS[32 + 10:64 + 10],
+      "0x" + TEST_CONTRACT_PARAMETERS[64 + 10:96 + 10],
+    ],
+    'data': "0x" + TEST_CONTRACT_PARAMETERS[96 + 10:96 + 32 + 10],
+    'blockNumber': 10
+  }
+  contracts_class = ClickhouseEventsInputs
+  doc_type = "event"
+  index = "event"
+  input_index = "event_input"
+  block_flag_name = "events_extracted"
+
+  def test_iterate_transactions_restore_input_field(self):
+    test_transactions = [{"_source": self.doc}]
+    self.contracts._iterate_transactions = MagicMock(return_value=[test_transactions])
+    transactions = self.contracts._iterate_transactions_by_targets([], 0)
+    transaction = next(transactions)[0]
+    assert transaction["_source"]["input"] == TEST_CONTRACT_PARAMETERS
+

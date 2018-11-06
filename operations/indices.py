@@ -93,6 +93,11 @@ INDEX_FIELDS = {
     "name": "String",
     "types": "Array(String)",
     "params": "Nested(type String, value String)"
+  },
+  "event_input": {
+    "name": "String",
+    "types": "Array(String)",
+    "params": "Nested(type String, value String)"
   }
 }
 

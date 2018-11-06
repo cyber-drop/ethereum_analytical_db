@@ -44,6 +44,7 @@ class ClickhouseIteratorTestCase(unittest.TestCase):
     self.contracts_iterator.doc_type = "tx"
     self.contracts_iterator.block_prefix = "test"
     self.contracts_iterator.index = "internal_transaction"
+    self.contracts_iterator.contract_field = "to"
 
   def tearDown(self):
     config.PROCESSED_CONTRACTS.clear()
@@ -185,6 +186,18 @@ class ClickhouseIteratorTestCase(unittest.TestCase):
       test_max_block
     )
     assert transactions_request == "(to in('0x1', '0x2') AND blockNumber > 10 AND blockNumber <= 40)"
+
+  def test_create_transactions_request_contract_field(self):
+    test_max_block = 40
+    test_contracts = [
+      {"_source": {"address": "0x1"}},
+    ]
+    self.contracts_iterator.contract_field = "test_field"
+    transactions_request = self.contracts_iterator._create_transactions_request(
+      test_contracts,
+      test_max_block
+    )
+    assert transactions_request == "(test_field = '0x1')"
 
   def test_iterate_transactions_by_query(self):
     self.contracts_iterator._create_transactions_request = MagicMock(return_value="id IS NOT NULL")

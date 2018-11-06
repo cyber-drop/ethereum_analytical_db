@@ -5,11 +5,11 @@ from ethereum.abi import (
     method_id as get_abi_method_id)
 from ethereum.utils import encode_int, zpad, decode_hex
 from multiprocessing import Pool
-from config import PARITY_HOSTS, INDICES
+from config import PARITY_HOSTS, INDICES, INPUT_PARSING_PROCESSES
 import utils
 from clients.custom_clickhouse import CustomClickhouse
 
-NUMBER_OF_PROCESSES = 10
+NUMBER_OF_PROCESSES = INPUT_PARSING_PROCESSES
 
 def _decode_input(contract_abi, call_data):
   """
@@ -72,8 +72,6 @@ def _decode_inputs_batch_sync(encoded_params):
 
 class ClickhouseInputs(utils.ClickhouseContractTransactionsIterator):
   _contracts_abi = {}
-  doc_type = "itx"
-  index = "internal_transaction"
   block_prefix = "inputs_decoded"
 
   def __init__(self, indices=INDICES, parity_hosts=PARITY_HOSTS):
@@ -161,26 +159,6 @@ class ClickhouseInputs(utils.ClickhouseContractTransactionsIterator):
     )
     return self._iterate_contracts(max_block, query, fields=["abi", "address"])
 
-  def _iterate_transactions_by_targets(self, contracts, max_block):
-    """
-    Iterate through internal CALL transactions without errors
-    to specified contracts before specified block
-
-    Parameters
-    ----------
-    contracts : list
-        Contracts info in ElasticSearch JSON format, i.e.
-        {"_id": TRANSACTION_ID, "_source": {"document": "fields"}}
-    max_block : int
-        Block number
-
-    Returns
-    -------
-    generator
-        Generator that iterates through transactions by conditions above
-    """
-    return self._iterate_transactions(contracts, max_block, "WHERE error IS NULL AND callType = 'call'", fields=["input", "to"])
-
   def _add_id_to_inputs(self, decoded_inputs):
     for hash, input in decoded_inputs.items():
       input.update({
@@ -205,16 +183,16 @@ class ClickhouseInputs(utils.ClickhouseContractTransactionsIterator):
       try:
         inputs = {
           transaction["_id"]: (
-            self._contracts_abi[transaction["_source"]["to"]],
+            self._contracts_abi[transaction["_source"][self.contract_field]],
             transaction["_source"]["input"]
           )
           for transaction in transactions
         }
         decoded_inputs = self._decode_inputs_batch(inputs)
         self._add_id_to_inputs(decoded_inputs)
-        self.client.bulk_index(index=self.indices['transaction_input'], docs=list(decoded_inputs.values()))
-      except Exception as e:
-        pass
+        self.client.bulk_index(index=self.indices[self.input_index], docs=list(decoded_inputs.values()))
+      except Exception as exception:
+        print(exception)
 
   def decode_inputs(self):
     """
@@ -222,8 +200,33 @@ class ClickhouseInputs(utils.ClickhouseContractTransactionsIterator):
 
     This function is an entry point for parse-inputs operation
     """
-    max_block = self._get_max_block({"traces_extracted": 1})
+    max_block = self._get_max_block({self.block_flag_name: 1})
     for contracts in self._iterate_contracts_with_abi(max_block):
       self._set_contracts_abi({contract["_source"]["address"]: contract["_source"]["abi"] for contract in contracts})
       self._decode_inputs_for_contracts(contracts, max_block)
       self._save_max_block([contract["_source"]["address"] for contract in contracts], max_block)
+
+class ClickhouseTransactionsInputs(ClickhouseInputs):
+  doc_type = "itx"
+  index = "internal_transaction"
+  input_index = "transaction_input"
+  block_flag_name = "traces_extracted"
+  contract_field = "to"
+
+  def _iterate_transactions_by_targets(self, contracts, max_block):
+    return self._iterate_transactions(contracts, max_block, "WHERE error IS NULL AND callType = 'call'", fields=["input", "to"])
+
+class ClickhouseEventsInputs(ClickhouseInputs):
+  doc_type = "event"
+  index = "event"
+  input_index = "event_input"
+  block_flag_name = "events_extracted"
+  contract_field = "address"
+
+  def _iterate_transactions_by_targets(self, contracts, max_block):
+    for transactions in self._iterate_transactions(contracts, max_block, "WHERE id IS NOT NULL", fields=["topics", "data", "address"]):
+      for transaction in transactions:
+        transaction = transaction["_source"]
+        transaction["input"] = transaction["topics"][0][0:10] + "".join([topic[2:] for topic in transaction["topics"][1:]]) + transaction["data"][2:]
+      yield transactions
+

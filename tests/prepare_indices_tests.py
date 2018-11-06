@@ -454,7 +454,7 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
     result = [flag["_id"] for flag in result]
     self.assertCountEqual(["0x1"], result)
 
-  def test_create_transactions_inputs_index(self):
+  def _test_create_inputs_index(self, index):
     self.indices.prepare_indices()
     test_input = {
       "id": 1,
@@ -462,10 +462,16 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
       'params.type': ['address', '0xd11b80088ce2623a9c017b93008405511cd951d2'],
       'params.value': ['0xd11b80088ce2623a9c017b93008405511cd951d2', '243571300000000000000']
     }
-    self.client.bulk_index(index=TEST_INDICES["transaction_input"], docs=[test_input])
-    result = self.client.search(index=TEST_INDICES["transaction_input"], fields=[])
+    self.client.bulk_index(index=TEST_INDICES[index], docs=[test_input])
+    result = self.client.search(index=TEST_INDICES[index], fields=[])
     result = [flag["_id"] for flag in result]
     self.assertCountEqual(["1"], result)
+
+  def test_create_transactions_inputs_index(self):
+    self._test_create_inputs_index("transaction_input")
+
+  def test_create_events_inputs_index(self):
+    self._test_create_inputs_index("event_input")
 
 CURRENT_ELASTICSEARCH_SIZE = 290659165119
 TEST_INDEX = 'test_ethereum_transactions'
@@ -484,5 +490,6 @@ TEST_INDICES = {
   "contract_abi": "test_contract_abi",
   "contract_block": "test_contract_block",
   "transaction_fee": "test_transaction_fee",
-  "transaction_input": "test_transaction_input"
+  "transaction_input": "test_transaction_input",
+  "event_input": "test_event_input",
 }

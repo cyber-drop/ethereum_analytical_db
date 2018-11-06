@@ -125,13 +125,14 @@ class ClickhouseContractTransactionsIterator():
       else:
         contracts_string = "in({})".format(", ".join(["'{}'".format(contract) for contract in contracts]))
       if max_synced_block > 0:
-        subquery = "(to {} AND blockNumber > {} AND blockNumber <= {})".format(
+        subquery = "({} {} AND blockNumber > {} AND blockNumber <= {})".format(
+          self.contract_field,
           contracts_string,
           max_synced_block,
           max_block
         )
       else:
-        subquery = "(to {})".format(contracts_string)
+        subquery = "({} {})".format(self.contract_field, contracts_string)
       query.append(subquery)
     return " OR ".join(query)
 
@@ -155,7 +156,6 @@ class ClickhouseContractTransactionsIterator():
         Generator that returns unprocessed transactions
     """
     query = partial_query
-    print(self._create_transactions_request(contracts, max_block))
     query += " AND " + self._create_transactions_request(contracts, max_block)
     return self.client.iterate(index=self.indices[self.index], fields=fields, query=query)
 
