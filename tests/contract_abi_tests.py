@@ -94,11 +94,11 @@ class ClickhouseContractABITestCase(unittest.TestCase):
       self.indices,
       parity_hosts=[(0, 8, "http://localhost:8545")]
     )
-    with patch('utils.get_max_block', return_value=2):
-      self.add_contracts_with_and_without_abi()
-      contracts = [c for c in self.contracts._iterate_contracts_without_abi()]
-      contracts = [c["_id"] for contracts_list in contracts for c in contracts_list]
-      self.assertCountEqual(contracts, [str(i) for i in range(1, 9)])
+    self.contracts._get_max_block = MagicMock(return_value=2)
+    self.add_contracts_with_and_without_abi()
+    contracts = [c for c in self.contracts._iterate_contracts_without_abi()]
+    contracts = [c["_id"] for contracts_list in contracts for c in contracts_list]
+    self.assertCountEqual(contracts, [str(i) for i in range(1, 9)])
 
   def test_iterate_contracts_without_abi_call_iterate_contracts(self):
     """Test iterations through all contracts using limitations by whitelist"""

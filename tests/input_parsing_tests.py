@@ -1,5 +1,5 @@
-from operations.contracts import _get_contracts_abi_sync, ClickhouseContracts
-from operations import contracts
+from operations.inputs import ClickhouseInputs
+from operations import inputs
 import os
 import unittest
 from tests.test_utils import TestElasticSearch, mockify, TestClickhouse
@@ -26,7 +26,7 @@ TEST_BLOCKS_INDEX = 'test_ethereum_blocks'
 TEST_BLOCKS_FLAG_INDEX = 'test_ethereum_blocks_flag'
 
 class ClickhouseInputParsingTestCase(unittest.TestCase):
-  contracts_class = ClickhouseContracts
+  contracts_class = ClickhouseInputs
   doc_type = "itx"
   index = "internal_transaction"
   doc = {'to': TEST_CONTRACT_ADDRESS, 'input': TEST_CONTRACT_PARAMETERS, "callType": "call", 'blockNumber': 10}
@@ -59,7 +59,7 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
 
   def test_decode_inputs_batch_sync(self):
     """Test decode inputs batch"""
-    response = contracts._decode_inputs_batch_sync({
+    response = inputs._decode_inputs_batch_sync({
       "0x1": (TEST_CONTRACT_ABI, TEST_CONTRACT_PARAMETERS),
       "0x2": (TEST_CONTRACT_ABI, TEST_CONTRACT_PARAMETERS)
     })
@@ -70,17 +70,17 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
 
   def test_decode_inputs_batch(self):
     """Test decoding inputs batch in parallel mode"""
-    inputs = {"0x" + str(i): "input" + str(i) for i in range(100)}
+    test_inputs = {"0x" + str(i): "input" + str(i) for i in range(100)}
     chunks = [[("0x1", "input1")], [("0x1", "input2")]]
     decoded_inputs = [{"0x1": "decoded_input2"}, {"0x0": "decoded_input1"}]
 
     self.contracts._split_on_chunks = MagicMock(return_value=chunks)
     self.contracts.pool.map = MagicMock(return_value=decoded_inputs)
 
-    response = self.contracts._decode_inputs_batch(inputs)
+    response = self.contracts._decode_inputs_batch(test_inputs)
 
-    self.contracts._split_on_chunks.assert_called_with([(hash, input) for hash, input in inputs.items()], 10)
-    self.contracts.pool.map.assert_called_with(contracts._decode_inputs_batch_sync, [dict(chunk) for chunk in chunks])
+    self.contracts._split_on_chunks.assert_called_with([(hash, input) for hash, input in test_inputs.items()], 10)
+    self.contracts.pool.map.assert_called_with(inputs._decode_inputs_batch_sync, [dict(chunk) for chunk in chunks])
     self.assertSequenceEqual({"0x0": "decoded_input1", "0x1": "decoded_input2"}, response)
 
   def add_contracts_with_and_without_abi(self):
@@ -279,9 +279,11 @@ class ClickhouseInputParsingTestCase(unittest.TestCase):
     for i in tqdm(range(10)):
       self.client.index(TEST_CONTRACTS_INDEX, {'address': TEST_CONTRACT_ADDRESS, 'blockNumber': i}, id=i + 1)
     for i in tqdm(range(10)):
+      self.client.index(TEST_CONTRACTS_ABI_INDEX, {'abi': json.dumps(TEST_CONTRACT_ABI)}, id=i + 1)
+    for i in tqdm(range(10)):
       self.client.index(TEST_TRANSACTIONS_INDEX, self.doc, id=i + 1)
     self.contracts._get_max_block = MagicMock(return_value=1000)
-    self.contracts.save_contracts_abi()
     self.contracts.decode_inputs()
+
     transactions = self.client.search(index=TEST_TRANSACTIONS_INPUT_INDEX, fields=["name"])
     assert len([transaction["_source"] for transaction in transactions]) == 10
