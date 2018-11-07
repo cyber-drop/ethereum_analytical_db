@@ -148,7 +148,7 @@ class ClickhouseIteratorTestCase(unittest.TestCase):
     test_fields = ["field1", "field2"]
     self.contracts_iterator.client.iterate = MagicMock()
     self.contracts_iterator._iterate_contracts(partial_query="WHERE address IS NOT NULL", fields=test_fields)
-    self.contracts_iterator.client.iterate.assert_called_with(index=ANY, query=ANY, fields=test_fields)
+    self.contracts_iterator.client.iterate.assert_called_with(index=ANY, query=ANY, fields=test_fields + ["tx_test_block"], final=ANY)
 
   def test_iterate_contracts_return_flags(self):
     test_contracts = [{
