@@ -16,6 +16,7 @@ OPERATIONS = {
     "extract-transaction-fees": clickhouse.extract_transaction_fees,
     "extract-events": clickhouse.extract_events,
     "parse-transactions-inputs": clickhouse.parse_transactions_inputs,
+    "parse-events-inputs": clickhouse.parse_events_inputs,
   }
 }
 

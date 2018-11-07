@@ -3,6 +3,7 @@ from operations.internal_transactions import ClickhouseInternalTransactions
 from operations.blocks import ClickhouseBlocks
 from operations.contract_transactions import ClickhouseContractTransactions
 from operations.contracts import ClickhouseContracts
+from operations.inputs import ClickhouseTransactionsInputs, ClickhouseEventsInputs
 from operations.transaction_fees import ClickhouseTransactionFees
 from operations.events import Events
 
@@ -43,5 +44,10 @@ def extract_events():
 
 def parse_transactions_inputs():
   print("Parsing transactions inputs...")
-  contracts = ClickhouseContracts()
+  contracts = ClickhouseTransactionsInputs()
+  contracts.decode_inputs()
+
+def parse_events_inputs():
+  print("Parsing events inputs...")
+  contracts = ClickhouseEventsInputs()
   contracts.decode_inputs()
