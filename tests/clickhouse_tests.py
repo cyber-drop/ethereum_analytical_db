@@ -58,6 +58,13 @@ class ClickhouseTestCase(unittest.TestCase):
     result = next(result)
     assert len(result) == 2
 
+  def test_iterate_with_and_without_final(self):
+    self._add_records()
+    self._add_records()
+    result_with_final = self.new_client.iterate(index="test", fields=[])
+    result_without_final = self.new_client.iterate(index="test", fields=[], final=False)
+    assert len(next(result_without_final)) > len(next(result_with_final))
+
   def test_iterate_with_derived_fields(self):
     self._add_records()
     result = self.new_client.iterate(index="test", fields=["x - 1 AS y"])
@@ -71,11 +78,8 @@ class ClickhouseTestCase(unittest.TestCase):
     self.assertCountEqual(result, [(str(doc["x"]), ) for doc in documents])
 
   def test_bulk_index_empty_fields(self):
-    # , {"id": 2, "dict": {"x": 1}}
     documents = [{"id": 1, "x": 1}]
     self.new_client.bulk_index(index="test", docs=[d for d in documents])
-    # result = self.client.execute('SELECT id FROM test')
-    # self.assertCountEqual(result, [("1", ), ("2", )])
 
   def test_bulk_index_dict_values(self):
     documents = [{"x": i, "dict": {"test": i}} for i in range(10)]

@@ -3,7 +3,7 @@ from clients.custom_clickhouse import CustomClickhouse
 from config import INDICES
 import utils
 
-class ElasticSearchContractTransactions(utils.ContractTransactionsIterator):
+class ElasticSearchContractTransactions():
   """
   Treat detect-contract and detect-contract-transaction operations
   """

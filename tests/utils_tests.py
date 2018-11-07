@@ -150,6 +150,31 @@ class ClickhouseIteratorTestCase(unittest.TestCase):
     self.contracts_iterator._iterate_contracts(partial_query="WHERE address IS NOT NULL", fields=test_fields)
     self.contracts_iterator.client.iterate.assert_called_with(index=ANY, query=ANY, fields=test_fields)
 
+  def test_iterate_contracts_return_flags(self):
+    test_contracts = [{
+      "address": "0x1",
+      "blockNumber": 1,
+      "id": 1
+    }, {
+      "address": "0x1",
+      "blockNumber": 2,
+      "id": 1
+    }]
+    test_contract_blocks = [
+      {"id": 1, "name": "tx_test_block", "value": 1},
+      {"id": 1, "name": "tx_test_block", "value": 2},
+    ]
+    self.client.bulk_index(index=TEST_CONTRACT_BLOCK_INDEX, docs=test_contract_blocks)
+    self.client.bulk_index(index=TEST_CONTRACTS_INDEX, docs=test_contracts)
+
+    contract_flags = [
+      c["_source"]["tx_test_block"]
+      for contracts in self.contracts_iterator._iterate_contracts(partial_query="WHERE address IS NOT NULL")
+      for c in contracts
+    ]
+
+    self.assertCountEqual(contract_flags, [2])
+
   def test_create_transactions_request(self):
     test_max_block = 40
     test_contracts = [

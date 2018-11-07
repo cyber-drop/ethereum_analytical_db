@@ -14,8 +14,8 @@ class Events:
     for ranges_chunk in self.client.iterate(index=self.indices["block"], fields=[range_query], query=flags_query, return_id=False):
       for range in ranges_chunk:
         range_bounds = (
-          range["_source"][range_query] * range_size,
-          (range["_source"][range_query] + 1) * range_size
+          range["_source"]["range"] * range_size,
+          (range["_source"]["range"] + 1) * range_size
         )
         yield range_bounds
 

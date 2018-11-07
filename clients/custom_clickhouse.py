@@ -10,9 +10,11 @@ class CustomClickhouse(CustomClient):
     self.client = Client('localhost', send_receive_timeout=10000)
     self.iterate_client = Client('localhost', send_receive_timeout=10000)
 
-  def _create_sql_query(self, index, query, fields):
+  def _create_sql_query(self, index, query, fields, final=True):
     fields_string = ",".join(fields)
-    sql = 'SELECT {} FROM {} FINAL'.format(fields_string, index)
+    sql = 'SELECT {} FROM {}'.format(fields_string, index)
+    if final:
+      sql += ' FINAL'
     if query:
       sql += ' ' + query
     return sql
@@ -32,17 +34,17 @@ class CustomClickhouse(CustomClient):
     values = self.client.execute(sql)
     return self._convert_values_to_dict(values, fields)
 
-  def count(self, index, query=None, **kwargs):
-    sql = self._create_sql_query(index, query, ["COUNT(*)"])
+  def count(self, index, query=None, final=True, **kwargs):
+    sql = self._create_sql_query(index, query, ["COUNT(*)"], final)
     return self.client.execute(sql)[0][0]
 
-  def iterate(self, index, fields, query=None, per=NUMBER_OF_JOBS, return_id=True):
+  def iterate(self, index, fields, query=None, per=NUMBER_OF_JOBS, return_id=True, final=True):
     if return_id:
       fields += ["id"]
     settings = {'max_block_size': per}
-    sql = self._create_sql_query(index, query, fields)
+    sql = self._create_sql_query(index, query, fields, final)
     generator = self.iterate_client.execute_iter(sql, settings=settings)
-    count = self.count(index, query)
+    count = self.count(index, query, final)
     progress_bar = tqdm(total=count)
     for chunk in split_on_chunks(generator, per):
       progress_bar.update(per)

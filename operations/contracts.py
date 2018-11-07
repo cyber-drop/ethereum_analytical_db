@@ -39,7 +39,7 @@ def _get_contracts_abi_sync(addresses):
 class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
   doc_type = "itx"
   index = "internal_transaction"
-  # block_prefix = "inputs_decoded"
+  block_prefix = "abi_extracted"
 
   def __init__(self, indices=INDICES, parity_hosts=PARITY_HOSTS):
     self.indices = indices

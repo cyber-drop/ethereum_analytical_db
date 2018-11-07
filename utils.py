@@ -90,7 +90,15 @@ class ClickhouseContractTransactionsIterator():
     if PROCESSED_CONTRACTS:
       addresses = ",".join(["'{}'".format(address) for address in PROCESSED_CONTRACTS])
       query += " AND address in({})".format(addresses)
-    return self.client.iterate(index=self.indices["contract"], query=query, fields=fields)
+    created_index = "(SELECT * FROM {} FINAL {})".format(
+      self.indices["contract"],
+      query
+    )
+    query = "ANY LEFT JOIN (SELECT id, value AS {1} FROM {0} FINAL WHERE name = '{1}') USING id".format(
+      self.indices["contract_block"],
+      self._get_flag_name()
+    )
+    return self.client.iterate(index=created_index, query=query, fields=fields + [self._get_flag_name()], final=False)
 
   def _create_transactions_request(self, contracts, max_block):
     """
