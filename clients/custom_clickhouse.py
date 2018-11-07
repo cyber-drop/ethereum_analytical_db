@@ -6,9 +6,11 @@ from tqdm import tqdm
 import json
 
 class CustomClickhouse(CustomClient):
+  def _create_client(self):
+    return Client('localhost', send_receive_timeout=10000)
+
   def __init__(self):
-    self.client = Client('localhost', send_receive_timeout=10000)
-    self.iterate_client = Client('localhost', send_receive_timeout=10000)
+    self.client = self._create_client()
 
   def _create_sql_query(self, index, query, fields, final=True):
     fields_string = ",".join(fields)
@@ -39,11 +41,12 @@ class CustomClickhouse(CustomClient):
     return self.client.execute(sql)[0][0]
 
   def iterate(self, index, fields, query=None, per=NUMBER_OF_JOBS, return_id=True, final=True):
+    iterate_client = self._create_client()
     if return_id:
       fields += ["id"]
     settings = {'max_block_size': per}
     sql = self._create_sql_query(index, query, fields, final)
-    generator = self.iterate_client.execute_iter(sql, settings=settings)
+    generator = iterate_client.execute_iter(sql, settings=settings)
     count = self.count(index, query, final)
     progress_bar = tqdm(total=count)
     for chunk in split_on_chunks(generator, per):

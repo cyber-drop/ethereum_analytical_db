@@ -44,13 +44,13 @@ class ClickhouseTestCase(unittest.TestCase):
     self.assertSequenceEqual(formatted_documents[0:test_per], next(result))
     self.assertSequenceEqual(formatted_documents[test_per:2*test_per], next(result))
 
-  def test_iterate_with_other_processes(self):
+  def test_multiple_iterate(self):
     test_per = 2
-    formatted_documents = self._add_records()
-    result = self.new_client.iterate(index="test", fields=["x"], per=test_per)
-    next(result)
-    self.new_client.bulk_index(index="test", docs=[{"id": "test", "x": 0}])
-    next(result)
+    self._add_records()
+    first_result = self.new_client.iterate(index="test", fields=["x"], per=test_per)
+    next(first_result)
+    second_result = self.new_client.iterate(index="test", fields=["x"], per=test_per)
+    next(second_result)
 
   def test_iterate_without_id(self):
     self._add_records()
