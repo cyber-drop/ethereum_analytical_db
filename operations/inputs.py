@@ -34,7 +34,7 @@ def _decode_input(contract_abi, call_data):
   call_data_bin = decode_hex(call_data)
   method_signature = call_data_bin[:4]
   for description in contract_abi:
-    if description.get('type') != 'function':
+    if description.get('type') not in ['function', 'event']:
       continue
     method_name = normalize_abi_method_name(description['name'])
     arg_types = [item['type'] for item in description['inputs']]
