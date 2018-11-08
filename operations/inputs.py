@@ -204,7 +204,7 @@ class ClickhouseInputs(utils.ClickhouseContractTransactionsIterator):
     for contracts in self._iterate_contracts_with_abi(max_block):
       self._set_contracts_abi({contract["_source"]["address"]: contract["_source"]["abi"] for contract in contracts})
       self._decode_inputs_for_contracts(contracts, max_block)
-      self._save_max_block([contract["_source"]["address"] for contract in contracts], max_block)
+      self._save_max_block([contract["_id"] for contract in contracts], max_block)
 
 class ClickhouseTransactionsInputs(ClickhouseInputs):
   doc_type = "itx"

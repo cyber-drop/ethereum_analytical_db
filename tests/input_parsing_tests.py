@@ -190,7 +190,7 @@ class ClickhouseInputParsingTestCase():
   def test_decode_inputs_save_inputs_decoded(self):
     """Test saving decoded inputs in process"""
     test_contracts = ["contract1", "contract2", "contract3"]
-    test_contracts_from_elasticsearch = [{"_source": {"abi": contract, "address": contract}} for contract in test_contracts]
+    test_contracts_from_elasticsearch = [{"_id": contract, "_source": {"abi": contract, "address": contract + "_address"}} for contract in test_contracts]
     mockify(self.contracts, {
       "_iterate_contracts_with_abi": MagicMock(return_value=[test_contracts_from_elasticsearch]),
       "_get_max_block": MagicMock()
@@ -210,7 +210,7 @@ class ClickhouseInputParsingTestCase():
   def test_decode_inputs_save_max_block_for_query(self):
     """Test saving max block parameter during all operation"""
     test_max_block = 1000
-    test_contracts_from_elasticsearch = [{"_source": {"abi": "contract", "address": "contract" + str(i)}} for i in range(3)]
+    test_contracts_from_elasticsearch = [{"_id": "contract" + str(i), "_source": {"abi": "contract", "address": "contract_address" + str(i)}} for i in range(3)]
     mockify(self.contracts, {
       "_iterate_contracts_with_abi": MagicMock(return_value=[test_contracts_from_elasticsearch]),
       "_get_max_block": MagicMock(side_effect=[test_max_block])
