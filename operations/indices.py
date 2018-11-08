@@ -91,12 +91,10 @@ INDEX_FIELDS = {
   },
   "transaction_input": {
     "name": "String",
-    "types": "Array(String)",
     "params": "Nested(type String, value String)"
   },
   "event_input": {
     "name": "String",
-    "types": "Array(String)",
     "params": "Nested(type String, value String)"
   }
 }
