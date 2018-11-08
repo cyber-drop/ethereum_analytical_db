@@ -134,3 +134,15 @@ class ClickhouseContractABITestCase(unittest.TestCase):
     self.contracts.save_contracts_abi()
     contracts_count = self.client.count(index=TEST_CONTRACTS_ABI_INDEX, query="WHERE abi_extracted = 1")
     assert contracts_count == 10
+
+  def test_save_contracts_empty_abi(self):
+    test_contracts = [[{"_id": 1, "_source": {"address": 1}}]]
+    test_abis = [[]]
+    test_contracts_abi = [{'abi': None, 'abi_extracted': True, "id": 1}]
+    self.contracts._iterate_contracts_without_abi = MagicMock(return_value=test_contracts)
+    self.contracts._get_contracts_abi = MagicMock(return_value=test_abis)
+    self.contracts.client.bulk_index = MagicMock()
+
+    self.contracts.save_contracts_abi()
+
+    self.contracts.client.bulk_index.assert_called_with(docs=test_contracts_abi, index=ANY)

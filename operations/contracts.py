@@ -112,6 +112,12 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
     )
     return self._iterate_contracts(partial_query=query, fields=["address"])
 
+  def _convert_abi(self, abi):
+    if abi:
+      return json.dumps(abi)
+    else:
+      return None
+
   def save_contracts_abi(self):
     """
     Save contracts ABI to ElasticSearch
@@ -120,5 +126,5 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
     """
     for contracts in self._iterate_contracts_without_abi():
       abis = self._get_contracts_abi([contract["_source"]["address"] for contract in contracts])
-      documents = [{'abi': json.dumps(abis[index]), 'abi_extracted': True, "id": contract["_id"]} for index, contract in enumerate(contracts)]
+      documents = [{'abi': self._convert_abi(abis[index]), 'abi_extracted': True, "id": contract["_id"]} for index, contract in enumerate(contracts)]
       self.client.bulk_index(index=self.indices["contract_abi"], docs=documents)
