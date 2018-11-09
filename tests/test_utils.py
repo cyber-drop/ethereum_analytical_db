@@ -29,6 +29,10 @@ class TestClickhouse(CustomClickhouse):
     if "contract" in indices:
       self.send_sql_request("CREATE TABLE IF NOT EXISTS {} ({}) {}".format(indices["contract"], contract_fields, engine))
 
+  def index(self, index, doc, id):
+    doc['id'] = id
+    self.bulk_index(index=index, docs=[doc])
+
 class TestElasticSearch(ElasticSearch):
   def __init__(self):
     super().__init__("http://localhost:9200", timeout=1000)

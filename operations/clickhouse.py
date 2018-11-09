@@ -3,7 +3,9 @@ from operations.internal_transactions import ClickhouseInternalTransactions
 from operations.blocks import ClickhouseBlocks
 from operations.contract_transactions import ClickhouseContractTransactions
 from operations.contracts import ClickhouseContracts
+from operations.inputs import ClickhouseTransactionsInputs, ClickhouseEventsInputs
 from operations.transaction_fees import ClickhouseTransactionFees
+from operations.events import Events
 
 def prepare_indices():
   print("Preparing indices...")
@@ -34,3 +36,18 @@ def extract_transaction_fees():
   print("Extracting transaction fees...")
   transaction_fees = ClickhouseTransactionFees()
   transaction_fees.extract_transaction_fees()
+
+def extract_events():
+  print("Extracting events...")
+  events = Events()
+  events.extract_events()
+
+def parse_transactions_inputs():
+  print("Parsing transactions inputs...")
+  contracts = ClickhouseTransactionsInputs()
+  contracts.decode_inputs()
+
+def parse_events_inputs():
+  print("Parsing events inputs...")
+  contracts = ClickhouseEventsInputs()
+  contracts.decode_inputs()

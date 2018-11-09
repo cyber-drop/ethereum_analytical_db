@@ -434,6 +434,45 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
     result = [flag["_id"] for flag in result]
     self.assertCountEqual(["0x1"], result)
 
+  def test_create_events_index(self):
+    self.indices.prepare_indices()
+    test_event = {
+      'type': 'mined',
+      'logIndex': 0,
+      'transactionLogIndex': 0,
+      'data': '0x000000000000000000000000000000000000000000000b3cb19896ad16d0c000',
+      'transactionIndex': 2,
+      'address': '0x0f5d2fb29fb7d3cfee444a200298f468908cc942',
+      'transactionHash': '0x93159c656e7a4c11624b7935eb507125cf82f1aae9694fbacf5470bed7d84772',
+      'blockHash': '0x43340a6d232532c328211d8a8c0fa84af658dbff1f4906ab7a7d4e41f82fe3a3',
+      'blockNumber': 4500000,
+      'id': '0x1',
+      'topics': ['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef', '0x0000000000000000000000004d468cf47eb6df39618dc9450be4b56a70a520c1', '0x000000000000000000000000915c0d974fef3593444028a232fda420fd6e9d1a']
+    }
+    self.client.bulk_index(index=TEST_INDICES["event"], docs=[test_event])
+    result = self.client.search(index=TEST_INDICES["event"], fields=[])
+    result = [flag["_id"] for flag in result]
+    self.assertCountEqual(["0x1"], result)
+
+  def _test_create_inputs_index(self, index):
+    self.indices.prepare_indices()
+    test_input = {
+      "id": 1,
+      'name': 'transfer',
+      'params.type': ['address', '0xd11b80088ce2623a9c017b93008405511cd951d2'],
+      'params.value': ['0xd11b80088ce2623a9c017b93008405511cd951d2', '243571300000000000000']
+    }
+    self.client.bulk_index(index=TEST_INDICES[index], docs=[test_input])
+    result = self.client.search(index=TEST_INDICES[index], fields=[])
+    result = [flag["_id"] for flag in result]
+    self.assertCountEqual(["1"], result)
+
+  def test_create_transactions_inputs_index(self):
+    self._test_create_inputs_index("transaction_input")
+
+  def test_create_events_inputs_index(self):
+    self._test_create_inputs_index("event_input")
+
 CURRENT_ELASTICSEARCH_SIZE = 290659165119
 TEST_INDEX = 'test_ethereum_transactions'
 TEST_INDICES = {
@@ -445,9 +484,12 @@ TEST_INDICES = {
   "block": "test_ethereum_block",
   "miner_transaction": "test_ethereum_miner_transaction",
   "token_price": "test_ethereum_token_price",
+  "event": "test_ethereum_event",
 
   "block_flag": "test_block_traces_extracted",
   "contract_abi": "test_contract_abi",
   "contract_block": "test_contract_block",
-  "transaction_fee": "test_transaction_fee"
+  "transaction_fee": "test_transaction_fee",
+  "transaction_input": "test_transaction_input",
+  "event_input": "test_event_input",
 }

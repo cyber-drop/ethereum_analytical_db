@@ -76,6 +76,26 @@ INDEX_FIELDS = {
   "transaction_fee": {
     "gasUsed": "Int32",
     "gasPrice": "Float64"
+  },
+  "event": {
+    'type': 'String',
+    'logIndex': 'Int32',
+    'transactionLogIndex': 'Int32',
+    'data': 'String',
+    'transactionIndex': 'Int32',
+    'address': 'String',
+    'transactionHash': 'String',
+    'blockHash': 'String',
+    'blockNumber': 'Int32',
+    'topics': 'Array(String)'
+  },
+  "transaction_input": {
+    "name": "String",
+    "params": "Nested(type String, value String)"
+  },
+  "event_input": {
+    "name": "String",
+    "params": "Nested(type String, value String)"
   }
 }
 

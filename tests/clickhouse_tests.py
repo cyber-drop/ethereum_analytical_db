@@ -44,13 +44,32 @@ class ClickhouseTestCase(unittest.TestCase):
     self.assertSequenceEqual(formatted_documents[0:test_per], next(result))
     self.assertSequenceEqual(formatted_documents[test_per:2*test_per], next(result))
 
-  def test_iterate_with_other_processes(self):
+  def test_multiple_iterate(self):
     test_per = 2
-    formatted_documents = self._add_records()
-    result = self.new_client.iterate(index="test", fields=["x"], per=test_per)
-    next(result)
-    self.new_client.bulk_index(index="test", docs=[{"id": "test", "x": 0}])
-    next(result)
+    self._add_records()
+    first_result = self.new_client.iterate(index="test", fields=["x"], per=test_per)
+    next(first_result)
+    second_result = self.new_client.iterate(index="test", fields=["x"], per=test_per)
+    next(second_result)
+
+  def test_iterate_without_id(self):
+    self._add_records()
+    result = self.new_client.iterate(index="test", fields=["distinct(ceiling(x / 10))"], return_id=False)
+    result = next(result)
+    assert len(result) == 2
+
+  def test_iterate_with_and_without_final(self):
+    self._add_records()
+    self._add_records()
+    result_with_final = self.new_client.iterate(index="test", fields=[])
+    result_without_final = self.new_client.iterate(index="test", fields=[], final=False)
+    assert len(next(result_without_final)) > len(next(result_with_final))
+
+  def test_iterate_with_derived_fields(self):
+    self._add_records()
+    result = self.new_client.iterate(index="test", fields=["x - 1 AS y"])
+    result_record = next(result)[0]
+    assert "y" in result_record["_source"]
 
   def test_bulk_index(self):
     documents = [{"x": i} for i in range(10)]
@@ -59,11 +78,8 @@ class ClickhouseTestCase(unittest.TestCase):
     self.assertCountEqual(result, [(str(doc["x"]), ) for doc in documents])
 
   def test_bulk_index_empty_fields(self):
-    # , {"id": 2, "dict": {"x": 1}}
     documents = [{"id": 1, "x": 1}]
     self.new_client.bulk_index(index="test", docs=[d for d in documents])
-    # result = self.client.execute('SELECT id FROM test')
-    # self.assertCountEqual(result, [("1", ), ("2", )])
 
   def test_bulk_index_dict_values(self):
     documents = [{"x": i, "dict": {"test": i}} for i in range(10)]
