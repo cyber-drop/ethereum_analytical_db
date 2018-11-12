@@ -98,7 +98,7 @@ class ClickhouseContractTransactionsIterator():
       self.indices["contract_block"],
       self._get_flag_name()
     )
-    return self.client.iterate(index=created_index, query=query, fields=fields + [self._get_flag_name()], final=False)
+    return self.client.iterate(index=created_index, query=query, fields=fields + [self._get_flag_name()], final=False, per=1)
 
   def _create_transactions_request(self, contracts, max_block):
     """
@@ -165,7 +165,7 @@ class ClickhouseContractTransactionsIterator():
     """
     query = partial_query
     query += " AND " + self._create_transactions_request(contracts, max_block)
-    return self.client.iterate(index=self.indices[self.index], fields=fields, query=query)
+    return self.client.iterate(index=self.indices[self.index], fields=fields, query=query, final=False)
 
   def _get_flag_name(self):
     """
