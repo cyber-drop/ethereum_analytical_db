@@ -6,7 +6,7 @@ class Events:
   def __init__(self, indices=INDICES, parity_hosts=PARITY_HOSTS):
     self.client = CustomClickhouse()
     self.indices = indices
-    self.web3 = Web3(HTTPProvider(parity_hosts[0][-1]))
+    self.web3 = Web3(HTTPProvider(parity_hosts[0][-1], request_kwargs={'timeout': 100}))
 
   def _iterate_block_ranges(self, range_size=EVENTS_RANGE_SIZE):
     range_query = "distinct(toInt32(floor(number / {}))) AS range".format(range_size)
