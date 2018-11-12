@@ -5,10 +5,45 @@ import math
 import json
 import re
 import utils
+from clients.custom_clickhouse import CustomClickhouse
 
 ADDRESS_ENCODING_CONSTANT = 0x0010000000000000000000000000000000000000000
 
-class TokenHolders(utils.ContractTransactionsIterator):
+class ClickhouseTokenHolders():
+  def __init__(self, indices=INDICES):
+    self.indices = indices
+    self.client = CustomClickhouse()
+
+  def extract_token_transactions(self):
+    sql = """
+      CREATE MATERIALIZED VIEW IF NOT EXISTS {} 
+      ENGINE = ReplacingMergeTree() ORDER BY id
+      AS 
+      (
+        SELECT 
+          params.value[1] AS from, 
+          params.value[2] AS to,
+          toFloat64(params.value[3]) / 1000000000000000000 AS value,
+          id,
+          address AS token
+        FROM {}
+        ANY LEFT JOIN
+        (
+          SELECT id, address 
+          FROM {}
+        )
+        USING id
+        WHERE
+          name = 'Transfer' AND params.type = ['address', 'address', 'uint256']
+      )
+    """.format(
+      self.indices["token_transaction"],
+      self.indices["event_input"],
+      self.indices["event"],
+    )
+    self.client.send_sql_request(sql)
+
+class ElasticSearchTokenHolders():
   '''
   Extract information about token transfers from internal txs and save it in a separate token_tx index
   
@@ -684,7 +719,7 @@ class TokenHolders(utils.ContractTransactionsIterator):
         transfers.append(tx_descr)
     self._insert_multiple_docs(transfers, 'tx', self.indices['token_tx'])
 
-class InternalTokenTransactions(TokenHolders):
+class InternalTokenTransactions(ElasticSearchTokenHolders):
   tx_index = 'internal_transaction'
   index = 'internal_transaction'
   tx_type = 'itx'

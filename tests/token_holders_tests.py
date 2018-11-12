@@ -1,9 +1,120 @@
 import unittest
-from token_holders import TokenHolders, InternalTokenTransactions
+from operations.token_holders import ElasticSearchTokenHolders, ClickhouseTokenHolders, InternalTokenTransactions
 from tests.test_utils import TestElasticSearch, mockify
 from unittest.mock import MagicMock, ANY, patch
+from tests.test_utils import TestClickhouse
 
-class TokenHoldersTestCase(unittest.TestCase):
+class ClickhouseTokenHoldersTestCase(unittest.TestCase):
+  def setUp(self):
+    self.indices = {
+      "event_input": TEST_EVENT_INPUTS_INDEX,
+      "token_transaction": TEST_TOKEN_TX_INDEX,
+      "event": TEST_EVENTS_INDEX
+    }
+    self.client = TestClickhouse()
+    self.client.prepare_indices({
+      "event_input": TEST_EVENT_INPUTS_INDEX,
+      "event": TEST_EVENTS_INDEX,
+    })
+    self.client.send_sql_request("DROP TABLE IF EXISTS {}".format(self.indices["token_transaction"]))
+    self.token_holders = ClickhouseTokenHolders(self.indices)
+    self.token_holders.extract_token_transactions()
+
+  def test_extract_token_transactions_from_erc20_transfer_events(self):
+    test_event_inputs = [{
+      "id": "0x1.0",
+      "name": "Transfer",
+      "params.type": ["address", "address", "uint256"],
+      "params.value": ["0x1", "0x2", str(100*(10**18))]
+    }, {
+      "id": "0x2.0",
+      "name": "Transfer",
+      "params.type": [],
+      "params.value": []
+    }, {
+      "id": "0x3.0",
+      "name": "NotTransfer",
+      "params.type": ["address", "address", "uint256"],
+      "params.value": ["0x2", "0x3", str(10*(10**18))]
+    }]
+    test_token_transactions = [{
+      "from": "0x1",
+      "to": "0x2",
+      "value": 100
+    }]
+    test_transactions_ids = ["0x1.0"]
+    self.client.bulk_index(index=TEST_EVENT_INPUTS_INDEX, docs=test_event_inputs)
+    token_transactions = self.client.search(index=TEST_TOKEN_TX_INDEX, fields=["id", "to", "from", "value"])
+    self.assertCountEqual([transaction["_id"] for transaction in token_transactions], test_transactions_ids)
+    self.assertCountEqual([transaction["_source"] for transaction in token_transactions], test_token_transactions)
+
+  def test_extract_events_add_token(self):
+    test_event_inputs = [{
+      "id": "0x1.0",
+      "name": "Transfer",
+      "params.type": ["address", "address", "uint256"],
+      "params.value": ["0x1", "0x2", "0"]
+    }, {
+      "id": "0x2.0",
+      "name": "Transfer",
+      "params.type": ["address", "address", "uint256"],
+      "params.value": ["0x2", "0x2", "0"]
+    }, {
+      "id": "0x3.0",
+      "name": "Transfer",
+      "params.type": ["address", "address", "uint256"],
+      "params.value": ["0x3", "0x2", "0"]
+    }, {
+      "id": "0x4.0",
+      "name": "Transfer",
+      "params.type": ["address", "address", "uint256"],
+      "params.value": ["0x4", "0x2", "0"]
+    }]
+    test_events = [{
+      "id": "0x1.0",
+      "address": "0x01"
+    }, {
+      "id": "0x2.0",
+      "address": "0x01"
+    }, {
+      "id": "0x3.0",
+      "address": "0x02"
+    }]
+    test_token_transactions = [{
+      "from": "0x1",
+      "token": "0x01"
+    }, {
+      "from": "0x2",
+      "token": "0x01"
+    }, {
+      "from": "0x3",
+      "token": "0x02"
+    }, {
+      "from": "0x4",
+      "token": ""
+    }]
+    self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=test_events)
+    self.client.bulk_index(index=TEST_EVENT_INPUTS_INDEX, docs=test_event_inputs)
+
+    token_transactions = self.client.search(index=TEST_TOKEN_TX_INDEX, fields=["from", "token"])
+
+    self.assertCountEqual([transaction["_source"] for transaction in token_transactions], test_token_transactions)
+
+  def test_extract_token_transactions_if_exists(self):
+    self.token_holders.extract_token_transactions()
+
+  def test_extract_token_transactions_ignore_duplicates(self):
+    event_input = {
+      "id": "0x1.0",
+      "name": "Transfer",
+      "params.type": ["address", "address", "uint256"],
+      "params.value": ["0x2", "0x2", "0"]
+    }
+    self.client.bulk_index(index=TEST_EVENT_INPUTS_INDEX, docs=[event_input, event_input])
+    count = self.client.count(index=TEST_TOKEN_TX_INDEX)
+    assert count == 1
+
+class ElasticSearchTokenHoldersTestCase(unittest.TestCase):
   def setUp(self):
     self.client = TestElasticSearch()
     self.client.recreate_index(TEST_CONTRACT_INDEX)
@@ -222,10 +333,12 @@ class TokenHoldersTestCase(unittest.TestCase):
 
       self.token_holders._save_max_block.assert_any_call(test_tokens_addresses, test_max_block)
 
-TEST_CONTRACT_INDEX = 'test-ethereum-contracts'
-TEST_ITX_INDEX = 'test-ethereum-internal-txs'
-TEST_TOKEN_TX_INDEX = 'test-token-txs'
-TEST_BLOCK_INDEX = 'test-block'
+TEST_CONTRACT_INDEX = 'test_ethereum_contracts'
+TEST_ITX_INDEX = 'test_ethereum_internal_txs'
+TEST_TOKEN_TX_INDEX = 'test_token_txs'
+TEST_BLOCK_INDEX = 'test_block'
+TEST_EVENTS_INDEX = 'test_ethereum_events'
+TEST_EVENT_INPUTS_INDEX = 'test_ethereum_events_inputs'
 
 TEST_TOKEN_ADDRESSES = ['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d',
   '0xa74476443119a942de498590fe1f2454d7d4ac0d'

@@ -6,6 +6,7 @@ from operations.contracts import ClickhouseContracts
 from operations.inputs import ClickhouseTransactionsInputs, ClickhouseEventsInputs
 from operations.transaction_fees import ClickhouseTransactionFees
 from operations.events import Events
+from operations.token_holders import ClickhouseTokenHolders
 from operations.multitransfers_detection import ClickhouseMultitransfersDetection
 from operations.token_prices import ClickhouseTokenPrices
 
@@ -53,6 +54,11 @@ def parse_events_inputs():
   print("Parsing events inputs...")
   contracts = ClickhouseEventsInputs()
   contracts.decode_inputs()
+
+def extract_token_transactions():
+  print("Preparing token transactions view...")
+  contracts = ClickhouseTokenHolders()
+  contracts.extract_token_transactions()
 
 def extract_multitransfers():
   print("Searching for multitransfers...")

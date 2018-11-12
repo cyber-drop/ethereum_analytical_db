@@ -208,9 +208,10 @@ class ClickhouseContractTransactionsTestCase(unittest.TestCase):
       "contract": TEST_CONTRACTS_INDEX
     }
     self.client = TestClickhouse()
-    for index in self.indices.values():
-      self.client.send_sql_request("DROP TABLE IF EXISTS {}".format(index))
-    ClickhouseIndices(self.indices).prepare_indices()
+    self.client.prepare_indices({
+      "internal_transaction": TEST_TRANSACTIONS_INDEX
+    })
+    self.client.send_sql_request("DROP TABLE IF EXISTS {}".format(self.indices["contract"]))
     self.contract_transactions = ClickhouseContractTransactions(self.indices)
     self.contract_transactions.extract_contract_addresses()
 
