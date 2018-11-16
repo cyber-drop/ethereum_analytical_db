@@ -473,6 +473,22 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
   def test_create_events_inputs_index(self):
     self._test_create_inputs_index("event_input")
 
+  def test_create_multitransfers_index(self):
+    self.indices.prepare_indices()
+    test_multitransfer = {
+      "id": "0x1.0x2",
+      "token": "0x1",
+      "address": "0x2",
+      "type": "ico",
+      "probability": 0.983,
+      "model": "test_model",
+    }
+    self.client.bulk_index(index=TEST_INDICES["multitransfer"], docs=[test_multitransfer])
+    result = self.client.search(index=TEST_INDICES["multitransfer"], fields=[])
+    result = [flag["_id"] for flag in result]
+    self.assertCountEqual(["0x1.0x2"], result)
+
+
 CURRENT_ELASTICSEARCH_SIZE = 290659165119
 TEST_INDEX = 'test_ethereum_transactions'
 TEST_INDICES = {
@@ -492,4 +508,5 @@ TEST_INDICES = {
   "transaction_fee": "test_transaction_fee",
   "transaction_input": "test_transaction_input",
   "event_input": "test_event_input",
+  "multitransfer": "test_multitransfer"
 }
