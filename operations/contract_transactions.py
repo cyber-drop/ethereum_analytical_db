@@ -2,6 +2,7 @@ from clients.custom_elastic_search import CustomElasticSearch
 from clients.custom_clickhouse import CustomClickhouse
 from config import INDICES
 import utils
+from web3 import Web3
 
 class ElasticSearchContractTransactions():
   """
@@ -138,13 +139,64 @@ class ClickhouseContractTransactions:
     self.indices = indices
     self.client = CustomClickhouse()
 
+  def _extract_first_bytes(self, func):
+    '''
+    Create contract method signature and return first 4 bytes of this signature
+
+    Parameters
+    ----------
+    func: str
+      String that contains function name and arguments
+
+    Returns
+    -------
+    str
+      String with first 4 bytes of method signature in hex format
+    '''
+    return str(Web3.toHex(Web3.sha3(text=func)[0:4]))[2:]
+
+  def _extract_methods_signatures(self):
+    '''
+    Return dictionary with first bytes of standard method signatures
+
+    Returns
+    -------
+    dict
+      Dictionary with first 4 bytes of methods signatures in hex format
+    '''
+    return {
+      'erc20': {
+        'totalSupply': self._extract_first_bytes('totalSupply()'),
+        'balanceOf': self._extract_first_bytes('balanceOf(address)'),
+        'allowance': self._extract_first_bytes('allowance(address,address)'),
+        'transfer': self._extract_first_bytes('transfer(address,uint256)'),
+        'transferFrom': self._extract_first_bytes('transferFrom(address,address,uint256)'),
+        'approve': self._extract_first_bytes('approve(address,uint256)'),
+      },
+      'erc223': {
+        'tokenFallback': self._extract_first_bytes('tokenFallback(address,uint256,bytes)')
+      }
+    }
+
+  def _get_standards(self):
+    standards = self._extract_methods_signatures()
+    return "[" + ", ".join([
+      "multiIf({}, '{}', NULL)".format(
+        " AND ".join(["(bytecode LIKE '%{}%')".format(signature) for signature in signatures.values()]),
+        standard
+      )
+      for standard, signatures in standards.items()
+    ]) + "]"
+
   def _get_fields(self):
+    standards_sql = self._get_standards()
     fields = {
       "id": "coalesce(address, id)",
       "blockNumber": "blockNumber",
       "address": "address",
       "owner": "from",
-      "bytecode": "code"
+      "bytecode": "code",
+      "standards": standards_sql
     }
     fields_string = ", ".join([
       "{} AS {}".format(field, alias)
