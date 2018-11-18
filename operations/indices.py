@@ -101,7 +101,7 @@ INDEX_FIELDS = {
     "token": "String",
     "address": "String",
     "type": "String",
-    "probability": "Float32",
+    "probability": "Float64",
     "model": "String"
   }
 }

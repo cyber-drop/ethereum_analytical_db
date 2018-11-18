@@ -25,7 +25,7 @@ class TestClickhouse(CustomClickhouse):
 
   def _prepare_views_as_indices(self, indices):
     engine = 'ENGINE = ReplacingMergeTree() ORDER BY id'
-    contract_fields = 'id String, address String, blockNumber Int64, test UInt8'
+    contract_fields = 'id String, address String, blockNumber Int64, test UInt8, standards Array(Nullable(String))'
     if "contract" in indices:
       self.send_sql_request("CREATE TABLE IF NOT EXISTS {} ({}) {}".format(indices["contract"], contract_fields, engine))
 
