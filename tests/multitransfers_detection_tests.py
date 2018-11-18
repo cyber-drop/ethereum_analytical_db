@@ -34,6 +34,10 @@ class MultitransfersDetectionTestCase(unittest.TestCase):
 
   def test_find_top_addresses(self):
     test_transactions = [{
+      "id": 0,
+      "from": "0x1",
+      "to": "0x2"
+    }, {
       "id": 1,
       "from": "0x1",
       "to": "0x2"
@@ -53,6 +57,14 @@ class MultitransfersDetectionTestCase(unittest.TestCase):
       "id": 5,
       "from": "0x3",
       "to": "0x3"
+    }, {
+      "id": 6,
+      "from": "0x3",
+      "to": "0x2"
+    }, {
+      "id": 7,
+      "from": "0x4",
+      "to": "0x2"
     }]
 
     self.client.bulk_index(index=TEST_TRANSACTIONS_INDEX, docs=test_transactions)
@@ -61,7 +73,7 @@ class MultitransfersDetectionTestCase(unittest.TestCase):
       {"_source": {"address": "0x2"}}
     ]])
 
-    top_addresses = next(self.multitransfers_detection._iterate_top_addresses("0x2"))
+    top_addresses = next(self.multitransfers_detection._iterate_top_addresses("0x2", limit=2))
 
     self.assertSequenceEqual(["0x1", "0x3"], [address["_source"]["address"] for address in top_addresses])
 

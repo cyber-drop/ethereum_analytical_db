@@ -15,12 +15,12 @@ class ClickhouseMultitransfersDetection:
       query="WHERE has(standards, 'erc20')"
     )
 
-  def _iterate_top_addresses(self, token):
+  def _iterate_top_addresses(self, token, limit=MULTITRANSFERS_TOP_ADDRESSES):
     return self.client.iterate(
       index=self.indices["internal_transaction"],
       fields=["from AS address"],
       return_id=False,
-      query="WHERE to = '{}' GROUP BY from ORDER BY count(*) DESC".format(token)
+      query="WHERE to = '{}' GROUP BY from ORDER BY count(*) DESC LIMIT {}".format(token, limit)
     )
 
   def _load_model(self, model_name=MULTITRANSFERS_DETECTION_MODEL_NAME):
