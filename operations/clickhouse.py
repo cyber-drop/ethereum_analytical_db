@@ -6,6 +6,7 @@ from operations.contracts import ClickhouseContracts
 from operations.inputs import ClickhouseTransactionsInputs, ClickhouseEventsInputs
 from operations.transaction_fees import ClickhouseTransactionFees
 from operations.events import Events
+from operations.multitransfers_detection import ClickhouseMultitransfersDetection
 
 def prepare_indices():
   print("Preparing indices...")
@@ -51,3 +52,8 @@ def parse_events_inputs():
   print("Parsing events inputs...")
   contracts = ClickhouseEventsInputs()
   contracts.decode_inputs()
+
+def extract_multitransfers():
+  print("Searching for multitransfers...")
+  multitransfers_detection = ClickhouseMultitransfersDetection()
+  multitransfers_detection.extract_multitransfers()
