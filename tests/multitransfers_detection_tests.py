@@ -3,10 +3,12 @@ from operations.multitransfers_detection import ClickhouseMultitransfersDetectio
 from tests.test_utils import TestClickhouse
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.externals import joblib
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
+import pandas as pd
 
 class MultitransfersDetectionTestCase(unittest.TestCase):
   test_transfer_event_hex = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+  maxDiff = None
   def setUp(self):
     self.indices = {
       "multitransfer": TEST_MULTITRANSFERS_INDEX,
@@ -266,14 +268,61 @@ class MultitransfersDetectionTestCase(unittest.TestCase):
 
     result = self.multitransfers_detection._get_initiated_holders(test_token, test_addresses).to_dict()
 
-    print(result)
     self.assertSequenceEqual(result, {
       self._create_transaction_address("0x1"): 1 / 2,
       self._create_transaction_address("0x2"): 1 / 2
     })
 
   def test_get_features(self):
-    pass
+    test_tokens = ["0x01", "0x02"]
+    test_client_tokens = [[{"_source": {"address": token}} for token in test_tokens]]
+    test_addresses = [
+      ["0x1", "0x2"],
+      ["0x2", "0x3"]
+    ]
+    test_client_addresses = [
+      [[{"_source": {"address": address}} for address in address_list]]
+      for address_list in test_addresses
+    ]
+    self.multitransfers_detection._iterate_tokens = MagicMock(return_value=test_client_tokens)
+    self.multitransfers_detection._iterate_top_addresses = MagicMock(side_effect=test_client_addresses)
+    test_feature = pd.DataFrame([["0x2", 2], ["0x1", 1]], columns=["address", "feature"]).set_index("address")["feature"]
+    feature_mock = MagicMock(return_value=test_feature)
+    self.multitransfers_detection._get_ethereum_senders = feature_mock
+    self.multitransfers_detection._get_events_per_transaction = feature_mock
+    self.multitransfers_detection._get_token_receivers = feature_mock
+    self.multitransfers_detection._get_initiated_holders = feature_mock
+
+    result = self.multitransfers_detection._get_features().reset_index().to_dict('records')
+    self.assertCountEqual(result, [{
+      'token': "0x01",
+      "address": "0x1",
+      "ethereum_senders": 1,
+      "events_per_transaction": 1,
+      "token_receivers": 1,
+      "initiated_holders": 1
+    }, {
+      'token': "0x01",
+      "address": "0x2",
+      "ethereum_senders": 2,
+      "events_per_transaction": 2,
+      "token_receivers": 2,
+      "initiated_holders": 2
+    }, {
+      'token': "0x02",
+      "address": "0x2",
+      "ethereum_senders": 2,
+      "events_per_transaction": 2,
+      "token_receivers": 2,
+      "initiated_holders": 2
+    }, {
+      'token': "0x02",
+      "address": "0x3",
+      "ethereum_senders": 0,
+      "events_per_transaction": 0,
+      "token_receivers": 0,
+      "initiated_holders": 0
+    }])
 
   def test_load_model(self):
     model = DecisionTreeClassifier()
