@@ -3,19 +3,21 @@ from config import INDICES, MULTITRANSFERS_DETECTION_MODEL_NAME, MULTITRANSFERS_
 from sklearn.externals import joblib
 import numpy as np
 import pandas as pd
+import utils
 
 TRANSFER_EVENT_HEX = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 
-class ClickhouseMultitransfersDetection:
+class ClickhouseMultitransfersDetection(utils.ClickhouseContractTransactionsIterator):
+  doc_type = "tx"
+  block_prefix = "multitransfers_detected"
   def __init__(self, indices=INDICES):
     self.client = CustomClickhouse()
     self.indices = indices
 
   def _iterate_tokens(self):
-    return self.client.iterate(
-      index=self.indices["contract"],
+    return self._iterate_contracts(
       fields=["address"],
-      query="WHERE has(standards, 'erc20')"
+      partial_query="WHERE has(standards, 'erc20')"
     )
 
   def _iterate_top_addresses(self, token, limit=MULTITRANSFERS_TOP_ADDRESSES):
@@ -138,22 +140,20 @@ class ClickhouseMultitransfersDetection:
     total_token_receivers = self._get_total_token_receivers(token)
     return token_receivers_df / total_token_receivers
 
-  def _get_features(self):
+  def _get_features(self, tokens):
     all_addresses_stats = []
-    for token_list in self._iterate_tokens():
-      for token in token_list:
-        for addresses in self._iterate_top_addresses(token["_source"]["address"]):
-          addresses_stats = pd.DataFrame(
-            [address["_source"]["address"] for address in addresses],
-            columns=["address"]
-          ).set_index("address")
-          addresses_stats["token"] = token["_source"]["address"]
-          addresses_stats["ethereum_senders"] = self._get_ethereum_senders(token, addresses)
-          addresses_stats["events_per_transaction"] = self._get_events_per_transaction(token, addresses)
-          addresses_stats["token_receivers"] = self._get_token_receivers(token, addresses)
-          addresses_stats["initiated_holders"] = self._get_initiated_holders(token, addresses)
-          all_addresses_stats.append(addresses_stats)
-
+    for token in tokens:
+      for addresses in self._iterate_top_addresses(token["_source"]["address"]):
+        addresses_stats = pd.DataFrame(
+          [address["_source"]["address"] for address in addresses],
+          columns=["address"]
+        ).set_index("address")
+        addresses_stats["token"] = token["_source"]["address"]
+        addresses_stats["ethereum_senders"] = self._get_ethereum_senders(token, addresses)
+        addresses_stats["events_per_transaction"] = self._get_events_per_transaction(token, addresses)
+        addresses_stats["token_receivers"] = self._get_token_receivers(token, addresses)
+        addresses_stats["initiated_holders"] = self._get_initiated_holders(token, addresses)
+        all_addresses_stats.append(addresses_stats)
     return pd.concat(all_addresses_stats).fillna(0)
 
   def _load_model(self, model_name=MULTITRANSFERS_DETECTION_MODEL_NAME):
@@ -169,10 +169,18 @@ class ClickhouseMultitransfersDetection:
       if prediction >= threshold
     ]
 
-  def _save_classes(self, multitransfers):
+  def _save_classes(self, multitransfers, model_name=MULTITRANSFERS_DETECTION_MODEL_NAME):
     for i, multitransfer in enumerate(multitransfers):
       multitransfer["id"] = "{}.{}".format(
         multitransfer["token"],
         multitransfer["address"]
       )
+      multitransfer["model"] = model_name
     self.client.bulk_index(index=self.indices["multitransfer"], docs=multitransfers)
+
+  def extract_multitransfers(self):
+    model = self._load_model()
+    for tokens in self._iterate_tokens():
+      features = self._get_features(tokens)
+      predictions = self._get_predictions(model, features)
+      self._save_classes(predictions)
