@@ -3,8 +3,13 @@ from operations.multitransfers_detection import ClickhouseMultitransfersDetectio
 from tests.test_utils import TestClickhouse
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.externals import joblib
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock, Mock, call, patch
 import pandas as pd
+import numpy as np
+from tests.test_utils import mockify
+
+from clickhouse_driver import Client
+import config
 
 class MultitransfersDetectionTestCase(unittest.TestCase):
   test_transfer_event_hex = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
@@ -14,7 +19,8 @@ class MultitransfersDetectionTestCase(unittest.TestCase):
       "multitransfer": TEST_MULTITRANSFERS_INDEX,
       "contract": TEST_CONTRACTS_INDEX,
       "internal_transaction": TEST_TRANSACTIONS_INDEX,
-      "event": TEST_EVENTS_INDEX
+      "event": TEST_EVENTS_INDEX,
+      "contract_block": "mock"
     }
     self.multitransfers_detection = ClickhouseMultitransfersDetection(self.indices)
     self.client = TestClickhouse()
@@ -35,6 +41,24 @@ class MultitransfersDetectionTestCase(unittest.TestCase):
     iterator = self.multitransfers_detection._iterate_tokens()
     tokens = [token["_source"]["address"] for token_list in iterator for token in token_list]
     self.assertSequenceEqual(tokens, ["0x1"])
+
+  def test_iterate_tokens_from_whitelist(self):
+    config.PROCESSED_CONTRACTS.append("0x1")
+    test_contracts = [{
+      "id": 1,
+      "address": "0x1",
+      "standards": ["erc20"]
+    }, {
+      "id": 2,
+      "address": "0x2",
+      "standards": ["erc20"]
+    }]
+    self.client.bulk_index(index=TEST_CONTRACTS_INDEX, docs=test_contracts)
+
+    iterator = self.multitransfers_detection._iterate_tokens()
+    tokens = [token["_source"]["address"] for token_list in iterator for token in token_list]
+    self.assertSequenceEqual(tokens, ["0x1"])
+    config.PROCESSED_CONTRACTS.clear()
 
   def test_find_top_addresses(self):
     test_transactions = [{
@@ -275,7 +299,7 @@ class MultitransfersDetectionTestCase(unittest.TestCase):
 
   def test_get_features(self):
     test_tokens = ["0x01", "0x02"]
-    test_client_tokens = [[{"_source": {"address": token}} for token in test_tokens]]
+    test_client_tokens = [{"_source": {"address": token}} for token in test_tokens]
     test_addresses = [
       ["0x1", "0x2"],
       ["0x2", "0x3"]
@@ -293,7 +317,7 @@ class MultitransfersDetectionTestCase(unittest.TestCase):
     self.multitransfers_detection._get_token_receivers = feature_mock
     self.multitransfers_detection._get_initiated_holders = feature_mock
 
-    result = self.multitransfers_detection._get_features().reset_index().to_dict('records')
+    result = self.multitransfers_detection._get_features(test_client_tokens).reset_index().to_dict('records')
     self.assertCountEqual(result, [{
       'token': "0x01",
       "address": "0x1",
@@ -366,10 +390,12 @@ class MultitransfersDetectionTestCase(unittest.TestCase):
       "token": "0x2"
     }]
     test_multitransfers_copy = [transfer.copy() for transfer in test_multitransfers]
+    for transfer in test_multitransfers_copy:
+      del transfer["model"]
     test_fields = list(test_multitransfers[0].keys())
     test_multitransfer_ids = [transfer["token"] + "." + transfer["address"] for transfer in test_multitransfers]
 
-    self.multitransfers_detection._save_classes(test_multitransfers_copy)
+    self.multitransfers_detection._save_classes(test_multitransfers_copy, model_name="test_model")
 
     multitransfers = self.client.search(index=TEST_MULTITRANSFERS_INDEX, fields=test_fields)
     self.assertSequenceEqual(
@@ -382,9 +408,81 @@ class MultitransfersDetectionTestCase(unittest.TestCase):
     )
 
   def test_extract_multitransfers(self):
-    # Iterate over top addresses
-    #
-    pass
+    test_tokens = [["0x01", "0x02"]]
+    test_features = "features"
+    test_predictions = "predictions"
+    test_model = "model"
+    mockify(self.multitransfers_detection, {
+      '_iterate_tokens': MagicMock(return_value=test_tokens),
+      '_get_features': MagicMock(return_value=test_features),
+      '_get_predictions': MagicMock(return_value=test_predictions),
+      '_load_model': MagicMock(return_value=test_model),
+    }, 'extract_multitransfers')
+    process = Mock(
+      iterate=self.multitransfers_detection._iterate_tokens,
+      get_features=self.multitransfers_detection._get_features,
+      get_predictions=self.multitransfers_detection._get_predictions,
+      load_model=self.multitransfers_detection._load_model,
+      save_classes=self.multitransfers_detection._save_classes
+    )
+
+    self.multitransfers_detection.extract_multitransfers()
+
+    calls = [call.load_model(), call.iterate()]
+    for token_list in test_tokens:
+      calls += [
+        call.get_features(token_list),
+        call.get_predictions(test_model, test_features),
+        call.save_classes(test_predictions)
+      ]
+    process.assert_has_calls(calls)
+
+  def xtest_process(self):
+    test_tokens = [
+      "0xe5dada80aa6477e85d09747f2842f7993d0df71c", # Dock drop and ICO
+      "0xf3e014fe81267870624132ef3a646b8e83853a96", # VinChain Drops
+      "0x86fa049857e0209aa7d9e616f7eb3b3b78ecfdb0" # EOS ICO
+    ]
+    test_tokens_string = str(test_tokens)[1:-1]
+    test_client = Client('localhost', 9001)
+    test_contracts = test_client.execute("""
+      SELECT id, address FROM ethereum_contract WHERE address in({})
+    """.format(test_tokens_string))
+    test_transactions = test_client.execute("""
+      SELECT id, from, to, value FROM ethereum_internal_transaction WHERE to in({}) 
+    """.format(test_tokens_string))
+    test_transactions += test_client.execute("""
+      SELECT from, to, value FROM ethereum_internal_transaction 
+      WHERE from in(
+        SELECT concat('0x', substring(topics[3], 27, 40))
+        FROM ethereum_event
+        WHERE topics[1] = '{}'
+        AND address in({})
+      ) 
+      AND value > 0
+      SAMPLE 100000
+    """.format(self.test_transfer_event_hex, test_tokens_string))
+    test_events = test_client.execute("""
+      SELECT id, address, topics, blockNumber
+      FROM ethereum_event 
+      WHERE address in({})
+    """.format(test_tokens_string))
+
+    test_contracts_df = pd.DataFrame(test_contracts, columns=["id", "address"])
+    test_events_df = pd.DataFrame(test_events, columns=["id", "address", "topics", "blockNumber"])
+    test_transactions_df = pd.DataFrame(test_transactions, columns=["id", "from", "to", "value"])
+
+    self.predict_proba = MagicMock(side_effect=lambda: np.random.rand(3))
+    self.classes_ = ["airdrop", "ico", "other"]
+    self.multitransfers_detection._load_model = MagicMock(return_value=self)
+
+    self.client.bulk_index(index=TEST_CONTRACTS_INDEX, docs=test_contracts)
+    self.client.bulk_index(index=TEST_TRANSACTIONS_INDEX, docs=test_transactions)
+    self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=test_events)
+
+    self.multitransfers_detection.extract_multitransfers()
+
+    assert self.client.count(index=TEST_MULTITRANSFERS_INDEX) > 0
 
 TEST_MULTITRANSFERS_INDEX = "test_multitransfers"
 TEST_CONTRACTS_INDEX = "test_contracts"
