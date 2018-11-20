@@ -25,6 +25,7 @@ class ClickhouseMultitransfersDetection(utils.ClickhouseContractTransactionsIter
       index=self.indices["internal_transaction"],
       fields=["from AS address"],
       return_id=False,
+      final=False,
       query="WHERE to = '{}' GROUP BY from ORDER BY count(*) DESC LIMIT {}".format(token, limit)
     )
 
@@ -38,6 +39,7 @@ class ClickhouseMultitransfersDetection(utils.ClickhouseContractTransactionsIter
           "concat('0x', any(substring(topics[2], 27, 40))) AS distributor",
           "COUNT(DISTINCT(topics[2])) AS distributors_count"
         ],
+        final=False,
         return_id=False,
         query="WHERE address = '{}' AND topics[1] = '{}' GROUP BY transactionHash".format(token, TRANSFER_EVENT_HEX)
       )
@@ -56,6 +58,7 @@ class ClickhouseMultitransfersDetection(utils.ClickhouseContractTransactionsIter
           "to", "count(distinct(from)) AS ethereum_senders",
         ],
         return_id=False,
+        final=False,
         query="""
           WHERE to in({})
           AND from in(
@@ -64,6 +67,7 @@ class ClickhouseMultitransfersDetection(utils.ClickhouseContractTransactionsIter
             WHERE topics[1] = '{}'
             AND address = '{}'
           ) 
+          AND value > 0
           GROUP BY to 
         """.format(addresses_string, self.indices["event"], TRANSFER_EVENT_HEX, token)
       )
@@ -78,7 +82,8 @@ class ClickhouseMultitransfersDetection(utils.ClickhouseContractTransactionsIter
           "to", "count(distinct(from)) AS ethereum_senders"
         ],
         return_id=False,
-        query="WHERE to in({}) GROUP BY to".format(addresses_string)
+        final=False,
+        query="WHERE to in({}) AND value > 0 GROUP BY to".format(addresses_string)
       )
       for sender in sender_list
     ]
@@ -103,6 +108,7 @@ class ClickhouseMultitransfersDetection(utils.ClickhouseContractTransactionsIter
           "concat('0x', substring(topics[2], 27, 40)) AS from", "count(distinct(topics[3])) AS token_receivers"
         ],
         return_id=False,
+        final=False,
         query="""
           WHERE concat('0x', substring(topics[2], 27, 40)) in({})
           AND address = '{}' 
@@ -127,6 +133,7 @@ class ClickhouseMultitransfersDetection(utils.ClickhouseContractTransactionsIter
           "argMin(concat('0x', substring(topics[2], 27, 40)), blockNumber) AS initial_sender"
         ],
         return_id=False,
+        final=False,
         query="""
               WHERE concat('0x', substring(topics[2], 27, 40)) in({})
               AND address = '{}' 
@@ -143,18 +150,20 @@ class ClickhouseMultitransfersDetection(utils.ClickhouseContractTransactionsIter
   def _get_features(self, tokens):
     all_addresses_stats = []
     for token in tokens:
-      for addresses in self._iterate_top_addresses(token["_source"]["address"]):
+      token = token["_source"]["address"]
+      for addresses in self._iterate_top_addresses(token):
+        addresses = [address["_source"]["address"] for address in addresses]
         addresses_stats = pd.DataFrame(
-          [address["_source"]["address"] for address in addresses],
+          addresses,
           columns=["address"]
         ).set_index("address")
-        addresses_stats["token"] = token["_source"]["address"]
+        addresses_stats["token"] = token
         addresses_stats["ethereum_senders"] = self._get_ethereum_senders(token, addresses)
         addresses_stats["events_per_transaction"] = self._get_events_per_transaction(token, addresses)
         addresses_stats["token_receivers"] = self._get_token_receivers(token, addresses)
         addresses_stats["initiated_holders"] = self._get_initiated_holders(token, addresses)
-        all_addresses_stats.append(addresses_stats)
-    return pd.concat(all_addresses_stats).fillna(0)
+        all_addresses_stats.append(addresses_stats.reset_index())
+    return pd.concat(all_addresses_stats).fillna(0).set_index(["token", "address"])
 
   def _load_model(self, model_name=MULTITRANSFERS_DETECTION_MODEL_NAME):
     return joblib.load("{}.pkl".format(model_name))

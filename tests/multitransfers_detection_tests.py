@@ -183,15 +183,13 @@ class MultitransfersDetectionTestCase(unittest.TestCase):
       "to":  self._create_transaction_address("0x2"),
       "from": self._create_transaction_address("0x2"),
       "value": 3,
-    },
-      {
+    }, {
       "id": 4,
       "to":  self._create_transaction_address("0x1"),
       "from": self._create_transaction_address("0x4"),
       "value": 0
-    },
-      {
-      "id": 4,
+    }, {
+      "id": 5,
       "to": self._create_transaction_address("0x1"),
       "from": self._create_transaction_address("0x5"),
       "value": 1
@@ -220,6 +218,7 @@ class MultitransfersDetectionTestCase(unittest.TestCase):
 
     result = self.multitransfers_detection._get_ethereum_senders(test_token, test_distributors).to_dict()
 
+    print(result)
     self.assertSequenceEqual(result, {
       self._create_transaction_address("0x1"): 1 / (1 + 2),
       self._create_transaction_address("0x2"): 1 / 1
@@ -317,8 +316,15 @@ class MultitransfersDetectionTestCase(unittest.TestCase):
     self.multitransfers_detection._get_token_receivers = feature_mock
     self.multitransfers_detection._get_initiated_holders = feature_mock
 
-    result = self.multitransfers_detection._get_features(test_client_tokens).reset_index().to_dict('records')
-    self.assertCountEqual(result, [{
+    result = self.multitransfers_detection._get_features(test_client_tokens)
+    calls = []
+    for token, addresses in zip(test_tokens, test_addresses):
+      calls += [call(token, addresses)]
+    feature_mock.assert_has_calls(calls)
+    
+    result_records = result.reset_index().to_dict('records')
+    result_ids = result.index
+    self.assertCountEqual(result_records, [{
       'token': "0x01",
       "address": "0x1",
       "ethereum_senders": 1,
@@ -347,6 +353,12 @@ class MultitransfersDetectionTestCase(unittest.TestCase):
       "token_receivers": 0,
       "initiated_holders": 0
     }])
+    self.assertCountEqual(list(result_ids), [
+      ("0x01", "0x1"),
+      ("0x01", "0x2"),
+      ("0x02", "0x2"),
+      ("0x02", "0x3"),
+    ])
 
   def test_load_model(self):
     model = DecisionTreeClassifier()
