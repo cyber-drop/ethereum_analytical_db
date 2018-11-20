@@ -138,6 +138,24 @@ class ClickhouseMultitransfersDetection:
     total_token_receivers = self._get_total_token_receivers(token)
     return token_receivers_df / total_token_receivers
 
+  def _get_features(self):
+    all_addresses_stats = []
+    for token_list in self._iterate_tokens():
+      for token in token_list:
+        for addresses in self._iterate_top_addresses(token["_source"]["address"]):
+          addresses_stats = pd.DataFrame(
+            [address["_source"]["address"] for address in addresses],
+            columns=["address"]
+          ).set_index("address")
+          addresses_stats["token"] = token["_source"]["address"]
+          addresses_stats["ethereum_senders"] = self._get_ethereum_senders(token, addresses)
+          addresses_stats["events_per_transaction"] = self._get_events_per_transaction(token, addresses)
+          addresses_stats["token_receivers"] = self._get_token_receivers(token, addresses)
+          addresses_stats["initiated_holders"] = self._get_initiated_holders(token, addresses)
+          all_addresses_stats.append(addresses_stats)
+
+    return pd.concat(all_addresses_stats).fillna(0)
+
   def _load_model(self, model_name=MULTITRANSFERS_DETECTION_MODEL_NAME):
     return joblib.load("{}.pkl".format(model_name))
 
