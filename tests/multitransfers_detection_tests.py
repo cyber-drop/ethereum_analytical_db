@@ -321,7 +321,7 @@ class MultitransfersDetectionTestCase(unittest.TestCase):
     for token, addresses in zip(test_tokens, test_addresses):
       calls += [call(token, addresses)]
     feature_mock.assert_has_calls(calls)
-    
+
     result_records = result.reset_index().to_dict('records')
     result_ids = result.index
     self.assertCountEqual(result_records, [{
@@ -370,16 +370,27 @@ class MultitransfersDetectionTestCase(unittest.TestCase):
 
   def test_get_prediction(self):
     test_predictions = [{
+      "token": "0x01",
+      "address": "0x1",
       "type": "ico",
       "probability": 0.5
     }, {
+      "token": "0x01",
+      "address": "0x2",
       "type": "other",
       "probability": 0.7
     }, {
+      "token": "0x02",
+      "address": "0x1",
       "type": "airdrop",
       "probability": 0.8
     }]
-    test_objects = [[]] * 4
+    test_objects = pd.DataFrame([
+      ["0x01", "0x1"],
+      ["0x01", "0x2"],
+      ["0x02", "0x1"],
+      ["0x02", "0x2"],
+    ], columns=["token", "address"]).set_index(["token", "address"])
     self.predict_proba = MagicMock(return_value=[
       [0.1, 0.5, 0.3],
       [0.1, 0.5, 0.7],

@@ -169,11 +169,17 @@ class ClickhouseMultitransfersDetection(utils.ClickhouseContractTransactionsIter
     return joblib.load("{}.pkl".format(model_name))
 
   def _get_predictions(self, model, dataset, threshold=MULTITRANSFERS_THRESHOLD):
+    dataset_index = list(dataset.index)
     predictions = model.predict_proba(dataset)
     max_predictions = np.max(predictions, axis=1)
     classes = [model.classes_[i] for i in np.argmax(predictions, axis=1)]
     return [
-      {"type": classes[index], "probability": prediction}
+      {
+        "type": classes[index],
+        "probability": prediction,
+        "token": dataset_index[index][0],
+        "address": dataset_index[index][1]
+      }
       for index, prediction in enumerate(max_predictions)
       if prediction >= threshold
     ]
