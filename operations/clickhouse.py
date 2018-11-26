@@ -7,6 +7,7 @@ from operations.inputs import ClickhouseTransactionsInputs, ClickhouseEventsInpu
 from operations.transaction_fees import ClickhouseTransactionFees
 from operations.events import Events
 from operations.multitransfers_detection import ClickhouseMultitransfersDetection
+from operations.token_prices import ClickhouseTokenPrices
 
 def prepare_indices():
   print("Preparing indices...")
@@ -57,3 +58,8 @@ def extract_multitransfers():
   print("Searching for multitransfers...")
   multitransfers_detection = ClickhouseMultitransfersDetection()
   multitransfers_detection.extract_multitransfers()
+
+def extract_prices():
+  print("Extracting prices...")
+  prices = ClickhouseTokenPrices()
+  prices.get_prices_within_interval()
