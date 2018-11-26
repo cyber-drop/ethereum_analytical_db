@@ -96,6 +96,13 @@ INDEX_FIELDS = {
   "event_input": {
     "name": "String",
     "params": "Nested(type String, value String)"
+  },
+  "multitransfer": {
+    "token": "String",
+    "address": "String",
+    "type": "String",
+    "probability": "Float64",
+    "model": "String"
   }
 }
 
