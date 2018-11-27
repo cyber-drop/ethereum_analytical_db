@@ -207,7 +207,7 @@ class ClickhouseContractTransactions:
     fields_string = self._get_fields()
     engine_string = 'ENGINE = ReplacingMergeTree() ORDER BY id'
     condition = "type = 'create' AND error IS NULL AND parent_error IS NULL"
-    sql = "CREATE MATERIALIZED VIEW IF NOT EXISTS {} {} AS (SELECT {} FROM {} WHERE {})".format(
+    sql = "CREATE MATERIALIZED VIEW IF NOT EXISTS {} {} POPULATE AS (SELECT {} FROM {} WHERE {})".format(
       self.indices["contract"],
       engine_string,
       fields_string,
