@@ -99,7 +99,8 @@ class ClickhouseTokenPricesTestCase(unittest.TestCase):
   def test_get_symbol_by_address(self):
     test_contracts = {
       "0xf230b790e05390fc8295f4d3f60332c93bed42e2": "TRX",
-      "0x86fa049857e0209aa7d9e616f7eb3b3b78ecfdb0": "EOS"
+      "0x86fa049857e0209aa7d9e616f7eb3b3b78ecfdb0": "EOS",
+      "0xb5a5f22694352c15b00323844ad545abb2b11028": ""
     }
     for address, symbol in test_contracts.items():
       result = self.token_prices._get_symbol_by_address(address)
