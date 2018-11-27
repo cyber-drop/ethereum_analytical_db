@@ -243,13 +243,17 @@ class ClickhouseContractTransactionsTestCase(unittest.TestCase):
       "id": "0x1",
       "type": "create",
       "code": TEST_ERC20_BYTECODE,
+    }, {
+      "id": "0x2",
+      "type": "create",
+      "code": "0x0"
     }]
     self.client.bulk_index(index=TEST_TRANSACTIONS_INDEX, docs=transactions)
     result = self.client.search(index=TEST_CONTRACTS_INDEX, fields=[
-      "standards"
+      "standard_erc20"
     ])
-    contract = result[0]["_source"]
-    assert "erc20" in contract["standards"]
+    assert result[0]["_source"]["standard_erc20"]
+    assert not result[1]["_source"]["standard_erc20"]
 
   def test_extract_contract_addresses_if_exists(self):
     self.contract_transactions.extract_contract_addresses()
