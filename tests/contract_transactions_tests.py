@@ -286,6 +286,16 @@ class ClickhouseContractTransactionsTestCase(unittest.TestCase):
     count = self.client.count(index=TEST_CONTRACTS_INDEX)
     assert count == 1
 
+  def test_extract_contract_addresses_recreate(self):
+    self.client.send_sql_request("DROP TABLE {}".format(TEST_CONTRACTS_INDEX))
+    self.client.bulk_index(index=TEST_TRANSACTIONS_INDEX, docs=[{
+      "id": 1,
+      "type": "create"
+    }])
+    self.contract_transactions.extract_contract_addresses()
+    count = self.client.count(index=TEST_CONTRACTS_INDEX)
+    assert count == 1
+
   # Cases:
   # self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "call"}, id=1, refresh=True)
   # self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create"}, id=2, refresh=True)
