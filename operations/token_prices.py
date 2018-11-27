@@ -356,7 +356,7 @@ class ClickhouseTokenPrices(ClickhouseContractTransactionsIterator):
     if 'string' in symbols:
       return symbols['string']
     else:
-      return symbols['bytes32'].decode('utf-8').rstrip('\0')
+      return symbols.get('bytes32', "".encode('utf-8')).decode('utf-8').rstrip('\0')
 
   def _get_historical_multi_prices(self):
     '''
