@@ -3,16 +3,36 @@ from operations.token_prices import ClickhouseTokenPrices
 from unittest import mock
 from tests.test_utils import TestClickhouse
 from datetime import datetime, timedelta
+import config
 
 class ClickhouseTokenPricesTestCase(unittest.TestCase):
   def setUp(self):
+    config.PROCESSED_CONTRACTS.clear()
     self.client = TestClickhouse()
     self.indices = {
       'contract': TEST_CONTRACT_INDEX,
+      'contract_block': TEST_CONTRACT_BLOCK_INDEX,
       'price': TEST_PRICES_INDEX
     }
     self.client.prepare_indices(self.indices)
     self.token_prices = ClickhouseTokenPrices(self.indices, TEST_PARITY_URL)
+
+  def test_iterate_tokens_from_whitelist(self):
+    test_contracts = [{
+      "id": 1,
+      "address": "0x1",
+      "standard_erc20": 1
+    }, {
+      "id": 2,
+      "address": "0x2",
+      "standard_erc20": 1
+    }]
+    self.client.bulk_index(index=TEST_CONTRACT_INDEX, docs=test_contracts)
+    config.PROCESSED_CONTRACTS.append("0x1")
+
+    contracts = self.token_prices._get_cc_tokens()
+
+    self.assertCountEqual([contract["address"] for contract in contracts], ["0x1"])
 
   def test_moving_average(self):
     test_prices = [
@@ -101,7 +121,7 @@ class ClickhouseTokenPricesTestCase(unittest.TestCase):
     test_contracts = ["0x86fa049857e0209aa7d9e616f7eb3b3b78ecfdb0"]
     self.client.bulk_index(
       index=self.indices["contract"],
-      docs=[{"address": contract, "id": contract} for contract in test_contracts]
+      docs=[{"address": contract, "id": contract, "standard_erc20": True} for contract in test_contracts]
     )
     self.token_prices.get_prices_within_interval()
     prices = self.client.search(index=TEST_PRICES_INDEX, fields=["BTC", "address", "timestamp"])
@@ -111,6 +131,7 @@ class ClickhouseTokenPricesTestCase(unittest.TestCase):
 TEST_PARITY_URL = "http://localhost:8550"
 TEST_PRICES_INDEX = 'test_token_prices'
 TEST_CONTRACT_INDEX = 'test_ethereum_contract'
+TEST_CONTRACT_BLOCK_INDEX = 'test_ethereum_contract_block'
 TEST_TOKEN_SYMBOLS = ['AE', 'FND', 'CPAY', 'SEXC']
 TEST_ADDRESSES = ['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d', '0x4df47b4969b2911c966506e3592c41389493953b', '0x0ebb614204e47c09b6c3feb9aaecad8ee060e23e', '0x2567c677473d110d75a8360c35309e63b1d52429']
 TEST_RES = {"AE":{"BTC":0.0004365},"FND":{"BTC":0.00001584},"CPAY":{"BTC":0.00000634}}

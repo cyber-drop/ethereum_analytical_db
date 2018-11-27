@@ -8,11 +8,14 @@ from tqdm import *
 import numpy as np
 import pandas as pd
 from web3 import Web3, HTTPProvider
+from utils import ClickhouseContractTransactionsIterator
 
 MOVING_AVERAGE_WINDOW = 5
 DAYS_LIMIT = 2000
 
-class ClickhouseTokenPrices:
+class ClickhouseTokenPrices(ClickhouseContractTransactionsIterator):
+  doc_type = 'token'
+  block_prefix = 'prices_extracted'
   '''
   Extract token prices from Coinmarketcap and CryptoCompare and save in Elasticsearch
   '''
@@ -80,7 +83,8 @@ class ClickhouseTokenPrices:
     generator
       Generator that iterates over listed token contracts in Elasticsearch
     '''
-    return self.client.iterate(index=self.indices['contract'], query='WHERE address IS NOT NULL', fields=["address"])
+    # return self.client.iterate(index=self.indices["contract"], query="WHERE address IS NOT NULL", fields=["address"])
+    return self._iterate_contracts(partial_query='WHERE standard_erc20 = 1', fields=["address"])
 
   def _get_cc_tokens(self):
     '''
@@ -343,7 +347,8 @@ class ClickhouseTokenPrices:
       contract = self.web3.eth.contract(abi=self._get_symbol_abi(output_type), address=address)
       try:
         symbols[output_type] = contract.functions.symbol().call()
-      except:
+      except Exception as e:
+        print(e)
         pass
     if 'string' in symbols:
       return symbols['string']
