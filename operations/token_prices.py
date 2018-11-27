@@ -1,6 +1,6 @@
 import requests
 from clients.custom_clickhouse import CustomClickhouse
-from config import INDICES, PARITY_HOSTS
+from config import INDICES, PARITY_HOSTS, PROCESSED_CONTRACTS
 import datetime
 from datetime import date
 from pyelasticsearch import bulk_chunks
@@ -84,7 +84,8 @@ class ClickhouseTokenPrices(ClickhouseContractTransactionsIterator):
       Generator that iterates over listed token contracts in Elasticsearch
     '''
     # return self.client.iterate(index=self.indices["contract"], query="WHERE address IS NOT NULL", fields=["address"])
-    return self._iterate_contracts(partial_query='WHERE standard_erc20 = 1', fields=["address"])
+    # return self._iterate_contracts(partial_query='WHERE standard_erc20 = 1', fields=["address"])
+    pass
 
   def _get_cc_tokens(self):
     '''
@@ -95,9 +96,10 @@ class ClickhouseTokenPrices(ClickhouseContractTransactionsIterator):
     list
       List of listed tokens contracts
     '''
-    tokens = [token_chunk for token_chunk in self._iterate_cc_tokens()]
-    token_list = [t['_source'] for token_chunk in tokens for t in token_chunk]
-    return token_list
+    #tokens = [token_chunk for token_chunk in self._iterate_cc_tokens()]
+    #token_list = [t['_source'] for token_chunk in tokens for t in token_chunk]
+    #return token_list
+    return [{"address": address} for address in PROCESSED_CONTRACTS]
 
   def _get_prices_for_fsyms(self, symbol_list):
     '''
@@ -341,6 +343,7 @@ class ClickhouseTokenPrices(ClickhouseContractTransactionsIterator):
     }]
 
   def _get_symbol_by_address(self, address):
+    print(address)
     address = self.web3.toChecksumAddress(address)
     symbols = {}
     for output_type in ['string', 'bytes32']:
