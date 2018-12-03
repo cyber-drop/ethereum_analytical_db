@@ -8,6 +8,7 @@ from tqdm import *
 import time
 import numpy as np
 import pandas as pd
+from bs4 import BeautifulSoup
 
 MOVING_AVERAGE_WINDOW = 5
 
@@ -462,4 +463,52 @@ class TokenPrices:
       if cmc_info == None:
         continue
       self._update_multiple_docs(cmc_info, 'price', self.indices['token_price'])
+
+  def get_token_list(self):
+    url = 'https://coinmarketcap.com/tokens/views/all/'
+    res = requests.get(url).text
+    soup = BeautifulSoup(res, 'html.parser')
+    links = soup.find_all(class_='currency-name-container')
+    links = ['https://coinmarketcap.com' + link['href'] for link in links]
+    tokens = pd.read_html(res)[0]
+    tokens['link'] = links
+    tokens = tokens.loc[tokens.Platform == 'Ethereum']
+    tokens = tokens[['Name', 'link']]
+    return tokens
+
+  def get_token_cmc_historical_info(self, page):
+    today = datetime.date.today().strftime('%Y%m%d')
+    url = page + 'historical-data/?start=20130428&end={}'.format(today)
+    res = requests.get(url).text
+    
+    soup = BeautifulSoup(res, 'html.parser')
+    symbol = soup.find(class_='details-panel-item--name')
+    symbol = symbol.find('span').text if symbol != None else page.split('/')[4]
+    symbol = symbol[1:len(symbol) -1]
+    parsed_data = pd.read_html(res)[0]
+    
+    try:
+      info = [{
+        'market_cap': int(row['Market Cap']) if row['Market Cap'] != '-' and row['Market Cap']!=None else row['Market Cap'],
+        'timestamp': datetime.datetime.strptime(row['Date'], '%b %d, %Y').strftime('%Y-%m-%d'),
+        'USD_cmc': (row['Open*'] + row['Close**']) / 2,
+        'token': symbol
+      } for i, row in parsed_data.iterrows()]
+      return info
+    except:
+      return page.split('/')[4]
+
+  def get_historical_prices(self, links):
+    data = []
+    unprocessed = []
+    for i, link in tqdm_notebook(enumerate(links)):
+        token_info = get_token_cmc_historical_info(link)
+        if type(token_info) is str:
+            unprocessed.append(token_info)
+            continue
+        data.append(token_info)
+        if i > 0 and i % 10 == 0:
+            time.sleep(10)
+    data = [point for points in data for point in points]
+    return data, unprocessed
 

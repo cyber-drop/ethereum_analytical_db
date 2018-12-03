@@ -2,16 +2,24 @@ import unittest
 from token_prices import TokenPrices
 from tests.test_utils import TestElasticSearch
 from unittest import mock
+import datetime
+import codecs
+
+today = datetime.date.today().strftime('%Y%m%d')
 
 def mocked_requests_get(*args, **kwargs):
   class MockResponse:
-    def __init__(self, json_data, status_code):
+    def __init__(self, json_data, status_code, text=None):
       self.json_data = json_data
       self.status_code = status_code
+      self.text = text
     def json(self):
       return self.json_data
   if args[0] == 'https://min-api.cryptocompare.com/data/pricemulti?fsyms=BTC,ETH&tsyms=USD':
     return MockResponse({"BTC":{"USD":6508.66},"ETH":{"USD":470.14}}, 200)
+  elif args[0] == 'https://coinmarketcap.com/currencies/binance-coin/historical-data/?start=20130428&end={}'.format(today):
+    test_token_page = open('cmc_token_page.html', "r").read() #codecs.open('cmc_token_page.html', 'r', 'utf-8')
+    return MockResponse({}, 200, test_token_page)
   else:
     return MockResponse(TEST_RES, 200)
   return MockResponse(None, 404)
@@ -24,6 +32,12 @@ class TokenPricesTestCase(unittest.TestCase):
     self.client.recreate_index(TEST_CONTRACT_INDEX)
   def _iterate_prices(self):
     return self.token_prices.client.iterate(TEST_PRICES_INDEX, 'price', 'token:*')
+
+  @mock.patch('requests.get', side_effect=mocked_requests_get)
+  def test_get_token_cmc_historical_info(self, mock_get):
+    token_info = self.token_prices.get_token_cmc_historical_info('https://coinmarketcap.com/currencies/binance-coin/')
+    assert len(token_info) == 496
+    assert token_info[0] == {'market_cap': 686750930, 'timestamp': '2018-12-02', 'USD_cmc': 5.26, 'token': 'BNB'}
 
   @mock.patch('requests.get', side_effect=mocked_requests_get)
   def test_get_recent_token_prices(self, mock_get):
@@ -85,6 +99,9 @@ class TokenPricesTestCase(unittest.TestCase):
   def test_get_last_day_empty_index(self):
     last_date = self.token_prices._get_last_avail_price_date()
     self.assertSequenceEqual(last_date, ["2013", "01", "01"])
+
+  def test_scrap_token_page(self):
+    token_historical_info = self.token_prices.get_historical_prices()
 
 
 TEST_PRICES_INDEX = 'test-token-prices'
