@@ -5,6 +5,7 @@ from unittest import mock
 import datetime
 import codecs
 import json
+import os
 
 today = datetime.date.today().strftime('%Y%m%d')
 
@@ -16,16 +17,17 @@ def mocked_requests_get(*args, **kwargs):
       self.text = text
     def json(self):
       return self.json_data
+  tests_dir = os.path.dirname(__file__)
   if args[0] == 'https://min-api.cryptocompare.com/data/pricemulti?fsyms=BTC,ETH&tsyms=USD':
     return MockResponse({"BTC":{"USD":6508.66},"ETH":{"USD":470.14}}, 200)
   elif args[0] == 'https://coinmarketcap.com/currencies/binance-coin/historical-data/?start=20130428&end={}'.format(today):
-    test_token_page = open('./tests/cmc_token_page.html', "r").read() 
+    test_token_page = open('{}/cmc_token_page.html'.format(tests_dir), "r").read() 
     return MockResponse({}, 200, test_token_page)
   elif args[0] == 'https://coinmarketcap.com/tokens/views/all/':
-    test_token_list_page = open('./tests/cmc_token_list_page.html', "r").read()
+    test_token_list_page = open('{}/cmc_token_list_page.html'.format(tests_dir), "r").read()
     return MockResponse({}, 200, test_token_list_page)
   elif args[0] == 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest?limit=3000':
-    with open('./tests/test_cmc_api_res.json') as json_file:
+    with open('{}/test_cmc_api_res.json'.format(tests_dir)) as json_file:
       test_cmc_api_res = json.load(json_file)
     return MockResponse(test_cmc_api_res, 200)
   else:
