@@ -4,6 +4,7 @@ from tests.test_utils import TestElasticSearch
 from unittest import mock
 import datetime
 import codecs
+import json
 
 today = datetime.date.today().strftime('%Y%m%d')
 
@@ -18,11 +19,15 @@ def mocked_requests_get(*args, **kwargs):
   if args[0] == 'https://min-api.cryptocompare.com/data/pricemulti?fsyms=BTC,ETH&tsyms=USD':
     return MockResponse({"BTC":{"USD":6508.66},"ETH":{"USD":470.14}}, 200)
   elif args[0] == 'https://coinmarketcap.com/currencies/binance-coin/historical-data/?start=20130428&end={}'.format(today):
-    test_token_page = open('cmc_token_page.html', "r").read() #codecs.open('cmc_token_page.html', 'r', 'utf-8')
+    test_token_page = open('cmc_token_page.html', "r").read() 
     return MockResponse({}, 200, test_token_page)
   elif args[0] == 'https://coinmarketcap.com/tokens/views/all/':
-    test_token_list_page = open('./tests/cmc_token_list_page.html', "r").read() #codecs.open('cmc_token_page.html', 'r', 'utf-8')
+    test_token_list_page = open('./tests/cmc_token_list_page.html', "r").read()
     return MockResponse({}, 200, test_token_list_page)
+  elif args[0] == 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest?limit=3000':
+    with open('./tests/test_cmc_api_res.json') as json_file:
+      test_cmc_api_res = json.load(json_file)
+    return MockResponse(test_cmc_api_res, 200)
   else:
     return MockResponse(TEST_RES, 200)
   return MockResponse(None, 404)
@@ -37,16 +42,29 @@ class TokenPricesTestCase(unittest.TestCase):
     return self.token_prices.client.iterate(TEST_PRICES_INDEX, 'price', 'token:*')
 
   @mock.patch('requests.get', side_effect=mocked_requests_get)
+  def test_get_token_list(self, mock_get):
+    tokens = self.token_prices.get_token_list()
+    assert tokens.shape == (1059, 3)
+
+  @mock.patch('requests.get', side_effect=mocked_requests_get)
   def test_get_token_cmc_historical_info(self, mock_get):
     token_info = self.token_prices.get_token_cmc_historical_info('https://coinmarketcap.com/currencies/binance-coin/')
     assert len(token_info) == 496
-    assert token_info[0] == {'market_cap': 686750930, 'timestamp': '2018-12-02', 'USD_cmc': 5.26, 'token': 'BNB'}
+    assert token_info[0] == {'market_cap': 686750930, 'timestamp': '2018-12-02', 'USD': 5.26, 'token': 'BNB', 'source': 'cmc'}
 
   @mock.patch('requests.get', side_effect=mocked_requests_get)
-  def test_get_token_list(self, mock_get):
-    tokens = self.token_prices.get_token_list()
-    print(tokens.shape)
-    assert tokens.shape == (1059, 2)
+  def test_get_current_cmc_prices(self, mock_get):
+    prices = self.token_prices.get_current_cmc_prices()
+    bnb_price = {
+      'token': 'BNB', 
+      'USD': 4.62077743608, 
+      'ETH': 0.0522571339, 
+      'BTC': 0.0013527843, 
+      'source': 'coinmarketcap', 
+      'market_cap': 604394523, 
+      'timestamp': datetime.date(2018, 12, 11)
+    }
+    assert prices[0] == bnb_price
 
   @mock.patch('requests.get', side_effect=mocked_requests_get)
   def test_get_recent_token_prices(self, mock_get):

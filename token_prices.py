@@ -420,38 +420,6 @@ class TokenPrices:
     '''
     return self.client.iterate(self.indices['contract'], 'contract', '_exists_:website_slug')
 
-  def _get_token_cmc_historical_info(self, identifier, symbol):
-    '''
-    Extract token historical USD prices and capitalization from Coinmarketcap
-
-    Parameters
-    ----------
-    identifier: str
-      Token identifier used in Coinmarketcap
-    symbol: str
-      Token identifier used in Ethereum blockchain
-
-    Returns
-    -------
-    list
-      List of token prices from Coinmarketcap
-    '''
-    today = datetime.date.today().strftime('%Y%m%d')
-    url = 'https://coinmarketcap.com/currencies/{}/historical-data/?start=20130428&end={}'.format(identifier, today)
-    res = requests.get(url).text
-    try:
-      parsed_data = pd.read_html(res)[0]
-      parsed_data = parsed_data.loc[parsed_data['Market Cap'] != '-']
-    except:
-      return
-    info = [{
-      'marketCap': int(row['Market Cap']),
-      'timestamp': datetime.datetime.strptime(row['Date'], '%b %d, %Y').strftime('%Y-%m-%d'),
-      'USD_cmc': (row['Open*'] + row['Close**']) / 2,
-      'token': symbol
-      } for i, row in parsed_data.iterrows()]
-    return info
-
   def add_market_cap(self):
     '''
     Extract list of listed tokens and download USD prices and capitalization from Coinmarketcap
@@ -470,13 +438,16 @@ class TokenPrices:
     soup = BeautifulSoup(res, 'html.parser')
     links = soup.find_all(class_='currency-name-container')
     links = ['https://coinmarketcap.com' + link['href'] for link in links]
+    slugs = [link.split('/') for link in links]
+    slugs = [l[len(l) - 2] for l in slugs]
     tokens = pd.read_html(res)[0]
     tokens['link'] = links
+    tokens['slug'] = slugs
     tokens = tokens.loc[tokens.Platform == 'Ethereum']
-    tokens = tokens[['Name', 'link']]
+    tokens = tokens[['Name', 'link', 'slug']]
     return tokens
 
-  def get_token_cmc_historical_info(self, page):
+  def _get_token_cmc_historical_info(self, page):
     today = datetime.date.today().strftime('%Y%m%d')
     url = page + 'historical-data/?start=20130428&end={}'.format(today)
     res = requests.get(url).text
@@ -491,8 +462,9 @@ class TokenPrices:
       info = [{
         'market_cap': int(row['Market Cap']) if row['Market Cap'] != '-' and row['Market Cap']!=None else row['Market Cap'],
         'timestamp': datetime.datetime.strptime(row['Date'], '%b %d, %Y').strftime('%Y-%m-%d'),
-        'USD_cmc': (row['Open*'] + row['Close**']) / 2,
-        'token': symbol
+        'USD': (row['Open*'] + row['Close**']) / 2,
+        'token': symbol,
+        'source': 'coinmarketcap'
       } for i, row in parsed_data.iterrows()]
       return info
     except:
@@ -502,7 +474,7 @@ class TokenPrices:
     data = []
     unprocessed = []
     for i, link in tqdm_notebook(enumerate(links)):
-        token_info = get_token_cmc_historical_info(link)
+        token_info = _get_token_cmc_historical_info(link)
         if type(token_info) is str:
             unprocessed.append(token_info)
             continue
@@ -511,4 +483,25 @@ class TokenPrices:
             time.sleep(10)
     data = [point for points in data for point in points]
     return data, unprocessed
+
+  def get_current_cmc_prices(self):
+    eth_tokens = self.get_token_list()
+    res = requests.get(
+      'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest?limit=3000',
+      headers={'X-CMC_PRO_API_KEY': '06eef9b3-7f2f-4f0a-9a5d-e3ff7a1dbf1a'}
+      )
+    prices = res.json()['data']
+    btc_price = [price for price in prices if price['symbol'] == 'BTC'][0]['quote']['USD']['price']
+    eth_price = [price for price in prices if price['symbol'] == 'ETH'][0]['quote']['USD']['price']
+    today = date.today()
+    prices = [{
+      'token': p['symbol'], 
+      'USD': p['quote']['USD']['price'],
+      'ETH': float('{:0.10f}'.format(self._from_usd(p['quote']['USD']['price'], eth_price))),
+      'BTC': float('{:0.10f}'.format(self._from_usd(p['quote']['USD']['price'], btc_price))),
+      'source': 'coinmarketcap', 
+      'market_cap': int(p['quote']['USD']['market_cap']),
+      'timestamp': today,
+      } for p in prices if p['slug'] in eth_tokens.slug.values]
+    return prices
 
