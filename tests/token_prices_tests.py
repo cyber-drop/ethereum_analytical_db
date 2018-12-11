@@ -19,7 +19,7 @@ def mocked_requests_get(*args, **kwargs):
   if args[0] == 'https://min-api.cryptocompare.com/data/pricemulti?fsyms=BTC,ETH&tsyms=USD':
     return MockResponse({"BTC":{"USD":6508.66},"ETH":{"USD":470.14}}, 200)
   elif args[0] == 'https://coinmarketcap.com/currencies/binance-coin/historical-data/?start=20130428&end={}'.format(today):
-    test_token_page = open('cmc_token_page.html', "r").read() 
+    test_token_page = open('./tests/cmc_token_page.html', "r").read() 
     return MockResponse({}, 200, test_token_page)
   elif args[0] == 'https://coinmarketcap.com/tokens/views/all/':
     test_token_list_page = open('./tests/cmc_token_list_page.html', "r").read()
@@ -48,9 +48,9 @@ class TokenPricesTestCase(unittest.TestCase):
 
   @mock.patch('requests.get', side_effect=mocked_requests_get)
   def test_get_token_cmc_historical_info(self, mock_get):
-    token_info = self.token_prices.get_token_cmc_historical_info('https://coinmarketcap.com/currencies/binance-coin/')
+    token_info = self.token_prices._get_token_cmc_historical_info('https://coinmarketcap.com/currencies/binance-coin/')
     assert len(token_info) == 496
-    assert token_info[0] == {'market_cap': 686750930, 'timestamp': '2018-12-02', 'USD': 5.26, 'token': 'BNB', 'source': 'cmc'}
+    assert token_info[0] == {'market_cap': 686750930, 'timestamp': '2018-12-02', 'USD': 5.26, 'token': 'BNB', 'source': 'coinmarketcap'}
 
   @mock.patch('requests.get', side_effect=mocked_requests_get)
   def test_get_current_cmc_prices(self, mock_get):
@@ -126,10 +126,6 @@ class TokenPricesTestCase(unittest.TestCase):
   def test_get_last_day_empty_index(self):
     last_date = self.token_prices._get_last_avail_price_date()
     self.assertSequenceEqual(last_date, ["2013", "01", "01"])
-
-  def test_scrap_token_page(self):
-    token_historical_info = self.token_prices.get_historical_prices()
-
 
 TEST_PRICES_INDEX = 'test-token-prices'
 TEST_CONTRACT_INDEX = 'test-ethereum-contract'
