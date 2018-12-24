@@ -420,19 +420,15 @@ class TokenPrices:
     '''
     return self.client.iterate(self.indices['contract'], 'contract', '_exists_:website_slug')
 
-  def add_market_cap(self):
-    '''
-    Extract list of listed tokens and download USD prices and capitalization from Coinmarketcap
-    '''
-    cmc_tokens = self._iterate_cmc_tokens()
-    cmc_tokens = [t['_source'] for tokens in cmc_tokens for t in tokens]
-    for token in tqdm(cmc_tokens):
-      cmc_info = self._get_token_cmc_historical_info(token['website_slug'], token['cc_sym'])
-      if cmc_info == None:
-        continue
-      self._update_multiple_docs(cmc_info, 'price', self.indices['token_price'])
-
   def get_token_list(self):
+    '''
+    Scrap page from Coinmarketcap that contains a list of all token and parse this list to pandas DataFrame
+
+    Returns
+    -------
+    pandas.DataFrame
+      DataFrame with list of tokens and corresponding links to token pages
+    '''
     url = 'https://coinmarketcap.com/tokens/views/all/'
     res = requests.get(url).text
     soup = BeautifulSoup(res, 'html.parser')
@@ -447,7 +443,21 @@ class TokenPrices:
     tokens = tokens[['Name', 'link', 'slug']]
     return tokens
 
-  def _get_token_cmc_historical_info(self, page):
+  def get_token_cmc_historical_info(self, page):
+    '''
+    Scrap page from Coinmarketcap that contains a table with historical price info for token and parse 
+    it to list of prices
+
+    Parameters
+    ----------
+    page: str
+      Link to the token page
+
+    Returns
+    -------
+    list
+      List of token historical prices
+    '''
     today = datetime.date.today().strftime('%Y%m%d')
     url = page + 'historical-data/?start=20130428&end={}'.format(today)
     res = requests.get(url).text
@@ -471,10 +481,24 @@ class TokenPrices:
       return page.split('/')[4]
 
   def get_historical_prices(self, links):
+    '''
+    Get historical prices from Coinmarketcap for specified list of tokens
+
+    Parameters
+    ----------
+    links: list
+      List of links to token pages
+
+    Returns
+    -------
+    tuple
+      Tuple that contains 2 elements: list of token prices and list of token names for 
+      which Coinmarketcap didn't return data
+    '''
     data = []
     unprocessed = []
     for i, link in tqdm_notebook(enumerate(links)):
-        token_info = _get_token_cmc_historical_info(link)
+        token_info = get_token_cmc_historical_info(link)
         if type(token_info) is str:
             unprocessed.append(token_info)
             continue
@@ -485,6 +509,14 @@ class TokenPrices:
     return data, unprocessed
 
   def get_current_cmc_prices(self):
+    '''
+    Get current token prices from Coinmarketcap API
+
+    Returns
+    -------
+    list
+      List of tokens prices
+    '''
     eth_tokens = self.get_token_list()
     res = requests.get(
       'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest?limit=3000',
