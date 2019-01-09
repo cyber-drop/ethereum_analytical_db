@@ -4,113 +4,133 @@ from tests.test_utils import TestElasticSearch, mockify
 from unittest.mock import MagicMock, ANY, patch
 from tests.test_utils import TestClickhouse
 
+TRANSFER_EVENT = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+EVENT_ADDRESS_LENGTH = len("0x000000000000000000000000263627126a771fa9745763495d3975614e235298")
+TRANSACTION_ADDRESS_LENGTH = len("0x5cf04716ba20127f1e2297addcf4b5035000c9eb")
+
 class ClickhouseTokenHoldersTestCase(unittest.TestCase):
   def setUp(self):
     self.indices = {
-      "event_input": TEST_EVENT_INPUTS_INDEX,
       "token_transaction": TEST_TOKEN_TX_INDEX,
-      "event": TEST_EVENTS_INDEX
+      "event": TEST_EVENTS_INDEX,
+      "contract": TEST_CONTRACT_INDEX
     }
     self.client = TestClickhouse()
     self.client.prepare_indices({
-      "event_input": TEST_EVENT_INPUTS_INDEX,
       "event": TEST_EVENTS_INDEX,
+      "contract": TEST_CONTRACT_INDEX
     })
     self.client.send_sql_request("DROP TABLE IF EXISTS {}".format(self.indices["token_transaction"]))
     self.token_holders = ClickhouseTokenHolders(self.indices)
     self.token_holders.extract_token_transactions()
 
+  def test_big_hex_to_float_clickhouse(self):
+    number = 1000
+    big_hex = "{0:#0{1}x}".format(number * (10 ** 18), 64)
+    self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=[{
+      "id": 1,
+      "data": big_hex
+    }])
+    request_string = self.token_holders._generate_sql_for_data()
+    result = self.client.send_sql_request("""
+      SELECT 
+        {}  
+      FROM {} 
+      LIMIT 1
+    """.format(request_string, TEST_EVENTS_INDEX))
+    print(result)
+    assert round(result) == number
+
+  def _create_transfer_event(self, id, from_address, to_address, value, address):
+    return  {
+      "id": id,
+      "topics": [
+        TRANSFER_EVENT,
+        "{0:#0{1}x}".format(int(from_address, 0), EVENT_ADDRESS_LENGTH),
+        "{0:#0{1}x}".format(int(to_address, 0), EVENT_ADDRESS_LENGTH),
+      ],
+      "data": "{0:#0{1}x}".format(value * (10 ** 18), 64),
+      "address": address,
+    }
+
   def test_extract_token_transactions_from_erc20_transfer_events(self):
-    test_event_inputs = [{
-      "id": "0x1.0",
-      "name": "Transfer",
-      "params.type": ["address", "address", "uint256"],
-      "params.value": ["0x1", "0x2", str(100*(10**18))]
-    }, {
-      "id": "0x2.0",
-      "name": "Transfer",
-      "params.type": [],
-      "params.value": []
-    }, {
-      "id": "0x3.0",
-      "name": "NotTransfer",
-      "params.type": ["address", "address", "uint256"],
-      "params.value": ["0x2", "0x3", str(10*(10**18))]
+    test_contracts = [{
+      "id": 1,
+      "address": "0x01",
+      "standard_erc20": 1,
     }]
+    test_events = [
+      self._create_transfer_event("0x1.0", "0x1", "0x2", 100, "0x01"),
+      {
+        "id": "0x1.1",
+        "topics": [
+          "0x"
+        ],
+        "data": '0x',
+        "address": '0x01'
+      }
+    ]
     test_token_transactions = [{
-      "from": "0x1",
-      "to": "0x2",
+      "from": "{0:#0{1}x}".format(1, TRANSACTION_ADDRESS_LENGTH),
+      "to": "{0:#0{1}x}".format(2, TRANSACTION_ADDRESS_LENGTH),
       "value": 100
     }]
     test_transactions_ids = ["0x1.0"]
-    self.client.bulk_index(index=TEST_EVENT_INPUTS_INDEX, docs=test_event_inputs)
+    self.client.bulk_index(index=TEST_CONTRACT_INDEX, docs=test_contracts)
+    self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=test_events)
     token_transactions = self.client.search(index=TEST_TOKEN_TX_INDEX, fields=["id", "to", "from", "value"])
+    for transaction in token_transactions:
+      transaction["_source"]["value"] = round(transaction["_source"]["value"])
     self.assertCountEqual([transaction["_id"] for transaction in token_transactions], test_transactions_ids)
     self.assertCountEqual([transaction["_source"] for transaction in token_transactions], test_token_transactions)
 
-  def test_extract_events_add_token(self):
-    test_event_inputs = [{
-      "id": "0x1.0",
-      "name": "Transfer",
-      "params.type": ["address", "address", "uint256"],
-      "params.value": ["0x1", "0x2", "0"]
+  def test_extract_events_ignore_not_erc20_contracts(self):
+    test_contracts = [{
+      "id": 1,
+      "address": "0x01",
+      "standard_erc20": 1,
     }, {
-      "id": "0x2.0",
-      "name": "Transfer",
-      "params.type": ["address", "address", "uint256"],
-      "params.value": ["0x2", "0x2", "0"]
-    }, {
-      "id": "0x3.0",
-      "name": "Transfer",
-      "params.type": ["address", "address", "uint256"],
-      "params.value": ["0x3", "0x2", "0"]
-    }, {
-      "id": "0x4.0",
-      "name": "Transfer",
-      "params.type": ["address", "address", "uint256"],
-      "params.value": ["0x4", "0x2", "0"]
+      "id": 2,
+      "address": "0x02",
+      "standard_erc20": 0,
     }]
-    test_events = [{
-      "id": "0x1.0",
-      "address": "0x01"
-    }, {
-      "id": "0x2.0",
-      "address": "0x01"
-    }, {
-      "id": "0x3.0",
-      "address": "0x02"
-    }]
-    test_token_transactions = [{
-      "from": "0x1",
-      "token": "0x01"
-    }, {
-      "from": "0x2",
-      "token": "0x01"
-    }, {
-      "from": "0x3",
-      "token": "0x02"
-    }, {
-      "from": "0x4",
-      "token": ""
-    }]
+    test_events = [
+      self._create_transfer_event("0x1.0", "0x1", "0x2", 100, "0x01"),
+      self._create_transfer_event("0x1.1", "0x2", "0x1", 100, "0x02"),
+    ]
+    self.client.bulk_index(index=TEST_CONTRACT_INDEX, docs=test_contracts)
     self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=test_events)
-    self.client.bulk_index(index=TEST_EVENT_INPUTS_INDEX, docs=test_event_inputs)
-
-    token_transactions = self.client.search(index=TEST_TOKEN_TX_INDEX, fields=["from", "token"])
-
-    self.assertCountEqual([transaction["_source"] for transaction in token_transactions], test_token_transactions)
+    token_transactions = self.client.search(index=TEST_TOKEN_TX_INDEX, fields=["token"])
+    self.assertCountEqual([transaction["_id"] for transaction in token_transactions], ["0x1.0"])
+    self.assertCountEqual([transaction["_source"]["token"] for transaction in token_transactions], ["0x01"])
 
   def test_extract_token_transactions_if_exists(self):
     self.token_holders.extract_token_transactions()
 
   def test_extract_token_transactions_ignore_duplicates(self):
-    event_input = {
-      "id": "0x1.0",
-      "name": "Transfer",
-      "params.type": ["address", "address", "uint256"],
-      "params.value": ["0x2", "0x2", "0"]
+    test_contract = {
+      "id": 1,
+      "address": "0x01",
+      "standard_erc20": 1,
     }
-    self.client.bulk_index(index=TEST_EVENT_INPUTS_INDEX, docs=[event_input, event_input])
+    test_event = self._create_transfer_event("0x1.0", "0x1", "0x2", 100, "0x01")
+    self.client.bulk_index(index=TEST_CONTRACT_INDEX, docs=[test_contract])
+    self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=[test_event, test_event])
+    count = self.client.count(index=TEST_TOKEN_TX_INDEX)
+    assert count == 1
+
+  def test_extract_contract_addresses_recreate(self):
+    test_contract = {
+      "id": 1,
+      "address": "0x01",
+      "standard_erc20": 1,
+    }
+    self.client.send_sql_request("DROP TABLE {}".format(TEST_TOKEN_TX_INDEX))
+    self.client.bulk_index(index=TEST_CONTRACT_INDEX, docs=[test_contract])
+    self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=[
+      self._create_transfer_event("0x1.0", "0x1", "0x2", 100, "0x01")
+    ])
+    self.token_holders.extract_token_transactions()
     count = self.client.count(index=TEST_TOKEN_TX_INDEX)
     assert count == 1
 
@@ -385,3 +405,4 @@ TEST_MINT_ADDRESSES = {
     "output" : "0x",
     "id": "0x62e2f27cd5ada06ec9a7a4cb351d51ce697c07beadaeb1e30f5e2e2e9031ba58"
   }
+
