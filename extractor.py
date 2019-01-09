@@ -17,7 +17,7 @@ OPERATIONS = {
     "extract-events": clickhouse.extract_events,
     "parse-transactions-inputs": clickhouse.parse_transactions_inputs,
     "parse-events-inputs": clickhouse.parse_events_inputs,
-    "extract-token-transactions": clickhouse.extract_token_transactions
+    "extract-token-transactions": clickhouse.extract_token_transactions,
     "extract-multitransfers": clickhouse.extract_multitransfers,
     "extract-prices": clickhouse.extract_prices
   }
