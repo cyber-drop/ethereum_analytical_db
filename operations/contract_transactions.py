@@ -180,24 +180,23 @@ class ClickhouseContractTransactions:
 
   def _get_standards(self):
     standards = self._extract_methods_signatures()
-    return "[" + ", ".join([
-      "multiIf({}, '{}', NULL)".format(
-        " AND ".join(["(bytecode LIKE '%{}%')".format(signature) for signature in signatures.values()]),
-        standard
-      )
+    return {
+      "standard_" + standard: " AND ".join([
+        "(bytecode LIKE '%{}%')".format(signature) for signature in signatures.values()
+      ])
       for standard, signatures in standards.items()
-    ]) + "]"
+    }
 
   def _get_fields(self):
-    standards_sql = self._get_standards()
+    standard_fields = self._get_standards()
     fields = {
       "id": "coalesce(address, id)",
       "blockNumber": "blockNumber",
       "address": "address",
       "owner": "from",
-      "bytecode": "code",
-      "standards": standards_sql
+      "bytecode": "code"
     }
+    fields.update(standard_fields)
     fields_string = ", ".join([
       "{} AS {}".format(field, alias)
       for alias, field in fields.items()
@@ -208,7 +207,7 @@ class ClickhouseContractTransactions:
     fields_string = self._get_fields()
     engine_string = 'ENGINE = ReplacingMergeTree() ORDER BY id'
     condition = "type = 'create' AND error IS NULL AND parent_error IS NULL"
-    sql = "CREATE MATERIALIZED VIEW IF NOT EXISTS {} {} AS (SELECT {} FROM {} WHERE {})".format(
+    sql = "CREATE MATERIALIZED VIEW IF NOT EXISTS {} {} POPULATE AS (SELECT {} FROM {} WHERE {})".format(
       self.indices["contract"],
       engine_string,
       fields_string,

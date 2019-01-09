@@ -103,6 +103,13 @@ INDEX_FIELDS = {
     "type": "String",
     "probability": "Float64",
     "model": "String"
+  },
+  "price": {
+    "address": "String",
+    "USD": "Float64",
+    "BTC": "Float64",
+    "ETH": "Float64",
+    "timestamp": "DateTime"
   }
 }
 

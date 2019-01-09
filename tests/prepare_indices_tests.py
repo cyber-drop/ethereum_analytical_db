@@ -473,6 +473,21 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
   def test_create_events_inputs_index(self):
     self._test_create_inputs_index("event_input")
 
+  def test_create_prices_index(self):
+    self.indices.prepare_indices()
+    test_price = {
+      "id": 1,
+      "USD": 12.0,
+      "ETH": 1.0,
+      "BTC": 1.1,
+      'timestamp': datetime.today(),
+      "address": "0x0"
+    }
+    self.client.bulk_index(index=TEST_INDICES["price"], docs=[test_price])
+    result = self.client.search(index=TEST_INDICES["price"], fields=[])
+    result = [price["_id"] for price in result]
+    self.assertCountEqual(["1"], result)
+
   def test_create_multitransfers_index(self):
     self.indices.prepare_indices()
     test_multitransfer = {
@@ -508,5 +523,6 @@ TEST_INDICES = {
   "transaction_fee": "test_transaction_fee",
   "transaction_input": "test_transaction_input",
   "event_input": "test_event_input",
-  "multitransfer": "test_multitransfer"
+  "multitransfer": "test_multitransfer",
+  "price": 'test_price'
 }
