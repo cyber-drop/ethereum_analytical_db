@@ -17,7 +17,7 @@ class ClickhouseTokenHolders():
 
   def _generate_sql_for_data(self):
     return " + ".join([
-      "reinterpretAsUInt64(reverse(unhex(substring(data, {}, 16)))) * {}".format(i + 3, 16 ** (64 - i - 18) / (10 ** 18))
+      "reinterpretAsUInt64(reverse(unhex(substring(data, {}, 16)))) * {}".format(i + 5, 16 ** (64 - i - 18) / (10 ** 18))
       for i in range(0, 64, 16)
     ])
 

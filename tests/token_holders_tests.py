@@ -3,9 +3,11 @@ from operations.token_holders import ElasticSearchTokenHolders, ClickhouseTokenH
 from tests.test_utils import TestElasticSearch, mockify
 from unittest.mock import MagicMock, ANY, patch
 from tests.test_utils import TestClickhouse
+import numpy as np
 
 TRANSFER_EVENT = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 EVENT_ADDRESS_LENGTH = len("0x000000000000000000000000263627126a771fa9745763495d3975614e235298")
+EVENT_VALUE_LENGTH = len("0x0000000000000000000000000000000000000000000a50161174cc045b3a8000")
 TRANSACTION_ADDRESS_LENGTH = len("0x5cf04716ba20127f1e2297addcf4b5035000c9eb")
 
 class ClickhouseTokenHoldersTestCase(unittest.TestCase):
@@ -25,8 +27,8 @@ class ClickhouseTokenHoldersTestCase(unittest.TestCase):
     self.token_holders.extract_token_transactions()
 
   def test_big_hex_to_float_clickhouse(self):
-    number = 1000
-    big_hex = "{0:#0{1}x}".format(number * (10 ** 18), 64)
+    number = 22418.8
+    big_hex = "0x0000000000000000000000000000000000000000000004bf53596c1b5f580000"
     self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=[{
       "id": 1,
       "data": big_hex
@@ -39,7 +41,7 @@ class ClickhouseTokenHoldersTestCase(unittest.TestCase):
       LIMIT 1
     """.format(request_string, TEST_EVENTS_INDEX))
     print(result)
-    assert round(result) == number
+    assert np.abs(result - number) < 1
 
   def _create_transfer_event(self, id, from_address, to_address, value, address):
     return  {
@@ -49,7 +51,7 @@ class ClickhouseTokenHoldersTestCase(unittest.TestCase):
         "{0:#0{1}x}".format(int(from_address, 0), EVENT_ADDRESS_LENGTH),
         "{0:#0{1}x}".format(int(to_address, 0), EVENT_ADDRESS_LENGTH),
       ],
-      "data": "{0:#0{1}x}".format(value * (10 ** 18), 64),
+      "data": "{0:#0{1}x}".format(value * (10 ** 18), EVENT_VALUE_LENGTH),
       "address": address,
     }
 
