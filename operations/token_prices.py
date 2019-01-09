@@ -1,23 +1,28 @@
 import requests
-from custom_elastic_search import CustomElasticSearch
-from config import INDICES
+from clients.custom_clickhouse import CustomClickhouse
+from config import INDICES, PARITY_HOSTS, PROCESSED_CONTRACTS
 import datetime
 from datetime import date
 from pyelasticsearch import bulk_chunks
 from tqdm import *
-import time
 import numpy as np
 import pandas as pd
+from web3 import Web3, HTTPProvider
+from utils import ClickhouseContractTransactionsIterator
 
 MOVING_AVERAGE_WINDOW = 5
+DAYS_LIMIT = 2000
 
-class TokenPrices:
+class ClickhouseTokenPrices(ClickhouseContractTransactionsIterator):
+  doc_type = 'token'
+  block_prefix = 'prices_extracted'
   '''
   Extract token prices from Coinmarketcap and CryptoCompare and save in Elasticsearch
   '''
-  def __init__(self, elasticsearch_indices=INDICES, elasticsearch_host='http://localhost:9200'):
-    self.indices = elasticsearch_indices
-    self.client = CustomElasticSearch(elasticsearch_host)
+  def __init__(self, indices=INDICES, parity_host=PARITY_HOSTS[0][-1]):
+    self.indices = indices
+    self.client = CustomClickhouse()
+    self.web3 = Web3(HTTPProvider(parity_host))
 
   def _chunks(self, l, n):
     '''
@@ -78,7 +83,7 @@ class TokenPrices:
     generator
       Generator that iterates over listed token contracts in Elasticsearch
     '''
-    return self.client.iterate(self.indices['contract'], 'contract', 'cc_sym:*')
+    return self._iterate_contracts(partial_query='WHERE standard_erc20 = 1', fields=["address"])
 
   def _get_cc_tokens(self):
     '''
@@ -134,19 +139,10 @@ class TokenPrices:
     for symbols in token_list_chunks:
       prices = self._get_prices_for_fsyms(symbols)
       if prices != None:
-        prices = [{'token': key, 'BTC': float('{:0.10f}'.format(prices[key]['BTC']))} for key in prices.keys()]
+        prices = [{'address': key, 'BTC': float('{:0.10f}'.format(prices[key]['BTC']))} for key in prices.keys()]
         all_prices.append(prices)
     all_prices = [price for prices in all_prices for price in prices]
     return all_prices
-
-  def _get_btc_eth_current_prices(self):
-    '''
-    Extract current BTC and ETH prices from CryptoCompare
-    '''
-    url = 'https://min-api.cryptocompare.com/data/pricemulti?fsyms=BTC,ETH&tsyms=USD'
-    res = requests.get(url).json()
-    self.btc_price = res['BTC']['USD']
-    self.eth_price = res['ETH']['USD']
 
   def _get_multi_prices(self):
     '''
@@ -159,7 +155,7 @@ class TokenPrices:
     '''
     now = datetime.datetime.now()
     self._get_btc_eth_current_prices()
-    token_syms = [token['cc_sym'] for token in self._get_cc_tokens()]
+    token_syms = [token['address'] for token in self._get_cc_tokens()]
     prices = self._make_multi_prices_req(token_syms)
     for price in prices:
       price['USD'] = float('{:0.10f}'.format(self._to_usd(price['BTC'], self.btc_price)))
@@ -177,9 +173,9 @@ class TokenPrices:
       List of dictionaries with new data
     '''
     for doc in docs:
-      yield self.client.index_op(doc, id=doc['token']+'_'+doc['timestamp'])
+      doc["id"] = doc['address']+'_'+doc['timestamp'].strftime("%Y-%m-%d")
 
-  def _insert_multiple_docs(self, docs, doc_type, index_name):
+  def _insert_multiple_docs(self, docs, index_name):
     ''' 
     Index multiple documents simultaneously
 
@@ -192,21 +188,22 @@ class TokenPrices:
     index_name: str
       Name of the index that contains inserted documents
     '''
-    for chunk in bulk_chunks(self._construct_bulk_insert_ops(docs), docs_per_chunk=1000):
-      self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
+    for chunk in bulk_chunks(docs, docs_per_chunk=1000):
+      self._construct_bulk_insert_ops(chunk)
+      self.client.bulk_index(index=index_name, docs=chunk)
 
   def get_recent_token_prices(self):
     '''
     Extract listed tokens current prices from CryptoCompare and saves in Elasticsearch
     '''
     prices = self._get_multi_prices()
-    self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
+    self._insert_multiple_docs(prices, 'price', self.indices['price'])
 
-  def _set_moving_average(self, prices):
+  def _set_moving_average(self, prices, window_size=MOVING_AVERAGE_WINDOW):
     prices_stack = []
     for price in prices:
       prices_stack.append(price["close"])
-      if len(prices_stack) == MOVING_AVERAGE_WINDOW:
+      if len(prices_stack) == window_size:
         price["average"] = np.mean(prices_stack)
         prices_stack.pop(0)
       else:
@@ -232,18 +229,12 @@ class TokenPrices:
       point = {}
       point['BTC'] = price["average"]
       point['BTC'] = float('{:0.10f}'.format(point['BTC']))
-      point['timestamp'] = datetime.datetime.fromtimestamp(price['time']).strftime("%Y-%m-%d")
-      point['token'] = price['token']
-      point['USD'] = self._to_usd(point['BTC'], self.btc_prices[point['timestamp']])
-      point['USD'] = float('{:0.10f}'.format(point['USD']))
-      if point['timestamp'] in self.eth_prices.keys():
-        point['ETH'] = self._from_usd(point['USD'], self.eth_prices[point['timestamp']])
-        point['ETH'] = float('{:0.10f}'.format(point['ETH']))
-      point['source'] = 'cryptocompare'
+      point['timestamp'] = datetime.datetime.fromtimestamp(price['time'])
+      point['address'] = price['address']
       points.append(point)
     return points
 
-  def _make_historical_prices_req(self, symbol, days_count):
+  def _make_historical_prices_req(self, address, days_count):
     '''
     Make call to CryptoCompare API to extract token historical data
 
@@ -259,13 +250,15 @@ class TokenPrices:
     list
       List of token historical prices
     '''
+    symbol = self._get_symbol_by_address(address)
     url = 'https://min-api.cryptocompare.com/data/histoday?fsym={}&tsym=BTC&limit={}'.format(symbol, days_count)
     try:
       res = requests.get(url).json()
       for point in res['Data']:
-        point['token'] = symbol
+        point['address'] = address
       return res['Data']
     except:
+      print("No exchange rate for {}".format(symbol))
       return
 
   def _get_last_avail_price_date(self):
@@ -277,19 +270,7 @@ class TokenPrices:
     string
       Timestamp of last available date or 2013-01-01 if there are no prices in index
     '''
-    query = {
-      "from" : 0, "size" : 1,
-      'sort': {
-        'timestamp': {'order': 'desc'}
-      }
-    }
-    try:
-      res = self.client.send_request('GET', [self.indices['token_price'], 'price', '_search'], query, {})['hits']['hits']
-      last_date = res[0]['_source']['timestamp']
-    except:
-      last_date = '2013-01-01'
-    last_date = last_date.split('-')
-    return last_date
+    return self.client.send_sql_request('SELECT MAX(timestamp) FROM {}'.format(self.indices['price']))
 
   def _convert_btc_eth_prices(self, price):
     '''
@@ -323,7 +304,7 @@ class TokenPrices:
     self.btc_prices = btc_prices_dict
     self.eth_prices = eth_prices_dict
 
-  def _get_days_count(self, now, last_price_date):
+  def _get_days_count(self, now, last_price_date, limit=DAYS_LIMIT):
     '''
     Count number of days for that prices are unavailable
 
@@ -339,10 +320,40 @@ class TokenPrices:
     int
       Number of days
     '''
-    start_date = date(int(now[0]), int(now[1]), int(now[2]))
-    end_date = date(int(last_price_date[0]), int(last_price_date[1]), int(last_price_date[2]))
-    days_count = (start_date - end_date).days + 1
-    return days_count
+    days_count = (now - last_price_date).days + 1
+    return min(days_count, DAYS_LIMIT)
+
+  def _get_symbol_abi(self, output_type):
+    return [{
+      "constant": True,
+      "inputs": [],
+      "name": "symbol",
+      "outputs": [
+        {
+          "name": "",
+          "type": output_type
+        }
+      ],
+      "payable": False,
+      "stateMutability": "view",
+      "type": "function"
+    }]
+
+  def _get_symbol_by_address(self, address):
+    print(address)
+    address = self.web3.toChecksumAddress(address)
+    symbols = {}
+    for output_type in ['string', 'bytes32']:
+      contract = self.web3.eth.contract(abi=self._get_symbol_abi(output_type), address=address)
+      try:
+        symbols[output_type] = contract.functions.symbol().call()
+      except Exception as e:
+        print(e)
+        pass
+    if 'string' in symbols:
+      return symbols['string']
+    else:
+      return symbols.get('bytes32', "".encode('utf-8')).decode('utf-8').rstrip('\0')
 
   def _get_historical_multi_prices(self):
     '''
@@ -353,13 +364,15 @@ class TokenPrices:
     list
       List ot token historical prices
     '''
-    self._get_btc_eth_prices()
-    token_syms = [token['cc_sym'] for token in self._get_cc_tokens()]
-    now = datetime.datetime.now().strftime("%Y-%m-%d").split('-')
+    token_addresses = [
+      token['address']
+      for token in self._get_cc_tokens()
+    ]
+    now = datetime.datetime.now()
     last_price_date = self._get_last_avail_price_date()
     days_count = self._get_days_count(now, last_price_date)
     prices = []
-    for token in tqdm(token_syms):
+    for token in tqdm(token_addresses):
       price = self._make_historical_prices_req(token, days_count)
       if price != None:
         price = self._process_hist_prices(price) 
@@ -377,89 +390,4 @@ class TokenPrices:
     '''
     prices = self._get_historical_multi_prices()
     if prices != None:
-      self._insert_multiple_docs(prices, 'price', self.indices['token_price'])
-    self.add_market_cap()
-
-  def _construct_bulk_update_ops(self, docs):
-    '''
-    Iterate over docs and create document-updating operations used in bulk update
-
-    Parameters
-    ----------
-    docs: list
-      List of dictionaries with new data
-    '''
-    for doc in docs:
-      yield self.client.update_op(doc, id=doc['token'] + '_' + doc['timestamp'], upsert=doc)
-
-  def _update_multiple_docs(self, docs, doc_type, index_name):
-    '''
-    Update multiple documents simultaneously
-
-    Parameters
-    ----------
-    docs: list
-      List of dictionaries with new data
-    doc_type: str 
-      Type of updated documents
-    index_name: str
-      Name of the index that contains updated documents
-    '''
-    for chunk in bulk_chunks(self._construct_bulk_update_ops(docs), docs_per_chunk=1000):
-      self.client.bulk(chunk, doc_type=doc_type, index=index_name, refresh=True)
-
-  def _iterate_cmc_tokens(self):
-    '''
-    Iterate over token contracts that are listed on Coinmarketcap
-
-    Returns
-    -------
-    generator
-      Generator that iterates over listed token contracts in Elasticsearch
-    '''
-    return self.client.iterate(self.indices['contract'], 'contract', '_exists_:website_slug')
-
-  def _get_token_cmc_historical_info(self, identifier, symbol):
-    '''
-    Extract token historical USD prices and capitalization from Coinmarketcap
-
-    Parameters
-    ----------
-    identifier: str
-      Token identifier used in Coinmarketcap
-    symbol: str
-      Token identifier used in Ethereum blockchain
-
-    Returns
-    -------
-    list
-      List of token prices from Coinmarketcap
-    '''
-    today = datetime.date.today().strftime('%Y%m%d')
-    url = 'https://coinmarketcap.com/currencies/{}/historical-data/?start=20130428&end={}'.format(identifier, today)
-    res = requests.get(url).text
-    try:
-      parsed_data = pd.read_html(res)[0]
-      parsed_data = parsed_data.loc[parsed_data['Market Cap'] != '-']
-    except:
-      return
-    info = [{
-      'marketCap': int(row['Market Cap']),
-      'timestamp': datetime.datetime.strptime(row['Date'], '%b %d, %Y').strftime('%Y-%m-%d'),
-      'USD_cmc': (row['Open*'] + row['Close**']) / 2,
-      'token': symbol
-      } for i, row in parsed_data.iterrows()]
-    return info
-
-  def add_market_cap(self):
-    '''
-    Extract list of listed tokens and download USD prices and capitalization from Coinmarketcap
-    '''
-    cmc_tokens = self._iterate_cmc_tokens()
-    cmc_tokens = [t['_source'] for tokens in cmc_tokens for t in tokens]
-    for token in tqdm(cmc_tokens):
-      cmc_info = self._get_token_cmc_historical_info(token['website_slug'], token['cc_sym'])
-      if cmc_info == None:
-        continue
-      self._update_multiple_docs(cmc_info, 'price', self.indices['token_price'])
-
+      self._insert_multiple_docs(prices, self.indices['price'])

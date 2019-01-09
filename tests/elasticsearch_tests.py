@@ -1,28 +1,14 @@
-from pyelasticsearch import ElasticSearch
-from custom_elastic_search import CustomElasticSearch as NewElasticSearch
+from clients.custom_elastic_search import CustomElasticSearch as NewElasticSearch
 import unittest
-from time import time
 import random
 from test_utils import TestElasticSearch
-import json
-import datetime as dt
-import subprocess
-from tqdm import tqdm
+
 
 class ElasticSearchTestCase(unittest.TestCase):
   def setUp(self):
     self.client = TestElasticSearch()
     self.new_client = NewElasticSearch('http://localhost:9200')
     self.client.recreate_index(TEST_INDEX)
-
-  def test_make_range_query(self):
-    assert self.new_client.make_range_query("block", (0, 3)) == "block:[0 TO 2]"
-    assert self.new_client.make_range_query("block", (None, 3)) == "block:[* TO 2]"
-    assert self.new_client.make_range_query("block", (0, None)) == "block:[0 TO *]"
-    assert self.new_client.make_range_query("block", (None, None)) == "block:[* TO *]"
-
-  def test_make_complex_range_query(self):
-    assert self.new_client.make_range_query("block", (0, 3), (10, 100)) == "(block:[0 TO 2] OR block:[10 TO 99])"
 
   def test_iterate_elasticsearch_data_with_pagination(self):
     for i in range(11):
@@ -74,5 +60,11 @@ class ElasticSearchTestCase(unittest.TestCase):
       self.client.index(TEST_INDEX, 'item', {'will_update': True}, id=i + 1, refresh=True)
     for i in range(5):
       self.client.index(TEST_INDEX, 'item', {'will_update': False}, id=i + 6, refresh=True)
+
+  def test_send_sql_request(self):
+    for i in range(100):
+      self.client.index(TEST_INDEX, 'item', {'x': i}, id=i + 1, refresh=True)
+    result = self.new_client.send_sql_request("SELECT max(x) FROM {}".format(TEST_INDEX))
+    assert result == 99
 
 TEST_INDEX = 'test-ethereum-transactions'

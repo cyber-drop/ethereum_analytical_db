@@ -1,27 +1,16 @@
 import unittest
-from tests.test_utils import TestElasticSearch, mockify
-from internal_transactions import *
-from internal_transactions import _get_parity_url_by_block, _get_traces_sync, _make_trace_requests
-import internal_transactions
+from tests.test_utils import TestElasticSearch, mockify, TestClickhouse
+from operations.internal_transactions import *
+from operations.internal_transactions import _get_parity_url_by_block, _get_traces_sync, _make_trace_requests
+from operations import internal_transactions
 import json
 import httpretty
 from unittest.mock import MagicMock, patch, call, Mock
+from clients.custom_clickhouse import CustomClickhouse
+from clients.custom_elastic_search import CustomElasticSearch
+from operations.indices import ClickhouseIndices
 
-class InternalTransactionsTestCase(unittest.TestCase):
-  def setUp(self):
-    self.client = TestElasticSearch()
-    self.client.recreate_fast_index(TEST_TRANSACTIONS_INDEX)
-    self.client.recreate_fast_index(TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type='itx')
-    self.client.recreate_index(TEST_MINER_TRANSACTIONS_INDEX)
-    self.client.recreate_index(TEST_BLOCKS_INDEX)
-    self.parity_hosts = [(None, None, "http://localhost:8545")]
-    self.internal_transactions = InternalTransactions({
-      "block": TEST_BLOCKS_INDEX,
-      "transaction": TEST_TRANSACTIONS_INDEX,
-      "internal_transaction": TEST_INTERNAL_TRANSACTIONS_INDEX,
-      "miner_transaction": TEST_MINER_TRANSACTIONS_INDEX
-    }, parity_hosts=self.parity_hosts)
-
+class InternalTransactionsTestCase():
   def test_split_on_chunks(self):
     """
     Test splitting on chunks
@@ -34,20 +23,6 @@ class InternalTransactionsTestCase(unittest.TestCase):
       chunks = self.internal_transactions._split_on_chunks(test_list, test_chunks_number)
       split_mock.assert_called_with(test_list, test_chunks_number)
       assert chunks == test_chunks
-
-  def test_iterate_blocks(self):
-    """
-    Test iteration through unprocessed blocks that are presented in given hosts config
-    """
-    self.internal_transactions.parity_hosts = [(0, 4, "http://localhost:8545"), (5, None, "http://localhost:8545")]
-    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 1}, id=1, refresh=True)
-    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 2}, id=2, refresh=True)
-    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 3, 'traces_extracted': True}, id=3, refresh=True)
-    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 4}, id=4, refresh=True)
-    self.client.index(TEST_BLOCKS_INDEX, 'b', {'number': 5}, id=5, refresh=True)
-    blocks = next(self.internal_transactions._iterate_blocks())
-    blocks = [block["_source"]["number"] for block in blocks]
-    self.assertCountEqual(blocks, [1, 2, 5])
 
   def test_get_parity_url_by_block(self):
     """
@@ -129,7 +104,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
         body=response,
         content_type='application/json'
       )
-    with patch('internal_transactions._make_trace_requests', make_trace_requests_mock):
+    with patch('operations.internal_transactions._make_trace_requests', make_trace_requests_mock):
       internal_transactions_response = internal_transactions._get_traces_sync(test_parity_hosts, test_blocks)
 
       internal_transactions._make_trace_requests.assert_called_with(test_parity_hosts, test_blocks)
@@ -278,15 +253,6 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.internal_transactions._set_parent_errors(trace)
     assert "parent_error" in trace[-1].keys()
 
-  def test_save_traces(self):
-    """
-    Test save traces_extracted flag for specified blocks
-    """
-    self.client.index(TEST_BLOCKS_INDEX, 'b', {"number": 123}, id=1, refresh=True)
-    self.internal_transactions._save_traces([123])
-    block = self.client.get(TEST_BLOCKS_INDEX, 'b', 1)['_source']
-    assert block['traces_extracted']
-
   def test_preprocess_internal_transaction_with_empty_field(self):
     """
     Test preprocessing internal transaction with empty flattened field
@@ -326,7 +292,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
     for transaction in test_trace:
       self.internal_transactions._preprocess_internal_transaction.assert_any_call(transaction)
 
-    internal_transactions = self.client.search(index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type="itx", query="*")["hits"]["hits"]
+    internal_transactions = self.client.search(index=TEST_INTERNAL_TRANSACTIONS_INDEX, fields=["transactionHash"])
     internal_transactions_bodies = [transaction["_source"] for transaction in internal_transactions]
     internal_transactions_ids = [transaction["_id"] for transaction in internal_transactions]
     self.assertCountEqual(internal_transactions_ids, test_transactions_ids)
@@ -338,7 +304,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
     """
     trace = [{"transactionHash": None, "hash": "0x1"}]
     self.internal_transactions._save_internal_transactions(trace)
-    internal_transactions = self.client.search(index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type="itx", query="*")["hits"]["hits"]
+    internal_transactions = self.client.search(index=TEST_INTERNAL_TRANSACTIONS_INDEX, fields=[])
     assert not len(internal_transactions)
 
   def test_save_miner_transaction(self):
@@ -347,20 +313,20 @@ class InternalTransactionsTestCase(unittest.TestCase):
     """
     trace = [{"transactionHash": None, "hash": "0x1"}, {"transactionHash": "0x1"}]
     self.internal_transactions._save_miner_transactions(trace)
-    miner_transactions = self.client.search(index=TEST_MINER_TRANSACTIONS_INDEX, doc_type="tx", query="*")["hits"]["hits"]
+    miner_transactions = self.client.search(index=TEST_INTERNAL_TRANSACTIONS_INDEX, fields=["transactionHash"])
     assert len(miner_transactions) != 0
     assert miner_transactions[0]["_id"] == "0x1"
     self.assertCountEqual(miner_transactions[0]["_source"], {"transactionHash": None})
 
   def test_save_genesis(self):
-    test_genesis = [{"hash": "1", "test": True}]
+    test_genesis = [{"hash": "1", "to": "0x"}]
     with open('test_genesis.json', "w") as file:
       file.write(json.dumps(test_genesis))
 
     self.internal_transactions._save_genesis_block('test_genesis.json')
-    genesis = self.client.search(index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type="itx", query="test:true")['hits']['hits']
+    genesis = self.client.search(index=TEST_INTERNAL_TRANSACTIONS_INDEX, fields=["to"])
 
-    assert genesis[0]["_source"]["test"]
+    assert genesis[0]["_source"]["to"] == "0x"
     assert genesis[0]["_id"] == "1"
 
   def test_extract_traces_chunk(self):
@@ -452,14 +418,9 @@ class InternalTransactionsTestCase(unittest.TestCase):
     Test extraction on a real data
     """
     test_transactions = json.load(open("real_transactions.json", "r"))
-    test_blocks = [{"number": block} for block in set(transaction["blockNumber"] for transaction in test_transactions)]
-    self.client.bulk_index(
-      docs=test_transactions,
-      index=TEST_TRANSACTIONS_INDEX,
-      doc_type='tx',
-      id_field="hash",
-      refresh=True
-    )
+    for i, transaction in enumerate(test_transactions):
+      transaction["hash"] = i
+    test_blocks = [{"id": block, "number": block} for block in set(transaction["blockNumber"] for transaction in test_transactions)]
     self.client.bulk_index(
       docs=test_blocks,
       index=TEST_BLOCKS_INDEX,
@@ -469,21 +430,75 @@ class InternalTransactionsTestCase(unittest.TestCase):
 
     self.internal_transactions.extract_traces()
 
-    internal_transactions_count = self.client.count(index=TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type="itx", query="*")["count"]
-    miner_transactions_count = self.client.count(index=TEST_MINER_TRANSACTIONS_INDEX, doc_type="tx", query="*")["count"]
-    print(miner_transactions_count)
-    print(internal_transactions_count)
-    assert internal_transactions_count == 66201
-    assert miner_transactions_count == 447
+    internal_transactions_count = self.client.count(index=TEST_INTERNAL_TRANSACTIONS_INDEX)
+    assert internal_transactions_count == 66201 + 447
+
+class ElasticSearchInternalTransactionsTestCase(InternalTransactionsTestCase, unittest.TestCase):
+  def setUp(self):
+    self.client = TestElasticSearch()
+    self.client.recreate_fast_index(TEST_TRANSACTIONS_INDEX)
+    self.client.recreate_fast_index(TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type='itx')
+    self.client.recreate_index(TEST_MINER_TRANSACTIONS_INDEX)
+    self.client.recreate_index(TEST_BLOCKS_INDEX)
+    self.parity_hosts = [(None, None, "http://localhost:8545")]
+    self.internal_transactions = InternalTransactions({
+      "block": TEST_BLOCKS_INDEX,
+      "transaction": TEST_TRANSACTIONS_INDEX,
+      "internal_transaction": TEST_INTERNAL_TRANSACTIONS_INDEX,
+      "miner_transaction": TEST_MINER_TRANSACTIONS_INDEX
+    }, parity_hosts=self.parity_hosts, client=CustomElasticSearch("http://localhost:9200"))
+
+class ClickhouseInternalTransactionsTestCase(InternalTransactionsTestCase, unittest.TestCase):
+  def setUp(self):
+    self.client = TestClickhouse()
+    self.indices = {
+      "block": TEST_BLOCKS_INDEX,
+      "transaction": TEST_TRANSACTIONS_INDEX,
+      "internal_transaction": TEST_INTERNAL_TRANSACTIONS_INDEX,
+      "miner_transaction": TEST_MINER_TRANSACTIONS_INDEX,
+      "block_flag": TEST_BLOCKS_TRACES_EXTRACTED_INDEX
+    }
+    self.client.prepare_indices(self.indices)
+    self.parity_hosts = [(None, None, "http://localhost:8545")]
+    self.internal_transactions = ClickhouseInternalTransactions(self.indices, parity_hosts=self.parity_hosts)
+
+  def test_iterate_blocks(self):
+    self.internal_transactions.parity_hosts = [(0, 4, "http://localhost:8545"), (5, None, "http://localhost:8545")]
+    blocks = [{'number': i, 'id': i} for i in range(1, 6)]
+    flags = [
+      {'name': 'traces_extracted', 'value': True, "id": 3},
+      {'name': 'traces_extracted', 'value': True, "id": 2},
+      {'name': 'traces_extracted', 'value': None, 'id': 2},
+      {"name": "other_flag", "value": True, "id": 1}
+    ]
+    self.client.bulk_index(index=TEST_BLOCKS_INDEX, docs=blocks)
+    self.client.bulk_index(index=TEST_BLOCKS_TRACES_EXTRACTED_INDEX, docs=flags)
+    iterator = self.internal_transactions._iterate_blocks()
+    blocks = next(iterator)
+    blocks = [block["_source"]["number"] for block in blocks]
+    self.assertCountEqual(blocks, [1, 2, 5])
+
+  def test_save_traces(self):
+    self.internal_transactions._save_traces([123])
+    block = self.client.search(index=TEST_BLOCKS_TRACES_EXTRACTED_INDEX, query="WHERE id = '123'", fields=["name", "value"])[0]['_source']
+    assert block['value']
+    assert block['name'] == 'traces_extracted'
+
+# Add two classes - for clickhouse and elasticsearch
+# Add different realizations for _iterate_blocks method
+# Move make_range_query and update_by_query to utils? Or make it static for ES client?
+
+# Check tests for blocks
 
 REAL_TRANSACTIONS_INDEX = "ethereum-internal-transaction"
 TEST_TRANSACTIONS_NUMBER = 10
 TEST_BLOCK_NUMBER = 3068185
 TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 10
-TEST_TRANSACTIONS_INDEX = 'test-ethereum-transactions'
-TEST_INTERNAL_TRANSACTIONS_INDEX = 'test-ethereum-internal-transactions'
-TEST_BLOCKS_INDEX = "test-ethereum-blocks"
-TEST_MINER_TRANSACTIONS_INDEX = 'test-ethereum-miner-transactions'
+TEST_TRANSACTIONS_INDEX = 'test_ethereum_transactions'
+TEST_INTERNAL_TRANSACTIONS_INDEX = 'test_ethereum_internal_transactions'
+TEST_BLOCKS_INDEX = "test_ethereum_blocks"
+TEST_MINER_TRANSACTIONS_INDEX = 'test_ethereum_miner_transactions'
 TEST_TRANSACTION_HASH = '0x38a999ebba98a14a67ea7a83921e3e58d04a29fc55adfa124a985771f323052a'
 TEST_TRANSACTION_INPUT = '0xb1631db29e09ec5581a0ec398f1229abaf105d3524c49727621841af947bdc44'
 TEST_INCORRECT_TRANSACTION_HASH = "0x"
+TEST_BLOCKS_TRACES_EXTRACTED_INDEX = "test_ethereum_block_traces_extracted"

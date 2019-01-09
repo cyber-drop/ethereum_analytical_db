@@ -1,6 +1,6 @@
 import re
 from web3 import Web3, HTTPProvider
-from custom_elastic_search import CustomElasticSearch
+from clients.custom_elastic_search import CustomElasticSearch
 from config import INDICES, PARITY_HOSTS
 import json
 import math
