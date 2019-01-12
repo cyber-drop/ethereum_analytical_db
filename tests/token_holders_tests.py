@@ -79,12 +79,14 @@ class ClickhouseTokenHoldersTestCase(unittest.TestCase):
     test_token_transactions = [{
       "from": "{0:#0{1}x}".format(1, TRANSACTION_ADDRESS_LENGTH),
       "to": "{0:#0{1}x}".format(2, TRANSACTION_ADDRESS_LENGTH),
+      "transactionHash": "0x1.0",
+      "blockNumber": 10,
       "value": 100
     }]
     test_transactions_ids = ["0x1.0"]
     self.client.bulk_index(index=TEST_CONTRACT_INDEX, docs=test_contracts)
     self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=test_events)
-    token_transactions = self.client.search(index=TEST_TOKEN_TX_INDEX, fields=["id", "to", "from", "value"])
+    token_transactions = self.client.search(index=TEST_TOKEN_TX_INDEX, fields=["id", "to", "from", "value", "blockNumber", "transactionHash"])
     for transaction in token_transactions:
       transaction["_source"]["value"] = round(transaction["_source"]["value"])
     self.assertCountEqual([transaction["_id"] for transaction in token_transactions], test_transactions_ids)

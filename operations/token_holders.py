@@ -34,7 +34,9 @@ class ClickhouseTokenHolders():
           concat('0x', substring(topics[3], 27, 40)) AS to,
           ({value_sql}) AS value,
           id,
-          address AS token
+          address AS token,
+          transactionHash,
+          blockNumber
         FROM {event}
         ANY INNER JOIN (
           SELECT address 
