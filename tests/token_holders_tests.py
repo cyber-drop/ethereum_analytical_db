@@ -46,6 +46,8 @@ class ClickhouseTokenHoldersTestCase(unittest.TestCase):
   def _create_transfer_event(self, id, from_address, to_address, value, address):
     return  {
       "id": id,
+      "transactionHash": id,
+      "blockNumber": 10,
       "topics": [
         TRANSFER_EVENT,
         "{0:#0{1}x}".format(int(from_address, 0), EVENT_ADDRESS_LENGTH),
@@ -69,7 +71,9 @@ class ClickhouseTokenHoldersTestCase(unittest.TestCase):
           "0x"
         ],
         "data": '0x',
-        "address": '0x01'
+        "address": '0x01',
+        "blockNumber": 1,
+        "transactionHash": "0x"
       }
     ]
     test_token_transactions = [{
