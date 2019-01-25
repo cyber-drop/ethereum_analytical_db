@@ -33,6 +33,7 @@ class ClickhouseTokenHolders():
           concat('0x', substring(topics[2], 27, 40)) AS from,
           concat('0x', substring(topics[3], 27, 40)) AS to,
           ({value_sql}) AS value,
+          data AS value_raw,
           id,
           address AS token,
           transactionHash,
