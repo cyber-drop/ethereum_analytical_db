@@ -208,10 +208,9 @@ class ClickhouseContractTransactionsTestCase(unittest.TestCase):
       "contract": TEST_CONTRACTS_INDEX
     }
     self.client = TestClickhouse()
-    self.client.prepare_indices({
-      "internal_transaction": TEST_TRANSACTIONS_INDEX
-    })
-    self.client.send_sql_request("DROP TABLE IF EXISTS {}".format(self.indices["contract"]))
+    for index in self.indices.values():
+      self.client.send_sql_request("DROP TABLE IF EXISTS {}".format(index))
+    ClickhouseIndices(self.indices).prepare_indices()
     self.contract_transactions = ClickhouseContractTransactions(self.indices)
     self.contract_transactions.extract_contract_addresses()
 
@@ -296,6 +295,22 @@ class ClickhouseContractTransactionsTestCase(unittest.TestCase):
     self.contract_transactions.extract_contract_addresses()
     count = self.client.count(index=TEST_CONTRACTS_INDEX)
     assert count == 1
+
+  # Cases:
+  # self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "call"}, id=1, refresh=True)
+  # self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create"}, id=2, refresh=True)
+  # self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create", "error": "Out of gas"}, id=3, refresh=True)
+  # self.client.index(TEST_TRANSACTIONS_INDEX, 'nottx', {'type': "create"}, id=4, refresh=True)
+  # self.client.index(TEST_TRANSACTIONS_INDEX, 'itx', {'type': "create", "contract_created": True}, id=5, refresh=True)
+
+  # Fields:
+  # assert contract["owner"] == transaction["from"]
+  # assert contract["blockNumber"] == transaction["blockNumber"]
+  # assert contract["parent_transaction"] == transaction_id
+  # assert contract["address"] == transaction["address"]
+  # assert contract["id"] == transaction["address"]
+  # assert contract["bytecode"] == transaction["code"]
+  pass
 
 TEST_TRANSACTIONS_INDEX = 'test_ethereum_transactions'
 TEST_CONTRACTS_INDEX = 'test_ethereum_contracts'
