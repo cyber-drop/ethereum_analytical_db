@@ -1,148 +1,9 @@
 import unittest
-from operations.token_holders import ElasticSearchTokenHolders, ClickhouseTokenHolders, InternalTokenTransactions
+from token_holders import TokenHolders, InternalTokenTransactions
 from tests.test_utils import TestElasticSearch, mockify
 from unittest.mock import MagicMock, ANY, patch
-from tests.test_utils import TestClickhouse
-import numpy as np
 
-TRANSFER_EVENT = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-EVENT_ADDRESS_LENGTH = len("0x000000000000000000000000263627126a771fa9745763495d3975614e235298")
-EVENT_VALUE_LENGTH = len("0x0000000000000000000000000000000000000000000a50161174cc045b3a8000")
-TRANSACTION_ADDRESS_LENGTH = len("0x5cf04716ba20127f1e2297addcf4b5035000c9eb")
-
-class ClickhouseTokenHoldersTestCase(unittest.TestCase):
-  def setUp(self):
-    self.indices = {
-      "token_transaction": TEST_TOKEN_TX_INDEX,
-      "event": TEST_EVENTS_INDEX,
-      "contract": TEST_CONTRACT_INDEX
-    }
-    self.client = TestClickhouse()
-    self.client.prepare_indices({
-      "event": TEST_EVENTS_INDEX,
-      "contract": TEST_CONTRACT_INDEX
-    })
-    self.client.send_sql_request("DROP TABLE IF EXISTS {}".format(self.indices["token_transaction"]))
-    self.token_holders = ClickhouseTokenHolders(self.indices)
-    self.token_holders.extract_token_transactions()
-
-  def test_big_hex_to_float_clickhouse(self):
-    number = 22418.8
-    big_hex = "0x0000000000000000000000000000000000000000000004bf53596c1b5f580000"
-    self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=[{
-      "id": 1,
-      "data": big_hex
-    }])
-    request_string = self.token_holders._generate_sql_for_data()
-    result = self.client.send_sql_request("""
-      SELECT 
-        {}  
-      FROM {} 
-      LIMIT 1
-    """.format(request_string, TEST_EVENTS_INDEX))
-    print(result)
-    assert np.abs(result - number) < 1
-
-  def _create_transfer_event(self, id, from_address, to_address, value, address):
-    return  {
-      "id": id,
-      "transactionHash": id,
-      "blockNumber": 10,
-      "topics": [
-        TRANSFER_EVENT,
-        "{0:#0{1}x}".format(int(from_address, 0), EVENT_ADDRESS_LENGTH),
-        "{0:#0{1}x}".format(int(to_address, 0), EVENT_ADDRESS_LENGTH),
-      ],
-      "data": "{0:#0{1}x}".format(value * (10 ** 18), EVENT_VALUE_LENGTH),
-      "address": address,
-    }
-
-  def test_extract_token_transactions_from_erc20_transfer_events(self):
-    test_contracts = [{
-      "id": 1,
-      "address": "0x01",
-      "standard_erc20": 1,
-    }]
-    test_events = [
-      self._create_transfer_event("0x1.0", "0x1", "0x2", 100, "0x01"),
-      {
-        "id": "0x1.1",
-        "topics": [
-          "0x"
-        ],
-        "data": '0x',
-        "address": '0x01',
-        "blockNumber": 1,
-        "transactionHash": "0x"
-      }
-    ]
-    test_token_transactions = [{
-      "from": "{0:#0{1}x}".format(1, TRANSACTION_ADDRESS_LENGTH),
-      "to": "{0:#0{1}x}".format(2, TRANSACTION_ADDRESS_LENGTH),
-      "transactionHash": "0x1.0",
-      "blockNumber": 10,
-      "value": 100
-    }]
-    test_transactions_ids = ["0x1.0"]
-    self.client.bulk_index(index=TEST_CONTRACT_INDEX, docs=test_contracts)
-    self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=test_events)
-    token_transactions = self.client.search(index=TEST_TOKEN_TX_INDEX, fields=["id", "to", "from", "value", "blockNumber", "transactionHash"])
-    for transaction in token_transactions:
-      transaction["_source"]["value"] = round(transaction["_source"]["value"])
-    self.assertCountEqual([transaction["_id"] for transaction in token_transactions], test_transactions_ids)
-    self.assertCountEqual([transaction["_source"] for transaction in token_transactions], test_token_transactions)
-
-  def test_extract_events_ignore_not_erc20_contracts(self):
-    test_contracts = [{
-      "id": 1,
-      "address": "0x01",
-      "standard_erc20": 1,
-    }, {
-      "id": 2,
-      "address": "0x02",
-      "standard_erc20": 0,
-    }]
-    test_events = [
-      self._create_transfer_event("0x1.0", "0x1", "0x2", 100, "0x01"),
-      self._create_transfer_event("0x1.1", "0x2", "0x1", 100, "0x02"),
-    ]
-    self.client.bulk_index(index=TEST_CONTRACT_INDEX, docs=test_contracts)
-    self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=test_events)
-    token_transactions = self.client.search(index=TEST_TOKEN_TX_INDEX, fields=["token"])
-    self.assertCountEqual([transaction["_id"] for transaction in token_transactions], ["0x1.0"])
-    self.assertCountEqual([transaction["_source"]["token"] for transaction in token_transactions], ["0x01"])
-
-  def test_extract_token_transactions_if_exists(self):
-    self.token_holders.extract_token_transactions()
-
-  def test_extract_token_transactions_ignore_duplicates(self):
-    test_contract = {
-      "id": 1,
-      "address": "0x01",
-      "standard_erc20": 1,
-    }
-    test_event = self._create_transfer_event("0x1.0", "0x1", "0x2", 100, "0x01")
-    self.client.bulk_index(index=TEST_CONTRACT_INDEX, docs=[test_contract])
-    self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=[test_event, test_event])
-    count = self.client.count(index=TEST_TOKEN_TX_INDEX)
-    assert count == 1
-
-  def test_extract_contract_addresses_recreate(self):
-    test_contract = {
-      "id": 1,
-      "address": "0x01",
-      "standard_erc20": 1,
-    }
-    self.client.send_sql_request("DROP TABLE {}".format(TEST_TOKEN_TX_INDEX))
-    self.client.bulk_index(index=TEST_CONTRACT_INDEX, docs=[test_contract])
-    self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=[
-      self._create_transfer_event("0x1.0", "0x1", "0x2", 100, "0x01")
-    ])
-    self.token_holders.extract_token_transactions()
-    count = self.client.count(index=TEST_TOKEN_TX_INDEX)
-    assert count == 1
-
-class ElasticSearchTokenHoldersTestCase(unittest.TestCase):
+class TokenHoldersTestCase(unittest.TestCase):
   def setUp(self):
     self.client = TestElasticSearch()
     self.client.recreate_index(TEST_CONTRACT_INDEX)
@@ -361,12 +222,10 @@ class ElasticSearchTokenHoldersTestCase(unittest.TestCase):
 
       self.token_holders._save_max_block.assert_any_call(test_tokens_addresses, test_max_block)
 
-TEST_CONTRACT_INDEX = 'test_ethereum_contracts'
-TEST_ITX_INDEX = 'test_ethereum_internal_txs'
-TEST_TOKEN_TX_INDEX = 'test_token_txs'
-TEST_BLOCK_INDEX = 'test_block'
-TEST_EVENTS_INDEX = 'test_ethereum_events'
-TEST_EVENT_INPUTS_INDEX = 'test_ethereum_events_inputs'
+TEST_CONTRACT_INDEX = 'test-ethereum-contracts'
+TEST_ITX_INDEX = 'test-ethereum-internal-txs'
+TEST_TOKEN_TX_INDEX = 'test-token-txs'
+TEST_BLOCK_INDEX = 'test-block'
 
 TEST_TOKEN_ADDRESSES = ['0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d',
   '0xa74476443119a942de498590fe1f2454d7d4ac0d'
@@ -413,4 +272,3 @@ TEST_MINT_ADDRESSES = {
     "output" : "0x",
     "id": "0x62e2f27cd5ada06ec9a7a4cb351d51ce697c07beadaeb1e30f5e2e2e9031ba58"
   }
-
