@@ -19,8 +19,6 @@ OUTPUT_TRANSACTION = 2
 OTHER_TRANSACTION = 3
 
 MAX_BLOCKS_NUMBER = 10000000
-ADDITIONAL_FIELDS = ["gasUsed", "gasPrice"]
-
 def _get_parity_url_by_block(parity_hosts, block):
   """
   Get url of a parity JSON RPC API for specified block
@@ -137,7 +135,7 @@ def _get_traces_sync(parity_hosts, blocks):
     transactions_request = transactions_requests_dict[parity_url]
     trace_response = _send_jsonrpc_request(parity_url, trace_request)
     transactions_response = _send_jsonrpc_request(parity_url, transactions_request)
-    traces += _merge_block(trace_response, transactions_response, ADDITIONAL_FIELDS)
+    traces += _merge_block(trace_response, transactions_response, ["gasUsed", "gasPrice"])
   return traces
 
 class InternalTransactions:
