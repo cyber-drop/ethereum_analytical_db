@@ -100,7 +100,7 @@ def _merge_block(internal_transactions, transactions, whitelist):
       del transactions_by_id[(hash, block)]
   return internal_transactions
 
-def _send_jsonrpc_request(parity_url, request):
+def _send_jsonrpc_request(parity_url, request, getter):
   request_string = json.dumps(request)
   responses = requests.post(
     parity_url,
@@ -109,8 +109,7 @@ def _send_jsonrpc_request(parity_url, request):
   ).json()
   full_response = []
   for response in responses:
-    if "result" in response.keys():
-      full_response += response["result"]
+    full_response += getter(response)
   return full_response
 
 def _get_traces_sync(parity_hosts, blocks):
@@ -133,8 +132,16 @@ def _get_traces_sync(parity_hosts, blocks):
   traces = []
   for parity_url, trace_request in trace_requests_dict.items():
     transactions_request = transactions_requests_dict[parity_url]
-    trace_response = _send_jsonrpc_request(parity_url, trace_request)
-    transactions_response = _send_jsonrpc_request(parity_url, transactions_request)
+    trace_response = _send_jsonrpc_request(
+      parity_url,
+      trace_request,
+      lambda x: x.get("result", [])
+    )
+    transactions_response = _send_jsonrpc_request(
+      parity_url,
+      transactions_request,
+      lambda x: x.get("result", {"transactions": []}).get("transactions", [])
+    )
     traces += _merge_block(trace_response, transactions_response, ["gasUsed", "gasPrice"])
   return traces
 

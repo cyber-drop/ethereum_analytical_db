@@ -11,7 +11,7 @@ from operations.internal_transactions import \
 from operations import internal_transactions
 import json
 import httpretty
-from unittest.mock import MagicMock, patch, call, Mock
+from unittest.mock import MagicMock, patch, call, Mock, ANY
 from clients.custom_clickhouse import CustomClickhouse
 from clients.custom_elastic_search import CustomElasticSearch
 from operations.indices import ClickhouseIndices
@@ -134,15 +134,19 @@ class InternalTransactionsTestCase(unittest.TestCase):
       httpretty.POST,
       test_url,
       body=json.dumps([
-        {"id": "2", "result": ["result_2", "result_3"]},
-        {"id": "1", "result": ["result_1"]},
+        {"id": "2", "result": {"test": ["result_2", "result_3"]}},
+        {"id": "1", "result": {"test": ["result_1"]}},
         {"id": "3", "error": True}
       ])
     )
-    response = _send_jsonrpc_request(test_url, test_request)
+    response = _send_jsonrpc_request(
+      test_url,
+      test_request,
+      lambda x: x.get("result", {"test": []}).get("test", [])
+    )
     self.assertCountEqual(response, test_response)
 
-  def test_get_traces_sync_refactor(self):
+  def test_get_traces_sync(self):
     test_parity_hosts = "hosts"
     test_blocks = "blocks"
     test_urls = ["url1", "url2"]
@@ -154,10 +158,19 @@ class InternalTransactionsTestCase(unittest.TestCase):
       test_urls[1]: "transactions2",
       test_urls[0]: "transactions1"
     }
+    test_trace_response = {
+      "result": ["trace"]
+    }
+    test_transactions_response = {
+      "result": {
+        "transactions": ["transactions"]
+      }
+    }
 
     make_trace_requests_mock = MagicMock(return_value=test_trace_requests)
     make_transactions_requests_mock = MagicMock(return_value=test_transactions_requests)
-    send_jsonrpc_request_mock = MagicMock(side_effect=lambda url, x: x)
+    return_response_mock = MagicMock(side_effect=[test_trace_response, test_transactions_response] * 2)
+    send_jsonrpc_request_mock = MagicMock(side_effect=lambda x, y, getter: getter(return_response_mock()))
     merge_block_mock = MagicMock(side_effect=[
       ["merge1"],
       ["merge2"]
@@ -182,8 +195,8 @@ class InternalTransactionsTestCase(unittest.TestCase):
       ]
       for url, trace_request in test_trace_requests.items():
         transaction_request = test_transactions_requests[url]
-        calls += [call.send(url, trace_request), call.send(url, transaction_request)]
-        calls += [call.merge(trace_request, transaction_request, ["gasUsed", "gasPrice"])]
+        calls += [call.send(url, trace_request, ANY), call.send(url, transaction_request, ANY)]
+        calls += [call.merge(["trace"], ["transactions"], ["gasUsed", "gasPrice"])]
       process.assert_has_calls(calls)
       self.assertSequenceEqual(result, ["merge1", "merge2"])
 
