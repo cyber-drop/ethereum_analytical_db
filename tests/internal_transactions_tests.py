@@ -100,10 +100,10 @@ class InternalTransactionsTestCase(unittest.TestCase):
 
   def test_merge_block(self):
     test_transactions = [
-      {"transactionHash": "0x1", "blockHash": "0x1", "test": True},
-      {"transactionHash": "0x2", "blockHash": "0x1", "test_not_listed": False},
-      {"transactionHash": None, "blockHash": "0x1"},
-      {"transactionHash": "0x1", "blockHash": "0x2", "test_2": True},
+      {"hash": "0x1", "blockHash": "0x1", "test": True},
+      {"hash": "0x2", "blockHash": "0x1", "test_not_listed": False},
+      {"hash": None, "blockHash": "0x1"},
+      {"hash": "0x1", "blockHash": "0x2", "test_2": True},
     ]
     test_internal_transactions = [
       {"transactionHash": "0x1", "test": False, "blockHash": "0x1"},

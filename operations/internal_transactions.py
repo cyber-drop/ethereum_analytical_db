@@ -84,7 +84,7 @@ def _make_transactions_requests(parity_hosts, blocks):
 
 def _merge_block(internal_transactions, transactions, whitelist):
   transactions_by_id = {
-    (transaction["transactionHash"], transaction["blockHash"]): transaction
+    (transaction["hash"], transaction["blockHash"]): transaction
     for transaction in transactions
   }
   for transaction in internal_transactions:
