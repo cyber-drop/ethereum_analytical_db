@@ -101,19 +101,21 @@ class InternalTransactionsTestCase(unittest.TestCase):
   def test_merge_block(self):
     test_transactions = [
       {"transactionHash": "0x1", "blockHash": "0x1", "test": True},
+      {"transactionHash": "0x2", "blockHash": "0x1", "test_not_listed": False},
       {"transactionHash": None, "blockHash": "0x1"},
       {"transactionHash": "0x1", "blockHash": "0x2", "test_2": True},
     ]
     test_internal_transactions = [
       {"transactionHash": "0x1", "test": False, "blockHash": "0x1"},
+      {"transactionHash": "0x2", "blockHash": "0x1"},
       {"transactionHash": "0x1", "internal_test": True, "blockHash": "0x1"},
       {"transactionHash": None, "blockHash": "0x1"},
       {"transactionHash": "0x1", "test_2": False, "blockHash": "0x2"},
     ]
-    merged_block = _merge_block(test_internal_transactions, test_transactions)
-    print(merged_block)
+    merged_block = _merge_block(test_internal_transactions, test_transactions, ["test", "test_2"])
     self.assertSequenceEqual(merged_block, [
       {"transactionHash": "0x1", "test": True, "blockHash": "0x1"},
+      {"transactionHash": "0x2", "blockHash": "0x1"},
       {"transactionHash": "0x1", "internal_test": True, "blockHash": "0x1"},
       {"transactionHash": None, "blockHash": "0x1"},
       {"transactionHash": "0x1", "test_2": True, "blockHash": "0x2"},
@@ -181,7 +183,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
       for url, trace_request in test_trace_requests.items():
         transaction_request = test_transactions_requests[url]
         calls += [call.send(url, trace_request), call.send(url, transaction_request)]
-        calls += [call.merge(trace_request, transaction_request)]
+        calls += [call.merge(trace_request, transaction_request, ["gasUsed", "gasPrice"])]
       process.assert_has_calls(calls)
       self.assertSequenceEqual(result, ["merge1", "merge2"])
 
@@ -326,23 +328,23 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert "parent_error" in trace[-1].keys()
 
   def test_preprocess_internal_transaction_with_empty_field(self):
-    """
-    Test preprocessing internal transaction with empty flattened field
-    """
     self.internal_transactions._preprocess_internal_transaction({"action": None})
     assert True
 
   def test_preprocess_internal_transaction_value(self):
-    """
-    Test converting internal transaction value from wei to eth
-    """
     transaction = self.internal_transactions._preprocess_internal_transaction({"value": hex(int(50.001851 * 1e18))})
     assert transaction["value"] == 50.001851
 
+  def test_preprocess_internal_transaction_gas_used(self):
+    transaction = self.internal_transactions._preprocess_internal_transaction({"gasUsed": hex(10000)})
+    print(transaction["gasUsed"])
+    assert transaction["gasUsed"] == 10000
+
+  def test_preprocess_internal_transaction_gas_price(self):
+    transaction = self.internal_transactions._preprocess_internal_transaction({"gasPrice": hex(int(10.1 * 10**18))})
+    assert transaction["gasPrice"] == 10.1
+
   def test_preprocess_internal_transaction_empty_value(self):
-    """
-    Test preprocessing internal transaction with empty value field
-    """
     transaction = self.internal_transactions._preprocess_internal_transaction({"value": "0x"})
     assert transaction["value"] == 0
 
@@ -501,7 +503,6 @@ class InternalTransactionsTestCase(unittest.TestCase):
     )
 
     self.internal_transactions.extract_traces()
-
     internal_transactions_count = self.client.count(index=TEST_INTERNAL_TRANSACTIONS_INDEX)
     assert internal_transactions_count == 66201 + 447
 

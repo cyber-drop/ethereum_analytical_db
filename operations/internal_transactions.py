@@ -19,6 +19,7 @@ OUTPUT_TRANSACTION = 2
 OTHER_TRANSACTION = 3
 
 MAX_BLOCKS_NUMBER = 10000000
+ADDITIONAL_FIELDS = ["gasUsed", "gasPrice"]
 
 def _get_parity_url_by_block(parity_hosts, block):
   """
@@ -83,7 +84,7 @@ def _make_transactions_requests(parity_hosts, blocks):
     }
   return _make_requests(parity_hosts, blocks, request)
 
-def _merge_block(internal_transactions, transactions):
+def _merge_block(internal_transactions, transactions, whitelist):
   transactions_by_id = {
     (transaction["transactionHash"], transaction["blockHash"]): transaction
     for transaction in transactions
@@ -92,7 +93,12 @@ def _merge_block(internal_transactions, transactions):
     hash = transaction["transactionHash"]
     block = transaction["blockHash"]
     if (hash, block) in transactions_by_id:
-      transaction.update(transactions_by_id[(hash, block)])
+      whitelisted_fields = {
+        key: value
+        for key, value in transactions_by_id[(hash, block)].items()
+        if key in whitelist
+      }
+      transaction.update(whitelisted_fields)
       del transactions_by_id[(hash, block)]
   return internal_transactions
 
@@ -131,7 +137,7 @@ def _get_traces_sync(parity_hosts, blocks):
     transactions_request = transactions_requests_dict[parity_url]
     trace_response = _send_jsonrpc_request(parity_url, trace_request)
     transactions_response = _send_jsonrpc_request(parity_url, transactions_request)
-    traces += _merge_block(trace_response, transactions_response)
+    traces += _merge_block(trace_response, transactions_response, ADDITIONAL_FIELDS)
   return traces
 
 class InternalTransactions:
@@ -232,11 +238,12 @@ class InternalTransactions:
       if (field in transaction.keys()) and (transaction[field]):
         transaction.update(transaction[field])
         del transaction[field]
-    if "value" in transaction.keys():
-      if transaction["value"] == "0x":
-        transaction["value"] = 0
-      else:
-        transaction["value"] = int(transaction["value"], 0) / 1e18
+    for field in ["value", "gasPrice", "gasUsed"]:
+      if (field in transaction.keys()) and (transaction[field]):
+        value_string = transaction[field][0:2] + "0" + transaction[field][2:]
+        transaction[field] = int(value_string, 0) / 1e18
+    if "gasUsed" in transaction:
+      transaction["gasUsed"] = int(transaction["gasUsed"] * 1e18)
     return transaction
 
   def _save_internal_transactions(self, blocks_traces):
