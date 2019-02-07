@@ -1,7 +1,13 @@
 import unittest
 from tests.test_utils import TestElasticSearch, mockify, TestClickhouse
 from operations.internal_transactions import *
-from operations.internal_transactions import _get_parity_url_by_block, _get_traces_sync, _make_trace_requests
+from operations.internal_transactions import \
+  _get_parity_url_by_block, \
+  _get_traces_sync, \
+  _make_trace_requests, \
+  _merge_block, \
+  _make_transactions_requests, \
+  _send_jsonrpc_request
 from operations import internal_transactions
 import json
 import httpretty
@@ -10,7 +16,20 @@ from clients.custom_clickhouse import CustomClickhouse
 from clients.custom_elastic_search import CustomElasticSearch
 from operations.indices import ClickhouseIndices
 
-class InternalTransactionsTestCase():
+class InternalTransactionsTestCase(unittest.TestCase):
+  def setUp(self):
+    self.client = TestClickhouse()
+    self.indices = {
+      "block": TEST_BLOCKS_INDEX,
+      "transaction": TEST_TRANSACTIONS_INDEX,
+      "internal_transaction": TEST_INTERNAL_TRANSACTIONS_INDEX,
+      "miner_transaction": TEST_MINER_TRANSACTIONS_INDEX,
+      "block_flag": TEST_BLOCKS_TRACES_EXTRACTED_INDEX
+    }
+    self.client.prepare_indices(self.indices)
+    self.parity_hosts = [(None, None, "http://localhost:8545")]
+    self.internal_transactions = ClickhouseInternalTransactions(self.indices, parity_hosts=self.parity_hosts)
+
   def test_split_on_chunks(self):
     """
     Test splitting on chunks
@@ -48,7 +67,7 @@ class InternalTransactionsTestCase():
     assert _get_parity_url_by_block(parity_hosts, 9) == "url2"
     assert _get_parity_url_by_block(parity_hosts, 10000) == "url3"
 
-  def test_make_trace_requests(self):
+  def _make_requests(self, method, check):
     """
     Test making trace requests for each block
     """
@@ -56,62 +75,115 @@ class InternalTransactionsTestCase():
       (TEST_BLOCK_NUMBER, TEST_BLOCK_NUMBER + 3, "http://localhost:8545"),
       (TEST_BLOCK_NUMBER + 3, None, "http://localhost:8546")
     ]
-    requests = _make_trace_requests(parity_hosts, [TEST_BLOCK_NUMBER + i for i in range(10)])
+    requests = method(parity_hosts, [TEST_BLOCK_NUMBER + i for i in range(10)])
     requests_to_node = requests["http://localhost:8546"]
     for i, request in enumerate(requests_to_node):
+      check(self, i, request)
+
+  def test_make_transactions_requests(self):
+    def check(self, index, request):
       assert request["jsonrpc"] == "2.0"
-      assert request["id"] == TEST_BLOCK_NUMBER + i + 3
+      assert request["id"] == "transactions_{}".format(TEST_BLOCK_NUMBER + index + 3)
+      assert request["method"] == "eth_getBlockByHash"
+      self.assertSequenceEqual(request["params"], [hex(TEST_BLOCK_NUMBER + index + 3), True])
+
+    self._make_requests(_make_transactions_requests, check)
+
+  def test_make_trace_requests(self):
+    def check(self, index, request):
+      assert request["jsonrpc"] == "2.0"
+      assert request["id"] == "trace_{}".format(TEST_BLOCK_NUMBER + index + 3)
       assert request["method"] == "trace_block"
-      self.assertSequenceEqual(request["params"], [hex(TEST_BLOCK_NUMBER + i + 3)])
+      self.assertSequenceEqual(request["params"], [hex(TEST_BLOCK_NUMBER + index + 3)])
+
+    self._make_requests(_make_trace_requests, check)
+
+  def test_merge_block(self):
+    test_transactions = [
+      {"transactionHash": "0x1", "blockHash": "0x1", "test": True},
+      {"transactionHash": None, "blockHash": "0x1"},
+      {"transactionHash": "0x1", "blockHash": "0x2", "test_2": True},
+    ]
+    test_internal_transactions = [
+      {"transactionHash": "0x1", "test": False, "blockHash": "0x1"},
+      {"transactionHash": "0x1", "internal_test": True, "blockHash": "0x1"},
+      {"transactionHash": None, "blockHash": "0x1"},
+      {"transactionHash": "0x1", "test_2": False, "blockHash": "0x2"},
+    ]
+    merged_block = _merge_block(test_internal_transactions, test_transactions)
+    print(merged_block)
+    self.assertSequenceEqual(merged_block, [
+      {"transactionHash": "0x1", "test": True, "blockHash": "0x1"},
+      {"transactionHash": "0x1", "internal_test": True, "blockHash": "0x1"},
+      {"transactionHash": None, "blockHash": "0x1"},
+      {"transactionHash": "0x1", "test_2": True, "blockHash": "0x2"},
+    ])
 
   @httpretty.activate
-  def test_get_traces_sync(self):
-    """
-    Test getting traces through a specified url in config
-    """
-    test_parity_hosts = [
-      (1, 2, "http://localhost:8545/"),
-      (2, 3, "http://localhost:8546/"),
-      (3, 4, "http://localhost:8547/")
+  def test_send_jsonrpc_request(self):
+    test_request = [
+      {"id": "1", "params": "some"},
+      {"id": "2", "params": "other"},
+      {"id": "3", "params": "error"}
     ]
-    test_blocks = [1, 2, 3]
-    test_requests = {
-      "http://localhost:8545/": [{
-        "id": "1",
-        "params": "block_1"
-      }],
-      "http://localhost:8546/": [{
-        "id": "2",
-        "params": "block_2"
-      }],
-      "http://localhost:8547/": [{
-        "id": "3",
-        "params": "block_3"
-      }]
-    }
-    test_responses = {
-      "http://localhost:8545/": MagicMock(return_value=(200, {}, '[{"id": "1", "result": ["transactions_1"]}]')),
-      "http://localhost:8546/": MagicMock(return_value=(200, {}, '[{"id": "2", "result": ["transactions_2"]}]')),
-      "http://localhost:8547/": MagicMock(return_value=(200, {}, '[{"id": "3", "result": ["transactions_3"]}]'))
-    }
-    test_blocks_response = ["transactions_1", "transactions_2", "transactions_3"]
+    test_response = ["result_1", "result_2", "result_3"]
+    test_url = "http://localhost:8545/"
+    httpretty.register_uri(
+      httpretty.POST,
+      test_url,
+      body=json.dumps([
+        {"id": "2", "result": ["result_2", "result_3"]},
+        {"id": "1", "result": ["result_1"]},
+        {"id": "3", "error": True}
+      ])
+    )
+    response = _send_jsonrpc_request(test_url, test_request)
+    self.assertCountEqual(response, test_response)
 
-    make_trace_requests_mock = MagicMock(return_value=test_requests)
-    for url, response in test_responses.items():
-      httpretty.register_uri(
-        httpretty.POST,
-        url,
-        body=response,
-        content_type='application/json'
-      )
-    with patch('operations.internal_transactions._make_trace_requests', make_trace_requests_mock):
-      internal_transactions_response = internal_transactions._get_traces_sync(test_parity_hosts, test_blocks)
+  def test_get_traces_sync_refactor(self):
+    test_parity_hosts = "hosts"
+    test_blocks = "blocks"
+    test_urls = ["url1", "url2"]
+    test_trace_requests = {
+      test_urls[0]: "trace1",
+      test_urls[1]: "trace2"
+    }
+    test_transactions_requests = {
+      test_urls[1]: "transactions2",
+      test_urls[0]: "transactions1"
+    }
 
-      internal_transactions._make_trace_requests.assert_called_with(test_parity_hosts, test_blocks)
-      for url, request in test_requests.items():
-        received_request = json.loads(test_responses[url].call_args[0][0].body.decode("utf-8"))
-        self.assertSequenceEqual(received_request, request)
-      self.assertCountEqual(internal_transactions_response, test_blocks_response)
+    make_trace_requests_mock = MagicMock(return_value=test_trace_requests)
+    make_transactions_requests_mock = MagicMock(return_value=test_transactions_requests)
+    send_jsonrpc_request_mock = MagicMock(side_effect=lambda url, x: x)
+    merge_block_mock = MagicMock(side_effect=[
+      ["merge1"],
+      ["merge2"]
+    ])
+
+    process = Mock(
+      trace_request=make_trace_requests_mock,
+      transaction_request=make_transactions_requests_mock,
+      send=send_jsonrpc_request_mock,
+      merge=merge_block_mock
+    )
+
+    with patch("operations.internal_transactions._make_trace_requests", make_trace_requests_mock), \
+         patch("operations.internal_transactions._make_transactions_requests", make_transactions_requests_mock), \
+         patch("operations.internal_transactions._send_jsonrpc_request", send_jsonrpc_request_mock), \
+         patch("operations.internal_transactions._merge_block", merge_block_mock):
+      result = _get_traces_sync(test_parity_hosts, test_blocks)
+
+      calls = [
+        call.trace_request(test_parity_hosts, test_blocks),
+        call.transaction_request(test_parity_hosts, test_blocks)
+      ]
+      for url, trace_request in test_trace_requests.items():
+        transaction_request = test_transactions_requests[url]
+        calls += [call.send(url, trace_request), call.send(url, transaction_request)]
+        calls += [call.merge(trace_request, transaction_request)]
+      process.assert_has_calls(calls)
+      self.assertSequenceEqual(result, ["merge1", "merge2"])
 
   def test_get_traces(self):
     """
@@ -433,35 +505,6 @@ class InternalTransactionsTestCase():
     internal_transactions_count = self.client.count(index=TEST_INTERNAL_TRANSACTIONS_INDEX)
     assert internal_transactions_count == 66201 + 447
 
-class ElasticSearchInternalTransactionsTestCase(InternalTransactionsTestCase, unittest.TestCase):
-  def setUp(self):
-    self.client = TestElasticSearch()
-    self.client.recreate_fast_index(TEST_TRANSACTIONS_INDEX)
-    self.client.recreate_fast_index(TEST_INTERNAL_TRANSACTIONS_INDEX, doc_type='itx')
-    self.client.recreate_index(TEST_MINER_TRANSACTIONS_INDEX)
-    self.client.recreate_index(TEST_BLOCKS_INDEX)
-    self.parity_hosts = [(None, None, "http://localhost:8545")]
-    self.internal_transactions = InternalTransactions({
-      "block": TEST_BLOCKS_INDEX,
-      "transaction": TEST_TRANSACTIONS_INDEX,
-      "internal_transaction": TEST_INTERNAL_TRANSACTIONS_INDEX,
-      "miner_transaction": TEST_MINER_TRANSACTIONS_INDEX
-    }, parity_hosts=self.parity_hosts, client=CustomElasticSearch("http://localhost:9200"))
-
-class ClickhouseInternalTransactionsTestCase(InternalTransactionsTestCase, unittest.TestCase):
-  def setUp(self):
-    self.client = TestClickhouse()
-    self.indices = {
-      "block": TEST_BLOCKS_INDEX,
-      "transaction": TEST_TRANSACTIONS_INDEX,
-      "internal_transaction": TEST_INTERNAL_TRANSACTIONS_INDEX,
-      "miner_transaction": TEST_MINER_TRANSACTIONS_INDEX,
-      "block_flag": TEST_BLOCKS_TRACES_EXTRACTED_INDEX
-    }
-    self.client.prepare_indices(self.indices)
-    self.parity_hosts = [(None, None, "http://localhost:8545")]
-    self.internal_transactions = ClickhouseInternalTransactions(self.indices, parity_hosts=self.parity_hosts)
-
   def test_iterate_blocks(self):
     self.internal_transactions.parity_hosts = [(0, 4, "http://localhost:8545"), (5, None, "http://localhost:8545")]
     blocks = [{'number': i, 'id': i} for i in range(1, 6)]
@@ -483,12 +526,6 @@ class ClickhouseInternalTransactionsTestCase(InternalTransactionsTestCase, unitt
     block = self.client.search(index=TEST_BLOCKS_TRACES_EXTRACTED_INDEX, query="WHERE id = '123'", fields=["name", "value"])[0]['_source']
     assert block['value']
     assert block['name'] == 'traces_extracted'
-
-# Add two classes - for clickhouse and elasticsearch
-# Add different realizations for _iterate_blocks method
-# Move make_range_query and update_by_query to utils? Or make it static for ES client?
-
-# Check tests for blocks
 
 REAL_TRANSACTIONS_INDEX = "ethereum-internal-transaction"
 TEST_TRANSACTIONS_NUMBER = 10

@@ -40,7 +40,7 @@ def _get_parity_url_by_block(parity_hosts, block):
     if ((not bottom_line) or (block >= bottom_line)) and ((not upper_bound) or (block < upper_bound)):
       return url
 
-def _make_trace_requests(parity_hosts, blocks):
+def _make_requests(parity_hosts, blocks, request):
   """
   Create json requests to parity JSON RPC API for specified blocks
 
@@ -60,13 +60,54 @@ def _make_trace_requests(parity_hosts, blocks):
     parity_url = _get_parity_url_by_block(parity_hosts, block_number)
     if parity_url not in requests.keys():
       requests[parity_url] = []
-    requests[parity_url].append({
+    requests[parity_url].append(request(block_number))
+  return requests
+
+def _make_trace_requests(parity_hosts, blocks):
+  def request(block_number):
+    return {
       "jsonrpc": "2.0",
-      "id": block_number,
+      "id": "trace_{}".format(block_number),
       "method": "trace_block",
       "params": [hex(block_number)]
-    }) 
-  return requests
+    }
+  return _make_requests(parity_hosts, blocks, request)
+
+def _make_transactions_requests(parity_hosts, blocks):
+  def request(block_number):
+    return {
+      "jsonrpc": "2.0",
+      "id": "transactions_{}".format(block_number),
+      "method": "eth_getBlockByHash",
+      "params": [hex(block_number), True]
+    }
+  return _make_requests(parity_hosts, blocks, request)
+
+def _merge_block(internal_transactions, transactions):
+  transactions_by_id = {
+    (transaction["transactionHash"], transaction["blockHash"]): transaction
+    for transaction in transactions
+  }
+  for transaction in internal_transactions:
+    hash = transaction["transactionHash"]
+    block = transaction["blockHash"]
+    if (hash, block) in transactions_by_id:
+      transaction.update(transactions_by_id[(hash, block)])
+      del transactions_by_id[(hash, block)]
+  return internal_transactions
+
+def _send_jsonrpc_request(parity_url, request):
+  request_string = json.dumps(request)
+  responses = requests.post(
+    parity_url,
+    data=request_string,
+    headers={"content-type": "application/json"}
+  ).json()
+  full_response = []
+  for response in responses:
+    if "result" in response.keys():
+      full_response += response["result"]
+  return full_response
 
 def _get_traces_sync(parity_hosts, blocks):
   """
@@ -83,18 +124,14 @@ def _get_traces_sync(parity_hosts, blocks):
   list
       List of transactions inside of specified blocks
   """
-  requests_dict = _make_trace_requests(parity_hosts, blocks)
+  trace_requests_dict = _make_trace_requests(parity_hosts, blocks)
+  transactions_requests_dict = _make_transactions_requests(parity_hosts, blocks)
   traces = []
-  for parity_url, request in requests_dict.items():
-    request_string = json.dumps(request)
-    responses = requests.post(
-      parity_url,
-      data=request_string,
-      headers={"content-type": "application/json"}
-    ).json()
-    for response in responses:
-      if "result" in response.keys():
-        traces += response["result"]
+  for parity_url, trace_request in trace_requests_dict.items():
+    transactions_request = transactions_requests_dict[parity_url]
+    trace_response = _send_jsonrpc_request(parity_url, trace_request)
+    transactions_response = _send_jsonrpc_request(parity_url, transactions_request)
+    traces += _merge_block(trace_response, transactions_response)
   return traces
 
 class InternalTransactions:
@@ -271,42 +308,6 @@ class InternalTransactions:
     for blocks in self._iterate_blocks():
       blocks = [block["_source"]["number"] for block in blocks]
       self._extract_traces_chunk(blocks)
-
-class ElasticSearchInternalTransactions(InternalTransactions):
-  # TODO add init
-  def _iterate_blocks(self):
-    """
-    Iterate through unprocessed blocks that can be found in parity nodes specified in a given config file
-
-    Returns
-    -------
-    generator
-        Generator that iterates through blocks without traces_extracted flag in ElasticSearch
-    """
-    ranges = [host_tuple[0:2] for host_tuple in self.parity_hosts]
-    range_query = self.client.make_range_query("number", *ranges)
-    query = {
-      "query_string": {
-        "query": '!(_exists_:traces_extracted) AND ' + range_query
-      }
-    }
-    return self.client.iterate(self.indices["block"], "b", query)
-
-  def _save_traces(self, blocks):
-    """
-    Save traces_extracted flag for processed blocks in ElasticSearch
-
-    Parameters
-    ----------
-    blocks : list
-        Block numbers to process
-    """
-    query = {
-      "terms": {
-        "number": blocks
-      }
-    }
-    self.client.update_by_query(self.indices["block"], 'b', query, 'ctx._source.traces_extracted = true')
 
 class ClickhouseInternalTransactions(InternalTransactions):
   def __init__(self, indices=INDICES, parity_hosts=PARITY_HOSTS):
