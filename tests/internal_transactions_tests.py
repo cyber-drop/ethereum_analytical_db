@@ -84,7 +84,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
     def check(self, index, request):
       assert request["jsonrpc"] == "2.0"
       assert request["id"] == "transactions_{}".format(TEST_BLOCK_NUMBER + index + 3)
-      assert request["method"] == "eth_getBlockByHash"
+      assert request["method"] == "eth_getBlockByNumber"
       self.assertSequenceEqual(request["params"], [hex(TEST_BLOCK_NUMBER + index + 3), True])
 
     self._make_requests(_make_transactions_requests, check)

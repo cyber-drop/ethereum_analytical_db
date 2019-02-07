@@ -77,7 +77,7 @@ def _make_transactions_requests(parity_hosts, blocks):
     return {
       "jsonrpc": "2.0",
       "id": "transactions_{}".format(block_number),
-      "method": "eth_getBlockByHash",
+      "method": "eth_getBlockByNumber",
       "params": [hex(block_number), True]
     }
   return _make_requests(parity_hosts, blocks, request)
