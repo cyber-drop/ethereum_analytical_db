@@ -6,14 +6,17 @@ import httpretty
 import json
 from unittest.mock import MagicMock, Mock, call
 from datetime import datetime
+from web3 import Web3, HTTPProvider
+from pprint import pprint
 
 TEST_BLOCKS_INDEX = "test_ethereum_blocks"
+TEST_PARITY_URL = "http://localhost:8545"
 
 class ClickhouseBlocksTestCase(unittest.TestCase):
   def setUp(self):
     self.blocks = ClickhouseBlocks(
       {"block": TEST_BLOCKS_INDEX},
-      parity_host="http://localhost:8545"
+      parity_host=TEST_PARITY_URL
     )
     self.client = TestClickhouse()
     self.client.send_sql_request("DROP TABLE IF EXISTS {}".format(TEST_BLOCKS_INDEX))
@@ -124,4 +127,19 @@ class ClickhouseBlocksTestCase(unittest.TestCase):
       call.max_elasticsearch_block(),
       call.create_blocks(test_max_elasticsearch_block + 1, test_max_parity_block)
     ])
+
+  @parity
+  def test_process(self):
+    w3 = Web3(HTTPProvider(TEST_PARITY_URL))
+    latest_block = w3.eth.getBlock('latest').number
+    start_block = latest_block - 10
+    self.client.bulk_index(docs=[{
+        "id": start_block,
+        "number": start_block
+    }], index=TEST_BLOCKS_INDEX)
+    self.blocks.create_blocks()
+    blocks = self.client.search(index=TEST_BLOCKS_INDEX, fields=["number", "timestamp"])
+    pprint(blocks)
+    assert len(blocks) == 11
+
 

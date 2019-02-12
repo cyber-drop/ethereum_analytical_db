@@ -1,8 +1,3 @@
-# search(index, query) => [{"_source": *, "_id": *}]
-# count
-# iterate
-# send_sql_request
-#
 class CustomClient:
   def search(self, index, query, fields):
     pass
