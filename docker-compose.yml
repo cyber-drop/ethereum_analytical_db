@@ -11,6 +11,6 @@ services:
     depends_on:
       - clickhouse
   clickhouse:
-    build: yandex/clickhouse-server
+    image: yandex/clickhouse-server:latest
     ports:
     - "9000:9000"

@@ -300,7 +300,6 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
     result = [flag["_id"] for flag in result]
     self.assertCountEqual(["0x1.0x2"], result)
 
-
 CURRENT_ELASTICSEARCH_SIZE = 290659165119
 TEST_INDEX = 'test_ethereum_transactions'
 TEST_INDICES = {

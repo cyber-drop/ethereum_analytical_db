@@ -1,5 +1,5 @@
 PARITY_HOSTS = [
-  (None, None, "http://localhost:8550")
+  (None, None, "http://localhost:8545")
 ]
 
 DATABASE = "clickhouse"

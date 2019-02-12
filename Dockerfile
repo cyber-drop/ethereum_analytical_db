@@ -16,15 +16,6 @@ WORKDIR /usr/src/core
 
 ADD . .
 
-RUN git clone https://github.com/Great-Hill-Corporation/quickBlocks && \
-    cd ./quickBlocks/src && \
-    git checkout master && \
-    git checkout 05f305ac3ce8eea27a21b52606588527f0131640 && \
-    cmake . && \
-    make && \
-    make install && \
-    cd ../../
-
 RUN git clone https://github.com/ethereum/pyethereum && \
     cd ./pyethereum && \
     git checkout develop && \
@@ -36,4 +27,4 @@ RUN pip3.6 install --default-timeout=100 -r ./requirements.txt
 
 RUN nosetests .
 
-CMD /bin/bash -c "sleep 10 && python3.6 ./extractor.py --operation prepare-indices && python3.6 ./extractor.py --operation run-loop"
+CMD /bin/bash -c "sleep 10 && python3.6 ./extractor.py --operation prepare-indices && python3.6 ./extractor.py --operation extract-internal-transactions"
