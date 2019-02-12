@@ -16,24 +16,24 @@ WORKDIR /usr/src/core
 
 ADD . .
 
-#RUN git clone https://github.com/Great-Hill-Corporation/quickBlocks && \
-#    cd ./quickBlocks/src && \
-#    git checkout master && \
-#    git checkout 05f305ac3ce8eea27a21b52606588527f0131640 && \
-#    cmake . && \
-#    make && \
-#    make install && \
-#    cd ../../
+RUN git clone https://github.com/Great-Hill-Corporation/quickBlocks && \
+    cd ./quickBlocks/src && \
+    git checkout master && \
+    git checkout 05f305ac3ce8eea27a21b52606588527f0131640 && \
+    cmake . && \
+    make && \
+    make install && \
+    cd ../../
 
-#RUN git clone https://github.com/ethereum/pyethereum && \
-#    cd ./pyethereum && \
-#    git checkout develop && \
-#    git checkout 3d5ec14032cc471f4dcfc7cc5c947294daf85fe0 && \
-#    pip3.6 install --default-timeout=100 . && \
-#    cd ../
+RUN git clone https://github.com/ethereum/pyethereum && \
+    cd ./pyethereum && \
+    git checkout develop && \
+    git checkout 3d5ec14032cc471f4dcfc7cc5c947294daf85fe0 && \
+    pip3.6 install --default-timeout=100 . && \
+    cd ../
 
 RUN pip3.6 install --default-timeout=100 -r ./requirements.txt
 
-#RUN nosetests .
+RUN nosetests .
 
 CMD /bin/bash -c "sleep 10 && python3.6 ./extractor.py --operation prepare-indices && python3.6 ./extractor.py --operation run-loop"

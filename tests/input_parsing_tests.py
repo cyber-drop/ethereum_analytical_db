@@ -2,7 +2,7 @@ from operations.inputs import ClickhouseEventsInputs, ClickhouseTransactionsInpu
 from operations import inputs
 import os
 import unittest
-from tests.test_utils import TestElasticSearch, mockify, TestClickhouse
+from tests.test_utils import mockify, TestClickhouse
 from tqdm import *
 from unittest.mock import MagicMock, call, Mock, patch, ANY
 import multiprocessing

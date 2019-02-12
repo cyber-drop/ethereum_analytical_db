@@ -4,10 +4,8 @@ from operations.blocks import ClickhouseBlocks
 from operations.contract_transactions import ClickhouseContractTransactions
 from operations.contracts import ClickhouseContracts
 from operations.inputs import ClickhouseTransactionsInputs, ClickhouseEventsInputs
-from operations.transaction_fees import ClickhouseTransactionFees
-from operations.events import Events
+from operations.events import ClickhouseEvents
 from operations.token_holders import ClickhouseTokenHolders
-from operations.multitransfers_detection import ClickhouseMultitransfersDetection
 from operations.token_prices import ClickhouseTokenPrices
 
 def prepare_indices():
@@ -35,14 +33,9 @@ def extract_contracts_abi():
   contracts = ClickhouseContracts()
   contracts.save_contracts_abi()
 
-def extract_transaction_fees():
-  print("Extracting transaction fees...")
-  transaction_fees = ClickhouseTransactionFees()
-  transaction_fees.extract_transaction_fees()
-
 def extract_events():
   print("Extracting events...")
-  events = Events()
+  events = ClickhouseEvents()
   events.extract_events()
 
 def parse_transactions_inputs():
@@ -59,11 +52,6 @@ def extract_token_transactions():
   print("Preparing token transactions view...")
   contracts = ClickhouseTokenHolders()
   contracts.extract_token_transactions()
-
-def extract_multitransfers():
-  print("Searching for multitransfers...")
-  multitransfers_detection = ClickhouseMultitransfersDetection()
-  multitransfers_detection.extract_multitransfers()
 
 def extract_prices():
   print("Extracting prices...")

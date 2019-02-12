@@ -1,6 +1,5 @@
 import unittest
 from contract_methods import ContractMethods, CURRENT_DIR
-from tests.test_utils import TestElasticSearch
 import json
 from pyelasticsearch import bulk_chunks
 from unittest.mock import MagicMock, ANY

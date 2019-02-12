@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import click
-from operations import elasticsearch, clickhouse
+from operations import clickhouse
 from config import DATABASE
 
 OPERATIONS = {

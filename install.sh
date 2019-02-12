@@ -1,4 +1,4 @@
-# Install and configure ElasticSearch
+# Install and configure Clickhouse
 
 # Install and configure Parity
 

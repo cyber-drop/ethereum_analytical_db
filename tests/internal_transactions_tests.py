@@ -1,5 +1,5 @@
 import unittest
-from tests.test_utils import TestElasticSearch, mockify, TestClickhouse
+from tests.test_utils import mockify, TestClickhouse
 from operations.internal_transactions import *
 from operations.internal_transactions import \
   _get_parity_url_by_block, \
@@ -13,7 +13,6 @@ import json
 import httpretty
 from unittest.mock import MagicMock, patch, call, Mock, ANY
 from clients.custom_clickhouse import CustomClickhouse
-from clients.custom_elastic_search import CustomElasticSearch
 from operations.indices import ClickhouseIndices
 
 class InternalTransactionsTestCase(unittest.TestCase):

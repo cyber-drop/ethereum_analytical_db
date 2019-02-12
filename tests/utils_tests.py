@@ -1,7 +1,7 @@
 import unittest
 from utils import split_on_chunks, make_range_query
 from utils import ClickhouseContractTransactionsIterator
-from tests.test_utils import TestElasticSearch, CustomElasticSearch, TestClickhouse
+from tests.test_utils import TestClickhouse
 import config
 from unittest.mock import MagicMock, ANY
 from clients.custom_clickhouse import CustomClickhouse

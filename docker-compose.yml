@@ -9,10 +9,8 @@ services:
       LC_ALL: C.UTF-8
       LANG: C.UTF-8
     depends_on:
-      - elasticsearch
-  elasticsearch:
-    build: elasticsearch/.
+      - clickhouse
+  clickhouse:
+    build: yandex/clickhouse-server
     ports:
-    - "9200:9200"
-    environment:
-      ES_JAVA_OPTS: -Xms2g -Xmx2g
+    - "9000:9000"

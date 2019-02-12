@@ -1,15 +1,24 @@
 import unittest
-from operations.blocks import ElasticSearchBlocks, ClickhouseBlocks
+from operations.blocks import ClickhouseBlocks
 from operations.indices import ClickhouseIndices
-from tests.test_utils import TestElasticSearch, mockify, TestClickhouse
+from tests.test_utils import mockify, TestClickhouse
 import httpretty
 import json
 from unittest.mock import MagicMock, Mock, call
 from datetime import datetime
-from clients.custom_elastic_search import CustomElasticSearch
-from clients.custom_clickhouse import CustomClickhouse
 
-class BlocksTestCase():
+TEST_BLOCKS_INDEX = "test_ethereum_blocks"
+
+class ClickhouseBlocksTestCase(unittest.TestCase):
+  def setUp(self):
+    self.blocks = ClickhouseBlocks(
+      {"block": TEST_BLOCKS_INDEX},
+      parity_host="http://localhost:8545"
+    )
+    self.client = TestClickhouse()
+    self.client.send_sql_request("DROP TABLE IF EXISTS {}".format(TEST_BLOCKS_INDEX))
+    ClickhouseIndices({"block": TEST_BLOCKS_INDEX}).prepare_indices()
+
   @httpretty.activate
   def test_get_max_parity_block(self):
     """Test sending request to parity to get last block"""
@@ -114,23 +123,3 @@ class BlocksTestCase():
       call.create_blocks(test_max_elasticsearch_block + 1, test_max_parity_block)
     ])
 
-class ElasticSearchBlocksTestCase(BlocksTestCase, unittest.TestCase):
-  def setUp(self):
-    self.blocks = ElasticSearchBlocks(
-      {"block": TEST_BLOCKS_INDEX},
-      parity_host="http://localhost:8545"
-    )
-    self.client = TestElasticSearch()
-    self.client.recreate_index(TEST_BLOCKS_INDEX)
-
-class ClickhouseBlocksTestCase(BlocksTestCase, unittest.TestCase):
-  def setUp(self):
-    self.blocks = ClickhouseBlocks(
-      {"block": TEST_BLOCKS_INDEX},
-      parity_host="http://localhost:8545"
-    )
-    self.client = TestClickhouse()
-    self.client.send_sql_request("DROP TABLE IF EXISTS {}".format(TEST_BLOCKS_INDEX))
-    ClickhouseIndices({"block": TEST_BLOCKS_INDEX}).prepare_indices()
-
-TEST_BLOCKS_INDEX = "test_ethereum_blocks"

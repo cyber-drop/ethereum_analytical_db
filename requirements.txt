@@ -1,5 +1,4 @@
 click==6.7
-pyelasticsearch==1.2.3
 tqdm==4.17.1
 requests==2.19.1
 pygtrie==2.2

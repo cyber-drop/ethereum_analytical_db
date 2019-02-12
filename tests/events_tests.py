@@ -2,7 +2,7 @@ import unittest
 import web3
 from web3 import Web3, HTTPProvider
 from tests.test_utils import TestClickhouse
-from operations.events import Events
+from operations.events import ClickhouseEvents as Events
 import httpretty
 from hexbytes import HexBytes
 from unittest.mock import MagicMock, Mock, call

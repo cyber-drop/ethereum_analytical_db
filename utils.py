@@ -1,7 +1,4 @@
-from clients.custom_elastic_search import CustomElasticSearch
 from config import INDICES, PROCESSED_CONTRACTS
-
-client = CustomElasticSearch("http://localhost:9200")
 
 def make_range_query(field, range_tuple, *args):
   """
@@ -38,19 +35,6 @@ def make_range_query(field, range_tuple, *args):
       return "{} < {}".format(field, upper_bound)
     else:
       return "{} IS NOT NULL".format(field)
-
-def get_elasticsearch_connection():
-  """
-  Establish ElasticSearch connection
-
-  TODO recreate connection each time it fails or remove this method
-
-  Returns
-  -------
-  CustomElasticSearch
-      ElasticSearch client
-  """
-  return client
 
 def split_on_chunks(iterable, size):
   """
