@@ -543,6 +543,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.internal_transactions.extract_traces()
     transactions = self.client.search(index=TEST_INTERNAL_TRANSACTIONS_INDEX, fields=["from", "to", "author", "value"])
     pprint(transactions)
+    assert len(transactions) == 873
 
 TEST_TRANSACTIONS_NUMBER = 10
 TEST_BLOCK_NUMBER = 3068185
