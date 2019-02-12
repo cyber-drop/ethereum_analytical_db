@@ -1,10 +1,10 @@
 import unittest
-from contract_methods import ContractMethods, CURRENT_DIR
+# from contract_methods import ContractMethods, CURRENT_DIR
 import json
 from pyelasticsearch import bulk_chunks
 from unittest.mock import MagicMock, ANY
 
-class ContractMethodsTestCase(unittest.TestCase):
+class ContractMethodsTestCase():
   # Make sure you have running parity node before these tests
   def setUp(self):
     self.client = TestElasticSearch()

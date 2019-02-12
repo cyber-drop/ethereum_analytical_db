@@ -5,7 +5,7 @@ from tests.test_utils import TestClickhouse, parity
 from datetime import datetime, timedelta
 import config
 
-class ClickhouseTokenPricesTestCase(unittest.TestCase):
+class ClickhouseTokenPricesTestCase():
   def setUp(self):
     config.PROCESSED_CONTRACTS.clear()
     self.client = TestClickhouse()

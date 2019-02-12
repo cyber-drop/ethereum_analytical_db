@@ -5,6 +5,8 @@ from tqdm import *
 from tests.test_utils import TestClickhouse
 from unittest.mock import MagicMock, Mock, call, ANY, patch
 from operations.indices import ClickhouseIndices
+from pprint import pprint
+from clickhouse_driver import Client
 
 class ClickhouseContractTransactionsTestCase(unittest.TestCase):
   def setUp(self):
@@ -101,6 +103,27 @@ class ClickhouseContractTransactionsTestCase(unittest.TestCase):
     self.contract_transactions.extract_contract_addresses()
     count = self.client.count(index=TEST_CONTRACTS_INDEX)
     assert count == 1
+
+  def test_preparation_extract_transactions_from_production_database(self):
+    production_client = Client('localhost', port=9001)
+    contract_transactions = production_client.execute("""
+      SELECT *
+      FROM ethereum_internal_transaction
+      WHERE address IS NOT NULL
+      LIMIT 10
+    """)
+    non_contract_transactions = production_client.execute("""
+      SELECT *
+      FROM ethereum_internal_transaction
+      WHERE address IS NOT NULL
+      LIMIT 10
+    """)
+
+  def test_process(self):
+    # Add part of transactions to database
+    # Add another part
+    # Count contracts
+    pass
 
 TEST_TRANSACTIONS_INDEX = 'test_ethereum_transactions'
 TEST_CONTRACTS_INDEX = 'test_ethereum_contracts'
