@@ -1,5 +1,5 @@
 import unittest
-from tests.test_utils import mockify, TestClickhouse
+from tests.test_utils import mockify, TestClickhouse, parity
 from operations.internal_transactions import *
 from operations.internal_transactions import \
   _get_parity_url_by_block, \
@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, patch, call, Mock, ANY
 from clients.custom_clickhouse import CustomClickhouse
 from operations.indices import ClickhouseIndices
 import os
+from pprint import pprint
 
 class InternalTransactionsTestCase(unittest.TestCase):
   def setUp(self):
@@ -526,26 +527,23 @@ class InternalTransactionsTestCase(unittest.TestCase):
     assert block['value']
     assert block['name'] == 'traces_extracted'
 
+  @parity
   def test_process(self):
     """
     Test extraction on a real data
     """
-    test_transactions = json.load(open("real_transactions.json", "r"))
-    for i, transaction in enumerate(test_transactions):
-      transaction["hash"] = i
-    test_blocks = [{"id": block, "number": block} for block in set(transaction["blockNumber"] for transaction in test_transactions)]
+    test_start_block = 7000000
+    test_end_block = test_start_block + 3
+    test_blocks = [{"id": block, "number": block} for block in range(test_start_block, test_end_block)]
     self.client.bulk_index(
       docs=test_blocks,
-      index=TEST_BLOCKS_INDEX,
-      doc_type='b',
-      refresh=True
+      index=TEST_BLOCKS_INDEX
     )
 
     self.internal_transactions.extract_traces()
-    internal_transactions_count = self.client.count(index=TEST_INTERNAL_TRANSACTIONS_INDEX)
-    assert internal_transactions_count == 66201 + 447
+    transactions = self.client.search(index=TEST_INTERNAL_TRANSACTIONS_INDEX, fields=["from", "to", "author", "value"])
+    pprint(transactions)
 
-REAL_TRANSACTIONS_INDEX = "ethereum-internal-transaction"
 TEST_TRANSACTIONS_NUMBER = 10
 TEST_BLOCK_NUMBER = 3068185
 TEST_BIG_TRANSACTIONS_NUMBER = TEST_TRANSACTIONS_NUMBER * 10
