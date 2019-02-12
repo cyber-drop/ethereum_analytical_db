@@ -1,4 +1,3 @@
-from clients.custom_elastic_search import CustomElasticSearch
 import requests
 import json
 from multiprocessing import Pool

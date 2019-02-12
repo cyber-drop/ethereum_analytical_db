@@ -1,7 +1,7 @@
 import unittest
 from operations.blocks import ClickhouseBlocks
 from operations.indices import ClickhouseIndices
-from tests.test_utils import mockify, TestClickhouse
+from tests.test_utils import mockify, TestClickhouse, parity
 import httpretty
 import json
 from unittest.mock import MagicMock, Mock, call
@@ -87,6 +87,7 @@ class ClickhouseBlocksTestCase(unittest.TestCase):
     blocks = [block["_source"]["timestamp"].timestamp() for block in blocks]
     self.assertCountEqual(blocks, [1, 2, 3])
 
+  @parity
   def test_extract_block_timestamp(self):
     # https://etherscan.io/block/10
     block_time = self.blocks._extract_block_timestamp(10)
@@ -94,6 +95,7 @@ class ClickhouseBlocksTestCase(unittest.TestCase):
     assert block_time < datetime(2015, 7, 31)
     assert block_time > datetime(2015, 7, 30)
 
+  @parity
   def test_extract_block_timestamp_no_such_block(self):
     block_time = self.blocks._extract_block_timestamp(9999999)
     assert not block_time

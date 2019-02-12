@@ -2,7 +2,7 @@ import unittest
 from operations.contract_transactions import ClickhouseContractTransactions
 from time import sleep
 from tqdm import *
-from tests.test_utils import TestElasticSearch, TestClickhouse
+from tests.test_utils import TestClickhouse
 from unittest.mock import MagicMock, Mock, call, ANY, patch
 from operations.indices import ClickhouseIndices
 

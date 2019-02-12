@@ -14,6 +14,7 @@ import httpretty
 from unittest.mock import MagicMock, patch, call, Mock, ANY
 from clients.custom_clickhouse import CustomClickhouse
 from operations.indices import ClickhouseIndices
+import os
 
 class InternalTransactionsTestCase(unittest.TestCase):
   def setUp(self):
@@ -412,6 +413,8 @@ class InternalTransactionsTestCase(unittest.TestCase):
     self.internal_transactions._save_genesis_block('test_genesis.json')
     genesis = self.client.search(index=TEST_INTERNAL_TRANSACTIONS_INDEX, fields=["to"])
 
+    os.remove("test_genesis.json")
+
     assert genesis[0]["_source"]["to"] == "0x"
     assert genesis[0]["_id"] == "1"
 
@@ -499,25 +502,6 @@ class InternalTransactionsTestCase(unittest.TestCase):
       calls.append(call.extract(chunk))
     process.assert_has_calls(calls)
 
-  def test_process(self):
-    """
-    Test extraction on a real data
-    """
-    test_transactions = json.load(open("real_transactions.json", "r"))
-    for i, transaction in enumerate(test_transactions):
-      transaction["hash"] = i
-    test_blocks = [{"id": block, "number": block} for block in set(transaction["blockNumber"] for transaction in test_transactions)]
-    self.client.bulk_index(
-      docs=test_blocks,
-      index=TEST_BLOCKS_INDEX,
-      doc_type='b',
-      refresh=True
-    )
-
-    self.internal_transactions.extract_traces()
-    internal_transactions_count = self.client.count(index=TEST_INTERNAL_TRANSACTIONS_INDEX)
-    assert internal_transactions_count == 66201 + 447
-
   def test_iterate_blocks(self):
     self.internal_transactions.parity_hosts = [(0, 4, "http://localhost:8545"), (5, None, "http://localhost:8545")]
     blocks = [{'number': i, 'id': i} for i in range(1, 6)]
@@ -536,9 +520,30 @@ class InternalTransactionsTestCase(unittest.TestCase):
 
   def test_save_traces(self):
     self.internal_transactions._save_traces([123])
-    block = self.client.search(index=TEST_BLOCKS_TRACES_EXTRACTED_INDEX, query="WHERE id = '123'", fields=["name", "value"])[0]['_source']
+    block = \
+    self.client.search(index=TEST_BLOCKS_TRACES_EXTRACTED_INDEX, query="WHERE id = '123'", fields=["name", "value"])[0][
+      '_source']
     assert block['value']
     assert block['name'] == 'traces_extracted'
+
+  def test_process(self):
+    """
+    Test extraction on a real data
+    """
+    test_transactions = json.load(open("real_transactions.json", "r"))
+    for i, transaction in enumerate(test_transactions):
+      transaction["hash"] = i
+    test_blocks = [{"id": block, "number": block} for block in set(transaction["blockNumber"] for transaction in test_transactions)]
+    self.client.bulk_index(
+      docs=test_blocks,
+      index=TEST_BLOCKS_INDEX,
+      doc_type='b',
+      refresh=True
+    )
+
+    self.internal_transactions.extract_traces()
+    internal_transactions_count = self.client.count(index=TEST_INTERNAL_TRANSACTIONS_INDEX)
+    assert internal_transactions_count == 66201 + 447
 
 REAL_TRANSACTIONS_INDEX = "ethereum-internal-transaction"
 TEST_TRANSACTIONS_NUMBER = 10

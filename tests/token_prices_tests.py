@@ -1,7 +1,7 @@
 import unittest
 from operations.token_prices import ClickhouseTokenPrices
 from unittest import mock
-from tests.test_utils import TestClickhouse
+from tests.test_utils import TestClickhouse, parity
 from datetime import datetime, timedelta
 import config
 
@@ -96,6 +96,7 @@ class ClickhouseTokenPricesTestCase(unittest.TestCase):
     last_date = self.token_prices._get_last_avail_price_date()
     assert (last_date - datetime(1970, 1, 1)).days < 1
 
+  @parity
   def test_get_symbol_by_address(self):
     test_contracts = {
       "0xf230b790e05390fc8295f4d3f60332c93bed42e2": "TRX",
@@ -129,7 +130,7 @@ class ClickhouseTokenPricesTestCase(unittest.TestCase):
     print(prices)
     assert len(prices)
 
-TEST_PARITY_URL = "http://localhost:8550"
+TEST_PARITY_URL = "http://localhost:8545"
 TEST_PRICES_INDEX = 'test_token_prices'
 TEST_CONTRACT_INDEX = 'test_ethereum_contract'
 TEST_CONTRACT_BLOCK_INDEX = 'test_ethereum_contract_block'

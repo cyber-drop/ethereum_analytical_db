@@ -1,6 +1,21 @@
 from clients.custom_clickhouse import CustomClickhouse
 from unittest.mock import MagicMock
 from operations.indices import ClickhouseIndices
+import socket
+
+TEST_PARITY_PORT = 8545
+
+def parity(test_function):
+  def wrap(*args, **kwargs):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    result = sock.connect_ex(('127.0.0.1', TEST_PARITY_PORT))
+    port_is_open = result == 0
+    if not port_is_open:
+      raise Exception("Parity port is not open")
+    test_function(*args, **kwargs)
+  return wrap
+
+# Decorator for production clickhouse connection check
 
 def mockify(object, mocks, not_mocks):
   def cat(x=None, *args, **kwargs):
