@@ -258,7 +258,7 @@ class ClickhouseInputParsingTestCase():
 
     self.contracts._iterate_contracts_with_abi.assert_called_with(test_max_block)
 
-  def test_decode_inputs_for_big_portion_of_contracts(self):
+  def xtest_decode_inputs_for_big_portion_of_contracts(self):
     """Test decoding inputs for big portion of contracts in ElasticSearch"""
     for i in tqdm(range(10)):
       self.client.index(TEST_CONTRACTS_INDEX, {'address': TEST_CONTRACT_ADDRESS, 'blockNumber': i}, id=i + 1)
@@ -272,7 +272,7 @@ class ClickhouseInputParsingTestCase():
     transactions = self.client.search(index=TEST_TRANSACTIONS_INPUT_INDEX, fields=["name"])
     assert len([transaction["_source"] for transaction in transactions]) == 10
 
-class ClickhouseTransactionsInputParsingTestCase(ClickhouseInputParsingTestCase, unittest.TestCase):
+class ClickhouseTransactionsInputParsingTestCase(ClickhouseInputParsingTestCase):
   doc = {
     'to': TEST_CONTRACT_ADDRESS,
     'input': TEST_CONTRACT_PARAMETERS,
@@ -306,7 +306,7 @@ class ClickhouseTransactionsInputParsingTestCase(ClickhouseInputParsingTestCase,
     transactions = [t["_id"] for transactions_list in transactions for t in transactions_list]
     self.assertCountEqual(transactions, ['1'])
 
-class ClickhouseEventsInputParsingTestCase(ClickhouseInputParsingTestCase, unittest.TestCase):
+class ClickhouseEventsInputParsingTestCase(ClickhouseInputParsingTestCase):
   doc = {
     'address': TEST_CONTRACT_ADDRESS,
     'topics': [

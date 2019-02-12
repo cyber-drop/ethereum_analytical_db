@@ -1,5 +1,8 @@
 FROM ubuntu:16.04
 
+ENV LC_ALL=C.UTF-8
+ENV LANG=C.UTF-8
+
 RUN apt-get update && \
     apt-get install -y libcurl4-openssl-dev cmake libssl-dev build-essential automake pkg-config libtool libffi-dev libgmp-dev libyaml-cpp-dev && \
     apt-get install -y git && \
@@ -25,6 +28,4 @@ RUN git clone https://github.com/ethereum/pyethereum && \
 
 RUN pip3.6 install --default-timeout=100 -r ./requirements.txt
 
-RUN nosetests .
-
-CMD /bin/bash -c "sleep 10 && python3.6 ./extractor.py --operation prepare-indices && python3.6 ./extractor.py --operation extract-internal-transactions"
+ENTRYPOINT ["python3.6", "./extractor.py", "--operation"]
