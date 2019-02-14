@@ -2,133 +2,137 @@ from config import INDICES
 from clients.custom_clickhouse import CustomClickhouse
 
 STRING_PROPERTIES = {
-  "tx": ["from", "hash", "blockTimestamp", "creates", "to"],
-  "itx": [
-    "from", "hash",
-    "blockTimestamp", "callType",
-    "gas", "gasUsed",
-    "callType", "blockHash", "transactionHash",
-    "refundAddress", "to",
-    "type", "address", "balance", "blockNumber"
-  ]
+    "tx": ["from", "hash", "blockTimestamp", "creates", "to"],
+    "itx": [
+        "from", "hash",
+        "blockTimestamp", "callType",
+        "gas", "gasUsed",
+        "callType", "blockHash", "transactionHash",
+        "refundAddress", "to",
+        "type", "address", "balance", "blockNumber"
+    ]
 }
 
 OBJECT_PROPERTIES = {
-  "tx": ["decoded_input"],
-  "itx": ["decoded_input", "traceAddress"]
+    "tx": ["decoded_input"],
+    "itx": ["decoded_input", "traceAddress"]
 }
 
 TEXT_PROPERTIES = {
-  "tx": ["input"],
-  "itx": ["code", "input", "init", "error", "output"]
+    "tx": ["input"],
+    "itx": ["code", "input", "init", "error", "output"]
 }
 
 FAST_INDICES = {
-  "internal_transaction": "itx"
+    "internal_transaction": "itx"
 }
 
 INDEX_FIELDS = {
-  "block": {
-    "number": "Int64",
-    "timestamp": "DateTime"
-  },
-  "internal_transaction": {
-    "blockNumber": "Int64",
-    "from": "Nullable(String)",
-    "to": "Nullable(String)",
-    "value": "Nullable(Float64)",
-    "input": "Nullable(String)",
-    "output": "Nullable(String)",
-    "gas": "Nullable(String)",
-    "gasUsed": "Nullable(Int32)",
-    "gasPrice": "Nullable(Float64)",
-    "blockHash": "String",
-    "transactionHash": "Nullable(String)",
-    "transactionPosition": "Nullable(Int32)",
-    "subtraces": "Int32",
-    "traceAddress": "Array(Int32)",
-    "type": "String",
-    "callType": "Nullable(String)",
-    "address": "Nullable(String)",
-    "code": "Nullable(String)",
-    "init": "Nullable(String)",
-    "refundAddress": "Nullable(String)",
-    "error": "Nullable(String)",
-    "parent_error": "Nullable(UInt8)",
-    "balance": "Nullable(String)",
-    "author": "Nullable(String)",
-    "rewardType": "Nullable(String)",
-    "result": "Nullable(String)"
-  },
-  "block_flag": {
-    "name": "String",
-    "value": "Nullable(UInt8)"
-  },
-  "contract_abi": {
-    "abi_extracted": "Nullable(UInt8)",
-    "abi": "Nullable(String)"
-  },
-  "contract_block": {
-    "name": "String",
-    "value": "Int64"
-  },
-  "transaction_fee": {
-    "gasUsed": "Int32",
-    "gasPrice": "Float64"
-  },
-  "event": {
-    'type': 'String',
-    'logIndex': 'Int32',
-    'transactionLogIndex': 'Int32',
-    'data': 'String',
-    'transactionIndex': 'Int32',
-    'address': 'String',
-    'transactionHash': 'String',
-    'blockHash': 'String',
-    'blockNumber': 'Int32',
-    'topics': 'Array(String)'
-  },
-  "transaction_input": {
-    "name": "String",
-    "params": "Nested(type String, value String)"
-  },
-  "event_input": {
-    "name": "String",
-    "params": "Nested(type String, value String)"
-  },
-  "multitransfer": {
-    "token": "String",
-    "address": "String",
-    "type": "String",
-    "probability": "Float64",
-    "model": "String"
-  },
-  "price": {
-    "address": "String",
-    "USD": "Float64",
-    "BTC": "Float64",
-    "ETH": "Float64",
-    "timestamp": "DateTime"
-  }
+    "block": {
+        "number": "Int64",
+        "timestamp": "DateTime"
+    },
+    "internal_transaction": {
+        "blockNumber": "Int64",
+        "from": "Nullable(String)",
+        "to": "Nullable(String)",
+        "value": "Nullable(Float64)",
+        "input": "Nullable(String)",
+        "output": "Nullable(String)",
+        "gas": "Nullable(String)",
+        "gasUsed": "Nullable(Int32)",
+        "gasPrice": "Nullable(Float64)",
+        "blockHash": "String",
+        "transactionHash": "Nullable(String)",
+        "transactionPosition": "Nullable(Int32)",
+        "subtraces": "Int32",
+        "traceAddress": "Array(Int32)",
+        "type": "String",
+        "callType": "Nullable(String)",
+        "address": "Nullable(String)",
+        "code": "Nullable(String)",
+        "init": "Nullable(String)",
+        "refundAddress": "Nullable(String)",
+        "error": "Nullable(String)",
+        "parent_error": "Nullable(UInt8)",
+        "balance": "Nullable(String)",
+        "author": "Nullable(String)",
+        "rewardType": "Nullable(String)",
+        "result": "Nullable(String)"
+    },
+    "block_flag": {
+        "name": "String",
+        "value": "Nullable(UInt8)"
+    },
+    "contract_abi": {
+        "abi_extracted": "Nullable(UInt8)",
+        "abi": "Nullable(String)"
+    },
+    "contract_block": {
+        "name": "String",
+        "value": "Int64"
+    },
+    "transaction_fee": {
+        "gasUsed": "Int32",
+        "gasPrice": "Float64"
+    },
+    "event": {
+        'type': 'String',
+        'logIndex': 'Int32',
+        'transactionLogIndex': 'Int32',
+        'data': 'String',
+        'transactionIndex': 'Int32',
+        'address': 'String',
+        'transactionHash': 'String',
+        'blockHash': 'String',
+        'blockNumber': 'Int32',
+        'topics': 'Array(String)'
+    },
+    "transaction_input": {
+        "name": "String",
+        "params": "Nested(type String, value String)"
+    },
+    "event_input": {
+        "name": "String",
+        "params": "Nested(type String, value String)"
+    },
+    "multitransfer": {
+        "token": "String",
+        "address": "String",
+        "type": "String",
+        "probability": "Float64",
+        "model": "String"
+    },
+    "price": {
+        "address": "String",
+        "USD": "Float64",
+        "BTC": "Float64",
+        "ETH": "Float64",
+        "timestamp": "DateTime"
+    }
 }
 
 PRIMARY_KEYS = {
-  "block_flag": ["id", "name"],
-  "contract_block": ["id", "name"]
+    "block_flag": ["id", "name"],
+    "contract_block": ["id", "name"]
 }
 
+
 class ClickhouseIndices:
-  def __init__(self, indices=INDICES):
-    self.client = CustomClickhouse()
-    self.indices = indices
+    def __init__(self, indices=INDICES):
+        self.client = CustomClickhouse()
+        self.indices = indices
 
-  def _create_index(self, index, fields={}, primary_key=["id"]):
-    fields["id"] = "String"
-    fields_string = ", ".join(["{} {}".format(name, type) for name, type in fields.items()])
-    create_sql = "CREATE TABLE IF NOT EXISTS {} ({}) ENGINE = ReplacingMergeTree() ORDER BY ({})".format(index, fields_string, ",".join(primary_key))
-    self.client.send_sql_request(create_sql)
+    def _create_index(self, index, fields={}, primary_key=["id"]):
+        fields["id"] = "String"
+        fields_string = ", ".join(["{} {}".format(name, type) for name, type in fields.items()])
+        create_sql = "CREATE TABLE IF NOT EXISTS {} ({}) ENGINE = ReplacingMergeTree() ORDER BY ({})".format(index,
+                                                                                                             fields_string,
+                                                                                                             ",".join(
+                                                                                                                 primary_key))
+        self.client.send_sql_request(create_sql)
 
-  def prepare_indices(self):
-    for key, index in self.indices.items():
-      if key in INDEX_FIELDS:
-        self._create_index(index, INDEX_FIELDS[key], PRIMARY_KEYS.get(key, ["id"]))
+    def prepare_indices(self):
+        for key, index in self.indices.items():
+            if key in INDEX_FIELDS:
+                self._create_index(index, INDEX_FIELDS[key], PRIMARY_KEYS.get(key, ["id"]))

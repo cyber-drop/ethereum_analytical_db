@@ -1,23 +1,23 @@
 PARITY_HOSTS = [
-  (None, None, "http://localhost:8545")
+    (None, None, "http://localhost:8545")
 ]
 
 DATABASE = "clickhouse"
 INDICES = {
-  "contract": "ethereum_contract",
-  "transaction": "ethereum_transaction",
-  "internal_transaction": "ethereum_internal_transaction",
-  "listed_token": "ethereum_listed_token",
-  "token_tx": "ethereum_token_transaction",
-  "block": "ethereum_block",
-  "token_price": "ethereum_token_price",
-  "block_flag": "ethereum_block_flag",
-  "contract_abi": "ethereum_contract_abi",
-  "contract_block": "ethereum_contract_block",
-  "transaction_input": "ethereum_transaction_input",
-  "event_input": "ethereum_event_input",
-  "miner_transaction": "ethereum_miner_transaction",
-  "event": "ethereum_event"
+    "contract": "ethereum_contract",
+    "transaction": "ethereum_transaction",
+    "internal_transaction": "ethereum_internal_transaction",
+    "listed_token": "ethereum_listed_token",
+    "token_tx": "ethereum_token_transaction",
+    "block": "ethereum_block",
+    "token_price": "ethereum_token_price",
+    "block_flag": "ethereum_block_flag",
+    "contract_abi": "ethereum_contract_abi",
+    "contract_block": "ethereum_contract_block",
+    "transaction_input": "ethereum_transaction_input",
+    "event_input": "ethereum_event_input",
+    "miner_transaction": "ethereum_miner_transaction",
+    "event": "ethereum_event"
 }
 
 GENESIS = "genesis.json"

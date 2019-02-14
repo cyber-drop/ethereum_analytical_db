@@ -1,15 +1,15 @@
 class CustomClient:
-  def search(self, index, query, fields):
-    pass
+    def search(self, index, query, fields):
+        pass
 
-  def count(self, index, query):
-    pass
+    def count(self, index, query):
+        pass
 
-  def iterate(self, index, query, fields):
-    pass
+    def iterate(self, index, query, fields):
+        pass
 
-  def send_sql_request(self, sql):
-    pass
+    def send_sql_request(self, sql):
+        pass
 
-  def bulk_index(self, index, docs, id_field):
-    pass
+    def bulk_index(self, index, docs, id_field):
+        pass
