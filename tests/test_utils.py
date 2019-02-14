@@ -13,6 +13,7 @@ def parity(test_function):
     if not port_is_open:
       raise Exception("Parity port is not open")
     test_function(*args, **kwargs)
+  wrap.__setattr__("__name__", test_function.__name__)
   return wrap
 
 # Decorator for production clickhouse connection check
