@@ -13,7 +13,7 @@ OPERATIONS = {
     "extract-events": clickhouse.extract_events,
     "parse-transactions-inputs": clickhouse.parse_transactions_inputs,
     "parse-events-inputs": clickhouse.parse_events_inputs,
-    "extract-token-transactions": clickhouse.extract_token_transactions,
+    "prepare-erc20-transactions-view": clickhouse.extract_token_transactions,
     "extract-prices": clickhouse.extract_prices,
     "synchronize": clickhouse.synchronize,
     "test": clickhouse.run_tests

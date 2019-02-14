@@ -142,19 +142,33 @@ Prepare tables in Clickhouse database
 
 - prepare-blocks (blocks.py)
 
-Extract blocks with timestamps to ElasticSearch
+Extract blocks with timestamps to Clickhouse
 
 - extract-traces (internal_transactions.py)
 
 Starts extraction of internal ethereum transactions
 
+- extract-events (events.py)
+
+Starts extraction of ethereum events
+
+- prepare-contracts-view (contract_transactions.py)
+
+Prepare material view with contracts extracted from transactions table
+
 - extract-contracts-abi (contracts.py)
 
-Extract ABI description from etherscan.io for specified contracts
+Extract ABI description from etherscan.io for contracts specified in config
 
-- parse-inputs (contracts.py)
+- parse-transactions-inputs, parse-events-inputs (contracts.py)
 
-Starts input parsing. Each transaction will get a field 'decoded_input' with name of method and arguments description
+Starts input parsing for transaction or event. 
+There will be created a table with names of called methods and arguments description.
+Works only for contracts specified in config
+
+- prepare-erc20-transactions-view (token_holders.py)
+
+Prepare material view with erc20 transactions extracted from transactions table.
 
 - search-methods (contract_methods.py)
 
