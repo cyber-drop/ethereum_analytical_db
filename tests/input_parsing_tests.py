@@ -281,7 +281,7 @@ class ClickhouseInputParsingTestCase():
         assert len([transaction["_source"] for transaction in transactions]) == 10
 
 
-class ClickhouseTransactionsInputParsingTestCase(ClickhouseInputParsingTestCase):
+class ClickhouseTransactionsInputParsingTestCase(ClickhouseInputParsingTestCase, unittest.TestCase):
     doc = {
         'to': TEST_CONTRACT_ADDRESS,
         'input': TEST_CONTRACT_PARAMETERS,
@@ -316,7 +316,7 @@ class ClickhouseTransactionsInputParsingTestCase(ClickhouseInputParsingTestCase)
         self.assertCountEqual(transactions, ['1'])
 
 
-class ClickhouseEventsInputParsingTestCase(ClickhouseInputParsingTestCase):
+class ClickhouseEventsInputParsingTestCase(ClickhouseInputParsingTestCase, unittest.TestCase):
     doc = {
         'address': TEST_CONTRACT_ADDRESS,
         'topics': [
