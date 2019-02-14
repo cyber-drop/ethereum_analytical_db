@@ -267,7 +267,7 @@ class ClickhouseIteratorTestCase(unittest.TestCase):
     self.contracts_iterator._create_transactions_request = MagicMock()
     self.contracts_iterator.client.iterate = MagicMock()
     self.contracts_iterator._iterate_transactions([], 0, partial_query="WHERE to IS NOT NULL", fields=test_fields)
-    self.contracts_iterator.client.iterate.assert_called_with(index=ANY, query=ANY, fields=test_fields)
+    self.contracts_iterator.client.iterate.assert_called_with(index=ANY, query=ANY, fields=test_fields, final=ANY)
 
   def test_save_max_block(self):
     test_max_block = 100

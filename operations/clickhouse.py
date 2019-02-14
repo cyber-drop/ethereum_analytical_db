@@ -7,6 +7,8 @@ from operations.inputs import ClickhouseTransactionsInputs, ClickhouseEventsInpu
 from operations.events import ClickhouseEvents
 from operations.token_holders import ClickhouseTokenHolders
 from operations.token_prices import ClickhouseTokenPrices
+from time import sleep
+import os
 
 def prepare_indices():
   print("Preparing indices...")
@@ -57,3 +59,16 @@ def extract_prices():
   print("Extracting prices...")
   prices = ClickhouseTokenPrices()
   prices.get_prices_within_interval()
+
+def synchronize():
+  prepare_indices()
+  prepare_contracts_view()
+
+  while True:
+    prepare_blocks()
+    extract_traces()
+    extract_events()
+    sleep(10)
+
+def run_tests():
+  os.system("nosetests --nologcapture .")

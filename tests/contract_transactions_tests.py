@@ -22,6 +22,9 @@ class ClickhouseContractTransactionsTestCase(unittest.TestCase):
     self.contract_transactions = ClickhouseContractTransactions(self.indices)
     self.contract_transactions.extract_contract_addresses()
 
+  def tearDown(self):
+    self.client.send_sql_request("DROP TABLE IF EXISTS {}".format(self.indices["contract"]))
+
   def test_extract_contract_addresses(self):
     transaction = {
       "id": "0x12345",
@@ -104,7 +107,7 @@ class ClickhouseContractTransactionsTestCase(unittest.TestCase):
     count = self.client.count(index=TEST_CONTRACTS_INDEX)
     assert count == 1
 
-  def test_preparation_extract_transactions_from_production_database(self):
+  def xtest_preparation_extract_transactions_from_production_database(self):
     production_client = Client('localhost', port=9001)
     contract_transactions = production_client.execute("""
       SELECT *
@@ -118,12 +121,6 @@ class ClickhouseContractTransactionsTestCase(unittest.TestCase):
       WHERE address IS NOT NULL
       LIMIT 10
     """)
-
-  def test_process(self):
-    # Add part of transactions to database
-    # Add another part
-    # Count contracts
-    pass
 
 TEST_TRANSACTIONS_INDEX = 'test_ethereum_transactions'
 TEST_CONTRACTS_INDEX = 'test_ethereum_contracts'

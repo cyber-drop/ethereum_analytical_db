@@ -11,7 +11,8 @@ docker-compose up
 ```
 
 It will:
-- prepare and install 
+- prepare and install dependencies
+- install clickhouse
 - create tables and views
 - run tests
 
@@ -25,13 +26,13 @@ To build docker container, use command
 docker build -t cyberdrop/core .
 ```
 
-To run docker container, use command
+Make sure you've activated clickhouse and parity ports. 
+
+Check the correctness of the installation using
 
 ```bash
-docker run --network host cyberdrop/core OPERATION
+docker run --network host cyberdrop/core --operation test
 ```
-
-Make sure you've activated clickhouse and parity ports
 
 ## Configuration
 
@@ -47,7 +48,7 @@ Configuration is located in config.py file. Please check this list before instal
 
 To start real-time synchronization loop, use:
 ```bash
-TODO
+docker run --network host cyberdrop/core
 ```
 
 ### Dump installation

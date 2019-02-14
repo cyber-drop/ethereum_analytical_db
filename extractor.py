@@ -14,7 +14,9 @@ OPERATIONS = {
     "parse-transactions-inputs": clickhouse.parse_transactions_inputs,
     "parse-events-inputs": clickhouse.parse_events_inputs,
     "extract-token-transactions": clickhouse.extract_token_transactions,
-    "extract-prices": clickhouse.extract_prices
+    "extract-prices": clickhouse.extract_prices,
+    "synchronize": clickhouse.synchronize,
+    "test": clickhouse.run_tests
   }
 }
 
@@ -22,7 +24,7 @@ def get_operation(name):
   return OPERATIONS[DATABASE][name]
 
 @click.command()
-@click.option('--operation', help='Action to perform', default='prepare-indices')
+@click.option('--operation', help='Action to perform', default='synchronize')
 def start_process(operation):
   get_operation(operation)()
 
