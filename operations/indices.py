@@ -72,10 +72,6 @@ INDEX_FIELDS = {
         "name": "String",
         "value": "Int64"
     },
-    "transaction_fee": {
-        "gasUsed": "Int32",
-        "gasPrice": "Float64"
-    },
     "event": {
         'type': 'String',
         'logIndex': 'Int32',
@@ -96,19 +92,22 @@ INDEX_FIELDS = {
         "name": "String",
         "params": "Nested(type String, value String)"
     },
-    "multitransfer": {
-        "token": "String",
-        "address": "String",
-        "type": "String",
-        "probability": "Float64",
-        "model": "String"
-    },
     "price": {
         "address": "String",
         "USD": "Float64",
         "BTC": "Float64",
         "ETH": "Float64",
         "timestamp": "DateTime"
+    },
+    "contract_description": {
+        "address": "String",
+        "token_name": "Nullable(String)",
+        "token_symbol": "Nullable(String)",
+        "decimals": "Nullable(UInt8)",
+        "total_supply": "Nullable(Int64)",
+        "token_owner": "Nullable(String)",
+        "cmc_id": "Nullable(String)",
+        "website_slug": "Nullable(String)"
     }
 }
 
@@ -126,10 +125,10 @@ class ClickhouseIndices:
     def _create_index(self, index, fields={}, primary_key=["id"]):
         fields["id"] = "String"
         fields_string = ", ".join(["{} {}".format(name, type) for name, type in fields.items()])
-        create_sql = "CREATE TABLE IF NOT EXISTS {} ({}) ENGINE = ReplacingMergeTree() ORDER BY ({})".format(index,
-                                                                                                             fields_string,
-                                                                                                             ",".join(
-                                                                                                                 primary_key))
+        primary_key_string = ",".join(primary_key)
+        create_sql = """
+            CREATE TABLE IF NOT EXISTS {} ({}) ENGINE = ReplacingMergeTree() ORDER BY ({})
+        """.format(index, fields_string, primary_key_string)
         self.client.send_sql_request(create_sql)
 
     def prepare_indices(self):

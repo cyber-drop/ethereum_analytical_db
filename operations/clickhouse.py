@@ -7,6 +7,7 @@ from operations.inputs import ClickhouseTransactionsInputs, ClickhouseEventsInpu
 from operations.events import ClickhouseEvents
 from operations.token_holders import ClickhouseTokenHolders
 from operations.token_prices import ClickhouseTokenPrices
+from operations.contract_methods import ClickhouseContractMethods
 from time import sleep
 import os
 
@@ -71,10 +72,15 @@ def extract_prices():
     prices.get_prices_within_interval()
 
 
+def extract_tokens():
+    print("Extracting tokens...")
+    tokens = ClickhouseContractMethods()
+    tokens.search_methods()
+
+
 def synchronize():
     prepare_indices()
     prepare_contracts_view()
-
     while True:
         prepare_blocks()
         extract_traces()

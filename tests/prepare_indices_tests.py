@@ -227,13 +227,33 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
         result = [flag["_id"] for flag in result]
         self.assertCountEqual(["1", "1"], result)
 
-    def test_create_transaction_fee_index(self):
+    def test_create_contract_description_index(self):
         self.indices.prepare_indices()
-        self.client.bulk_index(index=TEST_INDICES["transaction_fee"],
-                               docs=[{"id": "0x1", "gasUsed": 2100, "gasPrice": 20.12}])
-        result = self.client.search(index=TEST_INDICES["transaction_fee"], fields=[])
+        self.client.bulk_index(index=TEST_INDICES["contract_description"],
+                               docs=[{
+                                   "id": "0x1",
+                                   "address": '0x1',
+                                   "token_name": "test",
+                                   "token_symbol": "TST",
+                                   "decimals": 10,
+                                   "total_supply": 1000,
+                                   "token_owner": '0x0',
+                                   "website_slug": "fundrequest",
+                                   "cmc_id": "2751"
+                               }, {
+                                   "id": "0x2",
+                                   "address": '0x2',
+                                   "token_name": None,
+                                   "token_symbol": None,
+                                   "decimals": None,
+                                   "total_supply": None,
+                                   "token_owner": None,
+                                   "website_slug": None,
+                                   "cmc_id": None
+                               }])
+        result = self.client.search(index=TEST_INDICES["contract_description"], fields=[])
         result = [flag["_id"] for flag in result]
-        self.assertCountEqual(["0x1"], result)
+        self.assertCountEqual(["0x1", "0x2"], result)
 
     def test_create_events_index(self):
         self.indices.prepare_indices()
@@ -291,26 +311,12 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
         result = [price["_id"] for price in result]
         self.assertCountEqual(["1"], result)
 
-    def test_create_multitransfers_index(self):
-        self.indices.prepare_indices()
-        test_multitransfer = {
-            "id": "0x1.0x2",
-            "token": "0x1",
-            "address": "0x2",
-            "type": "ico",
-            "probability": 0.983,
-            "model": "test_model",
-        }
-        self.client.bulk_index(index=TEST_INDICES["multitransfer"], docs=[test_multitransfer])
-        result = self.client.search(index=TEST_INDICES["multitransfer"], fields=[])
-        result = [flag["_id"] for flag in result]
-        self.assertCountEqual(["0x1.0x2"], result)
-
 
 CURRENT_ELASTICSEARCH_SIZE = 290659165119
 TEST_INDEX = 'test_ethereum_transactions'
 TEST_INDICES = {
     "contract": "test_ethereum_contract",
+    "contract_description": "test_ethereum_contract_description",
     "transaction": "test_ethereum_transaction",
     "internal_transaction": "test_ethereum_internal_transaction",
     "listed_token": "test_ethereum_listed_token",
