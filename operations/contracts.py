@@ -80,7 +80,7 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
         dict_chunks = [dict(chunk) for chunk in chunks]
         abis = {key: abi for abis_dict in self.pool.map(_get_contracts_abi_sync, dict_chunks) for key, abi in
                 abis_dict.items()}
-        return list(abis.values())
+        return [abis[key] for key in sorted(abis.keys())]
 
     def _get_range_query(self):
         """

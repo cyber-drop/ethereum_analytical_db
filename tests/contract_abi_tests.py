@@ -57,15 +57,6 @@ class ClickhouseContractABITestCase(unittest.TestCase):
         response = _get_contracts_abi_sync({"wrong": "0x0"})
         self.assertSequenceEqual(response, {"wrong": []})
 
-    def xtest_get_uncached_contract_abi(self):
-        """Test getting contract ABI with no record in cache"""
-        try:
-            os.remove("/home/noomkcalb/.quickBlocks/cache/abis/" + TEST_CONTRACT_ADDRESS + ".json")
-        except:
-            pass
-        response = _get_contracts_abi_sync({"uncached": TEST_CONTRACT_ADDRESS})
-        self.assertSequenceEqual(response, {"uncached": TEST_CONTRACT_ABI})
-
     def test_get_multiple_contracts_abi(self):
         """Test getting ABI for multiple contracts"""
         response = _get_contracts_abi_sync({1: TEST_CONTRACT_ADDRESS, 2: TEST_CONTRACT_ADDRESS})
