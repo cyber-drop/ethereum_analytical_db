@@ -1,14 +1,13 @@
 import os
 import json
 from multiprocessing import Pool
-from config import PARITY_HOSTS, INDICES
+from config import PARITY_HOSTS, INDICES, ETHERSCAN_API_KEY
 import utils
 from clients.custom_clickhouse import CustomClickhouse
+import requests
 
-GRAB_ABI_PATH = "/usr/local/qblocks/bin/grabABI {} > /dev/null 2>&1"
-GRAB_ABI_CACHE_PATH = "/home/{}/.quickBlocks/cache/abis/{}.json"
+ETHERSCAN_ABI_API = "https://api.etherscan.io/api?module=contract&action=getabi&address={}&apikey=" + ETHERSCAN_API_KEY
 NUMBER_OF_PROCESSES = 10
-
 
 def _get_contracts_abi_sync(addresses):
     """
@@ -27,13 +26,11 @@ def _get_contracts_abi_sync(addresses):
     """
     abis = {}
     for key, address in addresses.items():
-        file_path = GRAB_ABI_CACHE_PATH.format(os.environ["USER"], address)
-        if not os.path.exists(file_path):
-            os.system(GRAB_ABI_PATH.format(address))
-        if os.path.exists(file_path):
-            abi_file = open(file_path)
-            abis[key] = json.load(abi_file)
-        else:
+        api_url = ETHERSCAN_ABI_API.format(address)
+        abi = requests.get(api_url).json()
+        try:
+            abis[key] = json.loads(abi["result"])
+        except:
             abis[key] = []
     return abis
 
