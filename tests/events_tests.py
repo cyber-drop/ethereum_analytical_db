@@ -21,7 +21,7 @@ class EventsTestCase(unittest.TestCase):
             "event": TEST_EVENTS_INDEX
         }
         self.client.prepare_indices(self.indices)
-        self.parity_hosts = [(None, None, "http://localhost:8545")]
+        self.parity_hosts = [(None, None, "http://localhost:8550")]
         self.events = Events(self.indices, parity_hosts=self.parity_hosts)
 
     def _get_test_event(self):
@@ -91,7 +91,7 @@ class EventsTestCase(unittest.TestCase):
         })
         httpretty.register_uri(
             httpretty.POST,
-            "http://localhost:8545/",
+            "http://localhost:8550/",
             body=response_body
         )
         received_events = self.events._get_events(test_range)
