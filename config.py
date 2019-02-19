@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import datetime
 
 PARITY_HOSTS = [
     (None, None, "http://localhost:8545")
@@ -30,4 +30,4 @@ NUMBER_OF_JOBS = 1000
 INPUT_PARSING_PROCESSES = 10
 EVENTS_RANGE_SIZE = 10
 ETHERSCAN_API_KEY = "YourApiKeyToken"
-ETHEREUM_START_DATE = date(2015, 7, 30)
+ETHEREUM_START_DATE = datetime(2015, 7, 30)

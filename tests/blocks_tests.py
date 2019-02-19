@@ -103,6 +103,11 @@ class ClickhouseBlocksTestCase(unittest.TestCase):
         block_time = self.blocks._extract_block_timestamp(0)
         print(block_time)
         assert block_time == ETHEREUM_START_DATE
+        self.client.bulk_index(index=TEST_BLOCKS_INDEX, docs=[{
+            "id": "test",
+            "number": 0,
+            "timestamp": block_time
+        }])
 
     @parity
     def test_extract_block_timestamp_no_such_block(self):
