@@ -1,4 +1,4 @@
-from config import INDICES, PARITY_HOSTS, NUMBER_OF_JOBS
+from config import INDICES, PARITY_HOSTS, NUMBER_OF_JOBS, ETHEREUM_START_DATE
 from clients.custom_clickhouse import CustomClickhouse
 import requests
 import json
@@ -68,6 +68,8 @@ class Blocks:
             Timestamp of a block
             None if no such block in parity
         """
+        if block_number == 0:
+            return ETHEREUM_START_DATE
         block = self.w3.eth.getBlock(block_number)
         if block != None:
             timestamp = block.timestamp

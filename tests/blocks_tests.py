@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, Mock, call
 from datetime import datetime
 from web3 import Web3, HTTPProvider
 from pprint import pprint
+from config import ETHEREUM_START_DATE
 
 TEST_BLOCKS_INDEX = "test_ethereum_blocks"
 TEST_PARITY_URL = "http://localhost:8545"
@@ -97,6 +98,11 @@ class ClickhouseBlocksTestCase(unittest.TestCase):
         print(block_time)
         assert block_time < datetime(2015, 7, 31)
         assert block_time > datetime(2015, 7, 30)
+
+    def test_extract_start_block_timestamp(self):
+        block_time = self.blocks._extract_block_timestamp(0)
+        print(block_time)
+        assert block_time == ETHEREUM_START_DATE
 
     @parity
     def test_extract_block_timestamp_no_such_block(self):
