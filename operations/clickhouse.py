@@ -96,6 +96,7 @@ def synchronize():
         _fill_database()
         sleep(10)
 
+
 def synchronize_full():
     _prepare_indices_and_views()
     while True:
