@@ -16,6 +16,7 @@ OPERATIONS = {
         "prepare-erc20-transactions-view": clickhouse.extract_token_transactions,
         "extract-prices": clickhouse.extract_prices,
         "synchronize": clickhouse.synchronize,
+        "synchronize-full": clickhouse.synchronize_full,
         "extract-tokens": clickhouse.extract_tokens,
         "test": clickhouse.run_tests
     }

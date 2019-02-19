@@ -78,14 +78,31 @@ def extract_tokens():
     tokens.search_methods()
 
 
-def synchronize():
+def _prepare_indices_and_views():
     prepare_indices()
     prepare_contracts_view()
+    extract_tokens()
+
+
+def _fill_database():
+    prepare_blocks()
+    extract_traces()
+    extract_events()
+
+
+def synchronize():
+    _prepare_indices_and_views()
     while True:
-        prepare_blocks()
-        extract_traces()
-        extract_events()
+        _fill_database()
         sleep(10)
+
+def synchronize_full():
+    _prepare_indices_and_views()
+    while True:
+        _fill_database()
+        extract_contracts_abi()
+        parse_transactions_inputs()
+        parse_events_inputs()
 
 
 def run_tests():
