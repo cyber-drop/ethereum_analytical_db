@@ -81,13 +81,13 @@ def extract_tokens():
 def _prepare_indices_and_views():
     prepare_indices()
     prepare_contracts_view()
-    extract_tokens()
 
 
 def _fill_database():
     prepare_blocks()
     extract_traces()
     extract_events()
+    extract_tokens()
 
 
 def synchronize():
