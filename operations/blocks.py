@@ -75,7 +75,7 @@ class Blocks:
             timestamp = block.timestamp
             return datetime.datetime.fromtimestamp(timestamp)
 
-    def _create_blocks(self, start, end):
+    def _create_blocks(self, start, end, max_blocks=NUMBER_OF_JOBS*10):
         """
         Create blocks from start to end. Extract timestamps for each block
 
@@ -86,6 +86,7 @@ class Blocks:
         end : int
             End block number
         """
+        end = min(end, start + max_blocks - 1)
         docs = [{
             "number": i,
             'id': i,

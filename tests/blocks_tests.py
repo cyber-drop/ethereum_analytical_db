@@ -65,7 +65,7 @@ class ClickhouseBlocksTestCase(unittest.TestCase):
     def test_create_blocks_by_range(self):
         """Test create blocks in ElasticSearch by range"""
         mockify(self.blocks, {}, "_create_blocks")
-        self.blocks._create_blocks(1, 3)
+        self.blocks._create_blocks(1, 5, max_blocks=3)
         blocks = self.client.search(index=TEST_BLOCKS_INDEX, doc_type="b", fields=["number"])
         blocks = [block["_source"]["number"] for block in blocks]
         self.assertCountEqual(blocks, [1, 2, 3])
