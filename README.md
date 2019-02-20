@@ -2,22 +2,6 @@
 
 ## Installation
 
-### With docker-compose
-
-To run contents of this repo with docker-compose, use command
-
-```bash
-docker-compose up
-```
-
-It will:
-- prepare and install dependencies
-- install clickhouse
-- create tables and views
-- run tests
-
-Parity node is not included in docker container, so make sure you have an access to parity API before this step
-
 ### With vanilla docker
 
 To build docker container, use command
