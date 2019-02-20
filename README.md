@@ -24,7 +24,7 @@ Configuration is located in config.py file. Please check this list before instal
 - INDICES - Dictionary of table names in Clickhouse. Meaning of each table explained below
 - PARITY_HOSTS - URLs of parity APIs. You can specify block range for each URL to use different nodes for each request
 - NUMBER_OF_JOBS - Size of pages received from Clickhouse
-- PROCESSED_CONTRACTS - List of contract addresses to process in several operations. All other contracts will be skipped (deprecated)
+- PROCESSED_CONTRACTS - List of contract addresses to process in several operations. All other contracts will be skipped during certain operations
 
 ## Usage
 
