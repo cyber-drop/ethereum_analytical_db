@@ -9,6 +9,7 @@ import utils
 from clients.custom_clickhouse import CustomClickhouse
 
 CURRENT_DIR = os.getcwd()
+MAX_TOTAL_SUPPLY = 1 << 63 - 1
 
 if "tests" in CURRENT_DIR:
     CURRENT_DIR = CURRENT_DIR[:-5]
@@ -132,7 +133,8 @@ class ClickhouseContractMethods():
             supply = supply / math.pow(10, decimals)
             supply = Decimal(supply)
             supply = round(supply)
-        return supply
+
+        return min(supply, MAX_TOTAL_SUPPLY)
 
     def _constant_methods(self, contract_instance):
         '''

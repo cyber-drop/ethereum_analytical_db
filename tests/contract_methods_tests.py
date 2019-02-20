@@ -1,5 +1,5 @@
 import unittest
-from operations.contract_methods import ClickhouseContractMethods as ContractMethods, CURRENT_DIR
+from operations.contract_methods import ClickhouseContractMethods as ContractMethods, CURRENT_DIR, MAX_TOTAL_SUPPLY
 import json
 from unittest.mock import MagicMock, ANY
 from tests.test_utils import TestClickhouse
@@ -50,6 +50,14 @@ class ContractMethodsTestCase(unittest.TestCase):
         contract = contracts[0]["_source"]
         self.assertCountEqual(['0x1'], contract_ids)
         self.assertCountEqual(["address"], contract.keys())
+
+    def test_round_supply_big_value(self):
+        total_supply = self.contract_methods._round_supply(MAX_TOTAL_SUPPLY + 100, 0)
+        assert total_supply == MAX_TOTAL_SUPPLY
+        self.client.bulk_index(index=TEST_INDEX, docs=[{
+            "id": "test",
+            "total_supply": MAX_TOTAL_SUPPLY
+        }])
 
     @parity
     def test_get_constants(self):
