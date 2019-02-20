@@ -232,7 +232,6 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
         self.client.bulk_index(index=TEST_INDICES["contract_description"],
                                docs=[{
                                    "id": "0x1",
-                                   "address": '0x1',
                                    "token_name": "test",
                                    "token_symbol": "TST",
                                    "decimals": 10,
@@ -242,7 +241,6 @@ class ClickhouseIndicesTestCase(unittest.TestCase):
                                    "cmc_id": "2751"
                                }, {
                                    "id": "0x2",
-                                   "address": '0x2',
                                    "token_name": None,
                                    "token_symbol": None,
                                    "decimals": None,

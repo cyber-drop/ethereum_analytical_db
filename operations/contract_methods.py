@@ -66,7 +66,7 @@ class ClickhouseContractMethods():
             query="""
                 WHERE standard_erc20 = 1
                 AND id not in(
-                    SELECT address
+                    SELECT id
                     FROM {} 
                 )
             """.format(self.indices["contract_description"])

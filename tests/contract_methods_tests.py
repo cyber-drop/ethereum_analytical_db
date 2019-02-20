@@ -37,10 +37,17 @@ class ContractMethodsTestCase(unittest.TestCase):
             "id": "0x3",
             "address": "0x3",
             "standard_erc20": False,
+        }, {
+            "id": "0x4.test",
+            "address": "0x4",
+            "standard_erc20": True,
         }]
         test_contract_descriptions = [{
             "id": "0x2",
             "address": "0x2"
+        }, {
+            "id": "0x4.test",
+            "address": "0x4"
         }]
         self.client.bulk_index(index=TEST_CONTRACT_INDEX, docs=test_contracts)
         self.client.bulk_index(index=TEST_INDEX, docs=test_contract_descriptions)
@@ -116,7 +123,7 @@ class ContractMethodsTestCase(unittest.TestCase):
         assert (not website_slug_3) and (not cmc_id_3)
 
     def test_classify_contract_set_external_links(self):
-        test_website = "wesite"
+        test_website = "website"
         test_cmc = "cmc"
         test_contract_address = "0x1"
         test_contract = {"_id": test_contract_address, "_source": {"address": test_contract_address}}

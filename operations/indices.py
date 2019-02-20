@@ -100,7 +100,6 @@ INDEX_FIELDS = {
         "timestamp": "DateTime"
     },
     "contract_description": {
-        "address": "String",
         "token_name": "Nullable(String)",
         "token_symbol": "Nullable(String)",
         "decimals": "Nullable(UInt8)",
