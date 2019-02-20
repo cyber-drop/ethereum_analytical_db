@@ -2,22 +2,6 @@
 
 ## Installation
 
-### With docker-compose
-
-To run contents of this repo with docker-compose, use command
-
-```bash
-docker-compose up
-```
-
-It will:
-- prepare and install dependencies
-- install clickhouse
-- create tables and views
-- run tests
-
-Parity node is not included in docker container, so make sure you have an access to parity API before this step
-
 ### With vanilla docker
 
 To build docker container, use command
@@ -40,7 +24,7 @@ Configuration is located in config.py file. Please check this list before instal
 - INDICES - Dictionary of table names in Clickhouse. Meaning of each table explained below
 - PARITY_HOSTS - URLs of parity APIs. You can specify block range for each URL to use different nodes for each request
 - NUMBER_OF_JOBS - Size of pages received from Clickhouse
-- PROCESSED_CONTRACTS - List of contract addresses to process in several operations. All other contracts will be skipped (deprecated)
+- PROCESSED_CONTRACTS - List of contract addresses to process in several operations. All other contracts will be skipped during certain operations
 
 ## Usage
 
@@ -49,6 +33,11 @@ Configuration is located in config.py file. Please check this list before instal
 To start real-time synchronization loop, use:
 ```bash
 docker run --network host cyberdrop/core
+```
+
+To start synchronization with additional info for contracts whitelisted in config.py (extract ABI, parse inputs), use:
+```bash
+docker run --network host cyberdrop/core --operation synchronize-full
 ```
 
 ### Dump installation
