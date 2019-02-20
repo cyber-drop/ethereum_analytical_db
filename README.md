@@ -51,6 +51,11 @@ To start real-time synchronization loop, use:
 docker run --network host cyberdrop/core
 ```
 
+To start synchronization with additional info for contracts whitelisted in config.py (extract ABI, parse inputs), use:
+```bash
+docker run --network host cyberdrop/core --operation synchronize-full
+```
+
 ### Dump installation
 
 To start from existed database dump, use:
