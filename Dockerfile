@@ -15,16 +15,16 @@ RUN add-apt-repository ppa:deadsnakes/ppa && \
 
 RUN curl https://bootstrap.pypa.io/get-pip.py | python3.6
 
-WORKDIR /usr/src/core
-
-ADD . .
-
 RUN git clone https://github.com/ethereum/pyethereum && \
     cd ./pyethereum && \
     git checkout develop && \
     git checkout 3d5ec14032cc471f4dcfc7cc5c947294daf85fe0 && \
     pip3.6 install --default-timeout=100 . && \
     cd ../
+
+WORKDIR /usr/src/core
+
+ADD . .
 
 RUN pip3.6 install --default-timeout=100 -r ./requirements.txt
 
