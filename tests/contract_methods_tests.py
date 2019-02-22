@@ -79,11 +79,6 @@ class ContractMethodsTestCase(unittest.TestCase):
 
     @parity
     def test_default_decimals(self):
-        self.client.index(TEST_INDEX,
-                          {'address': '0xa0e89120768bf166d228988627e4ac8af350220a'}, id=1)
-        self.client.index(TEST_INDEX,
-                          {'address': '0xc569a08db1a5f2cd3ef9c2c3bfbc4f42f74de51b'}, id=2)
-
         dec_exists = self.contract_methods._get_constants('0xa0e89120768bf166d228988627e4ac8af350220a')
         dec_non_exists = self.contract_methods._get_constants('0xc569a08db1a5f2cd3ef9c2c3bfbc4f42f74de51b')
         assert dec_exists[2] == 0

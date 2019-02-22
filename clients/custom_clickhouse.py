@@ -62,11 +62,23 @@ class CustomClickhouse(CustomClient):
                 elif type(document[field]) == dict:
                     document[field] = json.dumps(document[field])
 
-    def bulk_index(self, index, docs, id_field="id", **kwargs):
+    def _set_id(self, docs, id_field):
         for document in docs:
             id = str(document[id_field])
             del document[id_field]
             document["id"] = id
+
+    def _filter_schema(self, docs, index):
+        fields = self.client.execute("DESCRIBE TABLE {}".format(index))
+        whitelist = [field[0] for field in fields]
+        for document in docs:
+            blacklisted_keys = set([key for key in document if key not in whitelist])
+            for key in blacklisted_keys:
+                del document[key]
+
+    def bulk_index(self, index, docs, id_field="id", **kwargs):
+        self._set_id(docs, id_field)
+        self._filter_schema(docs, index)
         fields = list(set([field for doc in docs for field in doc.keys()]))
         self._prepare_fields(docs, fields)
         fields_string = ",".join(fields)
