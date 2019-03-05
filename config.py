@@ -7,6 +7,7 @@ PARITY_HOSTS = [
 DATABASE = "clickhouse"
 INDICES = {
     "contract": "ethereum_contract",
+    "token_transaction": "ethereum_token_transaction",
     "transaction": "ethereum_transaction",
     "internal_transaction": "ethereum_internal_transaction",
     "listed_token": "ethereum_listed_token",

@@ -81,6 +81,7 @@ def extract_tokens():
 def _prepare_indices_and_views():
     prepare_indices()
     prepare_contracts_view()
+    extract_token_transactions()
 
 
 def _fill_database():
