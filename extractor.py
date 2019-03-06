@@ -15,9 +15,10 @@ OPERATIONS = {
         "parse-events-inputs": clickhouse.parse_events_inputs,
         "prepare-erc20-transactions-view": clickhouse.extract_token_transactions,
         "extract-prices": clickhouse.extract_prices,
-        "synchronize": clickhouse.synchronize,
-        "synchronize-full": clickhouse.synchronize_full,
         "extract-tokens": clickhouse.extract_tokens,
+        "prepare-database": clickhouse.prepare_indices_and_views,
+        "start": clickhouse.synchronize,
+        "start-full": clickhouse.synchronize_full,
         "test": clickhouse.run_tests
     }
 }
@@ -28,7 +29,7 @@ def get_operation(name):
 
 
 @click.command()
-@click.option('--operation', help='Action to perform', default='synchronize')
+@click.option('--operation', help='Action to perform', default='start')
 def start_process(operation):
     get_operation(operation)()
 

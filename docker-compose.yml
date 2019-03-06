@@ -1,6 +1,6 @@
 version: '3'
 services:
-  cyberdrop:
+  core:
     network_mode: host
     build: .
     volumes:
@@ -10,7 +10,24 @@ services:
       LANG: C.UTF-8
     depends_on:
       - clickhouse
+      - parity
+    command: --operation prepare-database
+
   clickhouse:
-    image: yandex/clickhouse-server:latest
+    image: yandex/clickhouse-server:18.12.17
     ports:
-    - "9000:9000"
+      - "9000:9000"
+
+  parity:
+    image: parity/parity:stable # TODO check version
+    ports:
+      - "8545:8545"
+    command: --mode=active --pruning=archive --jsonrpc-interface=all
+
+#  tabix:
+#    image: spoonest/clickhouse-tabix-web-client
+#    depends_on:
+#      - clickhouse
+#    ports:
+#      - "8080:8080"
+

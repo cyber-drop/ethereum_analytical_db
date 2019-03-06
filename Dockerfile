@@ -24,8 +24,10 @@ RUN git clone https://github.com/ethereum/pyethereum && \
 
 WORKDIR /usr/src/core
 
-ADD . .
+ADD ./requirements.txt .
 
 RUN pip3.6 install --default-timeout=100 -r ./requirements.txt
+
+ADD . .
 
 ENTRYPOINT ["python3.6", "./extractor.py"]

@@ -78,7 +78,7 @@ def extract_tokens():
     tokens.search_methods()
 
 
-def _prepare_indices_and_views():
+def prepare_indices_and_views():
     prepare_indices()
     prepare_contracts_view()
     extract_token_transactions()
@@ -92,14 +92,12 @@ def _fill_database():
 
 
 def synchronize():
-    _prepare_indices_and_views()
     while True:
         _fill_database()
         sleep(10)
 
 
 def synchronize_full():
-    _prepare_indices_and_views()
     while True:
         _fill_database()
         extract_contracts_abi()
