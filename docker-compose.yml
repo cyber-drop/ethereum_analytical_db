@@ -17,6 +17,7 @@ services:
     image: yandex/clickhouse-server:18.12.17
     ports:
       - "9000:9000"
+      - "8123:8123"
 
   parity:
     image: parity/parity:stable # TODO check version
@@ -24,10 +25,9 @@ services:
       - "8545:8545"
     command: --mode=active --pruning=archive --jsonrpc-interface=all
 
-#  tabix:
-#    image: spoonest/clickhouse-tabix-web-client
-#    depends_on:
-#      - clickhouse
-#    ports:
-#      - "8080:8080"
-
+  tabix:
+    build: ./tabix/
+    depends_on:
+      - clickhouse
+    ports:
+      - "8080:80"
