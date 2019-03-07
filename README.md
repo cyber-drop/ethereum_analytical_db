@@ -18,13 +18,18 @@ Check the correctness of the installation using
 docker run --network host cyberdrop/core --operation test
 ```
 
-## Configuration
+### With docker-compose
 
-Configuration is located in config.py file. Please check this list before installation:
-- INDICES - Dictionary of table names in Clickhouse. Meaning of each table explained below
-- PARITY_HOSTS - URLs of parity APIs. You can specify block range for each URL to use different nodes for each request
-- NUMBER_OF_JOBS - Size of pages received from Clickhouse
-- PROCESSED_CONTRACTS - List of contract addresses to process in several operations. All other contracts will be skipped during certain operations
+To build all nessesary containers (clickhouse, parity, tabix, core), use command:
+```bash
+docker-compose up
+```
+
+Check the correctness of the installation using
+
+```bash
+docker-compose run core --operation test
+```
 
 ## Usage
 
@@ -32,12 +37,20 @@ Configuration is located in config.py file. Please check this list before instal
 
 To start real-time synchronization loop, use:
 ```bash
+# With vanilla docker
 docker run --network host cyberdrop/core
+
+# With docker-compose
+docker-compose run core --operation start
 ```
 
 To start synchronization with additional info for contracts whitelisted in config.py (extract ABI, parse inputs), use:
 ```bash
-docker run --network host cyberdrop/core --operation synchronize-full
+# With vanilla docker
+docker run --network host cyberdrop/core --operation start-full
+
+# With docker-compose
+docker-compose run core --operation start-full
 ```
 
 ### Dump installation
@@ -167,3 +180,15 @@ It also saves ERC20 token names, symbols, total supply and etc.
 - extract-prices (token_prices.py)
 
 Download token capitalization, ETH, BTC and USD prices from cryptocompare and coinmarketcap
+
+## Configuration
+
+Configuration is located in config.py file. Please check this list before installation:
+- INDICES - Dictionary of table names in Clickhouse. Meaning of each table explained below
+- PARITY_HOSTS - URLs of parity APIs. You can specify block range for each URL to use different nodes for each request
+- NUMBER_OF_JOBS - Size of pages received from Clickhouse
+- EVENTS_RANGE_SIZE - Number of blocks processed simultaneously during events extraction
+- INPUT_PARSING_PROCESSES - Number of chunks processed simultaneously during input parsing
+- PROCESSED_CONTRACTS - List of contract addresses to process in several operations. All other contracts will be skipped during certain operations
+- ETHERSCAN_API_KEY - API key for etherscan.io ABI extraction
+- ETHEREUM_START_DATE - The date of zero block in target chain

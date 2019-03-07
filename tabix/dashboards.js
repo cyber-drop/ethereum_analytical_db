@@ -1,7 +1,7 @@
 var LS_SESSION_DATA = "ls.sessionData"
 var DASHBOARDS = [{
     "name":"eth SQL",
-    "sql":"Zdes budet neskolko sluchainyh slov",
+    "sql":"Dashboard SQL for monitoring",
     "buttonTitle": "Run all ⇧ + ⌘ + ⏎",
     "format":{},
     "results":[],

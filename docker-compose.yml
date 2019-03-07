@@ -10,7 +10,6 @@ services:
       LANG: C.UTF-8
     depends_on:
       - clickhouse
-      - parity
     command: --operation prepare-database
 
   clickhouse:
@@ -20,7 +19,7 @@ services:
       - "8123:8123"
 
   parity:
-    image: parity/parity:stable # TODO check version
+    image: parity/parity:stable
     ports:
       - "8545:8545"
     command: --mode=active --pruning=archive --jsonrpc-interface=all
