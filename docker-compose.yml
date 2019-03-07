@@ -10,6 +10,7 @@ services:
       LANG: C.UTF-8
     depends_on:
       - clickhouse
+      - parity
     command: --operation prepare-database
 
   clickhouse:

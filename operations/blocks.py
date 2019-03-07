@@ -27,15 +27,11 @@ class Blocks:
             Last block number
             0 if there are no blocks in parity
         """
-        response = requests.post(self.parity_host, data=json.dumps({
-            "id": 1,
-            "jsonrpc": "2.0",
-            "method": "eth_blockNumber",
-            "params": []
-        }), headers={
-            "Content-Type": "application/json"
-        }).json()
-        return int(response["result"], 0)
+        syncing = self.w3.eth.syncing
+        if not syncing:
+            return 0
+        else:
+            return syncing["startingBlock"]
 
     def _get_max_elasticsearch_block(self):
         """

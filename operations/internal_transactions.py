@@ -117,7 +117,10 @@ def _send_jsonrpc_request(parity_url, request, getter):
     ).json()
     full_response = []
     for response in responses:
-        full_response += getter(response)
+        try:
+            full_response += getter(response)
+        except Exception as e:
+            print(e)
     return full_response
 
 
@@ -144,12 +147,12 @@ def _get_traces_sync(parity_hosts, blocks):
         trace_response = _send_jsonrpc_request(
             parity_url,
             trace_request,
-            lambda x: x.get("result", [])
+            lambda x: x.get("result")
         )
         transactions_response = _send_jsonrpc_request(
             parity_url,
             transactions_request,
-            lambda x: x.get("result", {"transactions": []}).get("transactions", [])
+            lambda x: x.get("result", {"transactions": []}).get("transactions")
         )
         traces += _merge_block(trace_response, transactions_response, ["gasUsed", "gasPrice"])
     return traces

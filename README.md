@@ -26,10 +26,11 @@ docker-compose up
 ```
 
 Check the correctness of the installation using
-
 ```bash
 docker-compose run core --operation test
 ```
+
+Maybe, you'll have to wait a bit while parity will get an actual info from Ethereum chain
 
 ## Usage
 

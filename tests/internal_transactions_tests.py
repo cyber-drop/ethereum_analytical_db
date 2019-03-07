@@ -138,13 +138,13 @@ class InternalTransactionsTestCase(unittest.TestCase):
             body=json.dumps([
                 {"id": "2", "result": {"test": ["result_2", "result_3"]}},
                 {"id": "1", "result": {"test": ["result_1"]}},
-                {"id": "3", "error": True}
+                {"id": "3", "error": True, "result": None}
             ])
         )
         response = _send_jsonrpc_request(
             test_url,
             test_request,
-            lambda x: x.get("result", {"test": []}).get("test", [])
+            lambda x: x.get("result", {"test": []}).get("test")
         )
         self.assertCountEqual(response, test_response)
 
