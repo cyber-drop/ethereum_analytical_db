@@ -19,7 +19,7 @@ services:
       - "8123:8123"
 
   parity:
-    image: parity/parity:stable
+    image: parity/parity:v2.2.7
     ports:
       - "8545:8545"
     command: --mode=active --pruning=archive --jsonrpc-interface=all
