@@ -20,7 +20,8 @@ INDICES = {
     "transaction_input": "ethereum_transaction_input",
     "event_input": "ethereum_event_input",
     "miner_transaction": "ethereum_miner_transaction",
-    "event": "ethereum_event"
+    "event": "ethereum_event",
+    "contract_description": "ethereum_contract_description"
 }
 
 GENESIS = "genesis.json"
