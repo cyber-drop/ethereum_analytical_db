@@ -47,6 +47,13 @@ To start from existed database dump, use:
 TODO
 ```
 
+### Component failure:
+
+In case of parity/clickhouse/core failure, use:
+```
+$docker-compose up -d --no-deps <service_name>
+```
+
 ### Schema
 
 Current data schema is going below:
