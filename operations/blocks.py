@@ -29,9 +29,9 @@ class Blocks:
         """
         syncing = self.w3.eth.syncing
         if not syncing:
-            return 0
+            return self.w3.eth.getBlock('latest')['number']
         else:
-            return syncing["startingBlock"]
+            return syncing["currentBlock"] - 1
 
     def _get_max_elasticsearch_block(self):
         """

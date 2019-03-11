@@ -36,31 +36,37 @@ class ClickhouseBlocksTestCase(unittest.TestCase):
                 "jsonrpc": "2.0",
                 "result": {
                     "startingBlock": hex(test_block),
-                    "currentBlock": hex(test_block + 1),
-                    "highestBlock": hex(test_block + 2)
+                    "currentBlock": hex(test_block + 2),
+                    "highestBlock": hex(test_block + 1)
                 }
             })
         )
 
         max_block = self.blocks._get_max_parity_block()
 
-        assert max_block == test_block
+        assert max_block == test_block + 1
 
     @httpretty.activate
     def test_get_max_parity_block_no_sync(self):
+        test_max_block = 100
+        eth = self.blocks.w3.eth
+        self.blocks.w3.eth = MagicMock(syncing=False)
+        self.blocks.w3.eth.getBlock = eth.getBlock
         httpretty.register_uri(
             httpretty.POST,
             "http://localhost:8545/",
             body=json.dumps({
                 "id": 1,
                 "jsonrpc": "2.0",
-                "result": False
+                "result": {
+                    "number": test_max_block
+                }
             })
         )
-
         max_block = self.blocks._get_max_parity_block()
+        print(max_block)
 
-        assert max_block == 0
+        assert max_block == test_max_block
 
     def test_get_max_elasticsearch_block(self):
         """Test getting max block from elasticsearch"""
