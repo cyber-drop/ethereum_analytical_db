@@ -20,10 +20,10 @@ services:
       - "8123:8123"
 
   parity:
-    image: parity/parity:v2.2.7
+    image: parity/parity:stable
     ports:
       - "8545:8545"
-    command: --mode=active --pruning=archive --jsonrpc-interface=all
+    command: --mode=active --jsonrpc-interface=all
 
   tabix:
     build: ./tabix/
