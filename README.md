@@ -53,7 +53,7 @@ docker run --network host cyberdrop/core --operation test
 To start real-time synchronization loop, use:
 ```bash
 # With vanilla docker
-docker run --network host cyberdrop/core
+docker run --network host cyberdrop/core --operation start
 
 # With docker-compose
 docker-compose run core --operation start
