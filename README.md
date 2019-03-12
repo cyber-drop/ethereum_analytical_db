@@ -151,6 +151,10 @@ TODO Will be updated
 ![Architecture](core.png)
 
 ### Operations
+```
+TODO add syntax from command line run with --help arg
+```
+
 Operation type can be selected from list below:
 
 - prepare-indices (indices.py)
