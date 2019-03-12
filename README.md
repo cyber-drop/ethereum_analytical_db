@@ -24,6 +24,10 @@ To build docker container, use command
 docker build -t cyberdrop/core .
 ```
 
+```bash
+TODO add parity and clickhouse installation
+```
+
 Make sure you've activated clickhouse and parity ports. 
 
 ```bash
