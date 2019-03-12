@@ -12,6 +12,15 @@ docker build -t cyberdrop/core .
 
 Make sure you've activated clickhouse and parity ports. 
 
+```bash
+$ curl localhost:8545
+Used HTTP Method is not allowed. POST or OPTIONS is required
+
+$ curl localhost:9000
+Port 9000 is for clickhouse-client program.                                                                                                                              │··································
+You must use port 8123 for HTTP.
+```
+
 Check the correctness of the installation using
 
 ```bash
