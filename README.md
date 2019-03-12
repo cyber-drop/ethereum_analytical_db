@@ -2,6 +2,20 @@
 
 ## Installation
 
+### With docker-compose
+
+To build all nessesary containers (clickhouse, parity, tabix, core), use command:
+```bash
+docker-compose up
+```
+
+Check the correctness of the installation using
+```bash
+docker-compose run core --operation test
+```
+
+Maybe, you'll have to wait a bit while parity will get an actual info from Ethereum chain
+
 ### With vanilla docker
 
 To build docker container, use command
@@ -27,19 +41,6 @@ Check the correctness of the installation using
 docker run --network host cyberdrop/core --operation test
 ```
 
-### With docker-compose
-
-To build all nessesary containers (clickhouse, parity, tabix, core), use command:
-```bash
-docker-compose up
-```
-
-Check the correctness of the installation using
-```bash
-docker-compose run core --operation test
-```
-
-Maybe, you'll have to wait a bit while parity will get an actual info from Ethereum chain
 
 ## Usage
 
