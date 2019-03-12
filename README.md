@@ -2,22 +2,6 @@
 
 ## Installation
 
-### With vanilla docker
-
-To build docker container, use command
-
-```bash
-docker build -t cyberdrop/core .
-```
-
-Make sure you've activated clickhouse and parity ports. 
-
-Check the correctness of the installation using
-
-```bash
-docker run --network host cyberdrop/core --operation test
-```
-
 ### With docker-compose
 
 To build all nessesary containers (clickhouse, parity, tabix, core), use command:
@@ -32,6 +16,36 @@ docker-compose run core --operation test
 
 Maybe, you'll have to wait a bit while parity will get an actual info from Ethereum chain
 
+### With vanilla docker
+
+To build docker container, use command
+
+```bash
+docker build -t cyberdrop/core .
+```
+
+```bash
+TODO add parity and clickhouse installation
+```
+
+Make sure you've activated clickhouse and parity ports. 
+
+```bash
+$ curl localhost:8545
+Used HTTP Method is not allowed. POST or OPTIONS is required
+
+$ curl localhost:9000
+Port 9000 is for clickhouse-client program.                                                                                                                              │··································
+You must use port 8123 for HTTP.
+```
+
+Check the correctness of the installation using
+
+```bash
+docker run --network host cyberdrop/core --operation test
+```
+
+
 ## Usage
 
 ### Real-time synchronization
@@ -39,7 +53,7 @@ Maybe, you'll have to wait a bit while parity will get an actual info from Ether
 To start real-time synchronization loop, use:
 ```bash
 # With vanilla docker
-docker run --network host cyberdrop/core
+docker run --network host cyberdrop/core --operation start
 
 # With docker-compose
 docker-compose run core --operation start
@@ -60,6 +74,10 @@ To start from existed database dump, use:
 ```bash
 TODO
 ```
+
+### Monitoring
+
+TODO tabix description
 
 ### Schema
 
@@ -137,6 +155,10 @@ TODO Will be updated
 ![Architecture](core.png)
 
 ### Operations
+```
+TODO add syntax from command line run with --help arg
+```
+
 Operation type can be selected from list below:
 
 - prepare-indices (indices.py)
