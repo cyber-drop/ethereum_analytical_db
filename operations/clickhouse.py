@@ -103,7 +103,8 @@ def synchronize_full():
         extract_contracts_abi()
         parse_transactions_inputs()
         parse_events_inputs()
-
+        extract_prices()
+        
 
 def run_tests():
     os.system("nosetests --nologcapture .")
