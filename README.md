@@ -102,7 +102,8 @@ This query checks the actual state over all blocks, unsynchronized blocks and co
 ### Examples
 
 Usage examples of the crawlers are located in **examples** dir of this repo. The actual description of examples goes below:
-- gas_price_estimation.ipynb
+- [gas_price_estimation.ipynb](https://gitlab.com/cyberdrop/core/blob/docker_compose/examples/gas_price_estimation.ipynb)
+
 Estimation of gas price for transactions between wallets
 
 ### Schema
