@@ -28,14 +28,14 @@ To install parity, use:
 
 ```bash
 docker pull parity/parity:stable
-docker run -p 8545:8545 parity/parity:stable --jsonrpc-interface=all --tracing=on
+docker run -p 8545:8545 parity/parity --jsonrpc-interface=all --tracing=on
 ```
 
 To install clickhouse, use:
 
 ```bash
 docker pull yandex/clickhouse-server:18.12.17
-docker run yandex/clickhouse-server:18.12.17 -p 9000:9000 -p 8123:8123 
+docker run yandex/clickhouse-server -p 9000:9000 -p 8123:8123 
 ```
 
 You can see actual options for these containers in docker-compose.yml file
@@ -102,7 +102,8 @@ This query checks the actual state over all blocks, unsynchronized blocks and co
 ### Examples
 
 Usage examples of the crawlers are located in **examples** dir of this repo. The actual description of examples goes below:
-- gas_price_estimation.ipynb
+- [gas_price_estimation.ipynb](https://gitlab.com/cyberdrop/core/blob/docker_compose/examples/gas_price_estimation.ipynb)
+
 Estimation of gas price for transactions between wallets
 
 ### Schema
