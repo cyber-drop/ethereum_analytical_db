@@ -24,9 +24,21 @@ To build docker container, use command
 docker build -t cyberdrop/core .
 ```
 
+To install parity, use:
+
 ```bash
-TODO add parity and clickhouse installation
+docker pull parity/parity:stable
+docker run -p 8545:8545 parity/parity:stable --jsonrpc-interface=all --tracing=on
 ```
+
+To install clickhouse, use:
+
+```bash
+docker pull yandex/clickhouse-server:18.12.17
+docker run yandex/clickhouse-server:18.12.17 -p 9000:9000 -p 8123:8123 
+```
+
+You can see actual options for these containers in docker-compose.yml file
 
 Make sure you've activated clickhouse and parity ports. 
 
@@ -35,7 +47,7 @@ $ curl localhost:8545
 Used HTTP Method is not allowed. POST or OPTIONS is required
 
 $ curl localhost:9000
-Port 9000 is for clickhouse-client program.                                                                                                                              │··································
+Port 9000 is for clickhouse-client program.
 You must use port 8123 for HTTP.
 ```
 
@@ -45,6 +57,17 @@ Check the correctness of the installation using
 docker run --network host cyberdrop/core --operation test
 ```
 
+### Configuration
+
+Configuration is located in config.py file. Please check this list before installation:
+- INDICES - Dictionary of table names in Clickhouse. Meaning of each table explained below
+- PARITY_HOSTS - URLs of parity APIs. You can specify block range for each URL to use different nodes for each request
+- NUMBER_OF_JOBS - Size of pages received from Clickhouse
+- EVENTS_RANGE_SIZE - Number of blocks processed simultaneously during events extraction
+- INPUT_PARSING_PROCESSES - Number of chunks processed simultaneously during input parsing
+- PROCESSED_CONTRACTS - List of contract addresses to process in several operations. All other contracts will be skipped during certain operations
+- ETHERSCAN_API_KEY - API key for etherscan.io ABI extraction
+- ETHEREUM_START_DATE - The date of zero block in target chain
 
 ## Usage
 
@@ -68,16 +91,19 @@ docker run --network host cyberdrop/core --operation start-full
 docker-compose run core --operation start-full
 ```
 
-### Dump installation
+### Stats
 
-To start from existed database dump, use:
-```bash
-TODO
-```
+Docker bundle contains tabix dashboard named "ETH SQL" that shows status of synchronization. You can look at the state of database [here](http://localhost:8080).
 
-### Monitoring
+![Tabix Dashboard](./images/tabix.png)
 
-TODO tabix description
+This query checks the actual state over all blocks, unsynchronized blocks and contracts.
+
+### Examples
+
+Usage examples of the crawlers are located in **examples** dir of this repo. The actual description of examples goes below:
+- gas_price_estimation.ipynb
+Estimation of gas price for transactions between wallets
 
 ### Schema
 
@@ -152,7 +178,7 @@ All components of this repo and their interactions can be found below:
 TODO Will be updated
 ```
 
-![Architecture](core.png)
+![Architecture](./images/core.png)
 
 ### Operations
 ```
@@ -203,15 +229,3 @@ It also saves ERC20 token names, symbols, total supply and etc.
 - extract-prices (token_prices.py)
 
 Download token capitalization, ETH, BTC and USD prices from cryptocompare and coinmarketcap
-
-## Configuration
-
-Configuration is located in config.py file. Please check this list before installation:
-- INDICES - Dictionary of table names in Clickhouse. Meaning of each table explained below
-- PARITY_HOSTS - URLs of parity APIs. You can specify block range for each URL to use different nodes for each request
-- NUMBER_OF_JOBS - Size of pages received from Clickhouse
-- EVENTS_RANGE_SIZE - Number of blocks processed simultaneously during events extraction
-- INPUT_PARSING_PROCESSES - Number of chunks processed simultaneously during input parsing
-- PROCESSED_CONTRACTS - List of contract addresses to process in several operations. All other contracts will be skipped during certain operations
-- ETHERSCAN_API_KEY - API key for etherscan.io ABI extraction
-- ETHEREUM_START_DATE - The date of zero block in target chain

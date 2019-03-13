@@ -23,7 +23,9 @@ services:
     image: parity/parity:stable
     ports:
       - "8545:8545"
-    command: --mode=active --jsonrpc-interface=all --tracing=on
+    command: --mode=active --jsonrpc-interface=all --tracing=on --db-path /db
+    volumes:
+      - ./parity:/db:Z
 
   tabix:
     build: ./tabix/

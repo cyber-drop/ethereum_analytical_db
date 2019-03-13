@@ -1,18 +1,45 @@
 var LS_SESSION_DATA = "ls.sessionData"
 var DASHBOARD_SQL = `
-SELECT 'Current block' as name, toFloat64(max(number)) AS current_state FROM ethereum_block
+SELECT '1. Actual block' as state, toFloat64(max(number)) AS value FROM eth_block
 UNION ALL
-SELECT 'Transactions' as name, toFloat64(count(*)) AS current_state FROM ethereum_internal_transaction
+SELECT '2. Actual block for event extraction' as state, max(toFloat64(id)) AS value FROM eth_block_flag WHERE name = 'events_extracted'
 UNION ALL
-SELECT 'Ethereum transferred, ETH' as name, toFloat64(sum(value)) AS current_state FROM ethereum_internal_transaction
+SELECT '3. Blocks without extracted events' as state, toFloat64(count(*)) AS value FROM eth_block WHERE id NOT IN(SELECT id FROM eth_block_flag WHERE name = 'events_extracted')
 UNION ALL
-SELECT 'Fees paid, ETH' as name, toFloat64(sum(gasPrice * gasUsed)) AS current_state FROM ethereum_internal_transaction
+SELECT '4. Actual block for traces extraction' as state, max(toFloat64(id)) AS value FROM eth_block_flag WHERE name = 'traces_extracted'
 UNION ALL
-SELECT 'Total senders' as name, toFloat64(count(distinct(from))) AS current_state FROM ethereum_internal_transaction
+SELECT '5. Blocks without extracted traces' as state, toFloat64(count(*)) AS value FROM eth_block WHERE id NOT IN(SELECT id FROM eth_block_flag WHERE name = 'traces_extracted')
 UNION ALL
-SELECT 'Total receivers' as name, toFloat64(count(distinct(to))) AS current_state FROM ethereum_internal_transaction
+SELECT '6. Contracts with descriptions' as state, toFloat64(count(*)) AS value FROM eth_contract_description
 UNION ALL
-SELECT 'Total miners and mining pools' as name, toFloat64(count(distinct(author))) AS current_state FROM ethereum_internal_transaction
+SELECT '7. Contracts with ABI' as state, toFloat64(count(*)) AS value FROM eth_contract_abi
+UNION ALL
+SELECT '8. Actual block for input parsing' as state, toFloat64(max(value)) as value FROM eth_contract_block
+ORDER BY state
+;;
+
+SELECT name, CEILING(toFloat64(id) / 100000) * 100000 AS blockRange, count(*) / 100000 AS blocksCount
+FROM eth_block_flag
+WHERE name = 'traces_extracted'
+GROUP BY name, blockRange
+ORDER BY blockRange
+DRAW_BAR
+{
+    'xAxis': "blockRange",
+    'yAxis': "blocksCount"
+}
+;;
+
+SELECT name, CEILING(toFloat64(id) / 100000) * 100000 AS blockRange, count(*) / 100000 AS blocksCount
+FROM eth_block_flag
+WHERE name = 'events_extracted'
+GROUP BY name, blockRange
+ORDER BY blockRange
+DRAW_BAR
+{
+    'xAxis': "blockRange",
+    'yAxis': "blocksCount"
+}
 ;;
 `
 var DASHBOARDS = [{
@@ -33,7 +60,7 @@ setTimeout(function() {
     var presented = sessionData.filter(x => x.name.indexOf("eth") != -1).length
     if (presented < DASHBOARDS.length) {
         console.log("Dashboards added")
-        sessionData = sessionData.concat(DASHBOARDS)
+        sessionData = DASHBOARDS.concat(sessionData)
         localStorage.setItem(LS_SESSION_DATA, JSON.stringify(sessionData))
         window.location.reload(false)
     }
