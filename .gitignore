@@ -30,5 +30,3 @@ error_blocks.log
 pyethereum
 quickBlocks
 ethdrain
-parity/*
-clickhouse/*
