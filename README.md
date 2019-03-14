@@ -121,6 +121,39 @@ Docker bundle contains tabix dashboard named "ETH SQL" that shows status of sync
 
 This query checks the actual state over all blocks, unsynchronized blocks and contracts.
 
+### All operations
+```bash
+$ docker-compose run core --help
+
+Usage: extractor.py [OPTIONS] COMMAND [ARGS]...
+
+  Ethereum extractor
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  prepare-database               Prepare all indices and views in database
+  start                          Run partial synchronization of the database.
+  start-full                     Run full synchronization of the database
+  
+  prepare-contracts-view         Prepare material view with contracts
+  prepare-erc-transactions-view  Prepare material view with erc20
+                                 transactions
+  prepare-indices                Prepare tables in database
+  extract-blocks                 Extract blocks with timestamp
+  extract-events                 Extract events
+  extract-traces                 Extract internal transactions
+  extract-tokens                 Extract ERC20 token names, symbols, 
+                                 total supply and etc.
+  download-contracts-abi         Extract ABI description from etherscan.io
+  download-prices                Download exchange rates
+  parse-events-inputs            Start input parsing for events.
+  parse-transactions-inputs      Start input parsing for transactions.
+  
+  test                           Run tests
+```
+
 ### Examples
 
 Usage examples of the crawlers are located in **examples** dir of this repo. The actual list of examples goes below:
@@ -200,36 +233,3 @@ TODO Will be updated
 ```
 
 ![Architecture](./images/core.png)
-
-### Operations
-```bash
-$ docker-compose run core --help
-
-Usage: extractor.py [OPTIONS] COMMAND [ARGS]...
-
-  Ethereum extractor
-
-Options:
-  --help  Show this message and exit.
-
-Commands:
-  prepare-database               Prepare all indices and views in database
-  start                          Run partial synchronization of the database.
-  start-full                     Run full synchronization of the database
-  
-  prepare-contracts-view         Prepare material view with contracts
-  prepare-erc-transactions-view  Prepare material view with erc20
-                                 transactions
-  prepare-indices                Prepare tables in database
-  extract-blocks                 Extract blocks with timestamp
-  extract-events                 Extract events
-  extract-traces                 Extract internal transactions
-  extract-tokens                 Extract ERC20 token names, symbols, 
-                                 total supply and etc.
-  download-contracts-abi         Extract ABI description from etherscan.io
-  download-prices                Download exchange rates
-  parse-events-inputs            Start input parsing for events.
-  parse-transactions-inputs      Start input parsing for transactions.
-  
-  test                           Run tests
-```
