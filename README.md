@@ -57,6 +57,43 @@ Check the correctness of the installation using
 docker run --network host cyberdrop/core test
 ```
 
+## Usage
+
+### Real-time synchronization
+
+To start real-time synchronization loop, use:
+```bash
+# With vanilla docker
+docker run --network host cyberdrop/core start
+
+# With docker-compose
+docker-compose run core start
+```
+
+To start synchronization with additional info for contracts whitelisted in config.py (extract ABI, parse inputs), use:
+```bash
+# With vanilla docker
+docker run --network host cyberdrop/core start-full
+
+# With docker-compose
+docker-compose run core start-full
+```
+
+### Stats
+
+Docker bundle contains tabix dashboard named "ETH SQL" that shows status of synchronization. You can look at the state of database [here](http://localhost:8080).
+
+![Tabix Dashboard](./images/tabix.png)
+
+This query checks the actual state over all blocks, unsynchronized blocks and contracts.
+
+### Examples
+
+Usage examples of the crawlers are located in **examples** dir of this repo. The actual list of examples goes below:
+- [Gas price estimator](https://gitlab.com/cyberdrop/core/blob/docker_compose/examples/gas_price_estimation)
+
+## Advanced usage
+
 ### Configuration
 
 Configuration is located in config.py file. Please check this list before installation:
@@ -91,36 +128,6 @@ ETHERSCAN_API_KEY = "..."
 ...
 ```
 
-## Usage
-
-### Real-time synchronization
-
-To start real-time synchronization loop, use:
-```bash
-# With vanilla docker
-docker run --network host cyberdrop/core start
-
-# With docker-compose
-docker-compose run core start
-```
-
-To start synchronization with additional info for contracts whitelisted in config.py (extract ABI, parse inputs), use:
-```bash
-# With vanilla docker
-docker run --network host cyberdrop/core start-full
-
-# With docker-compose
-docker-compose run core start-full
-```
-
-### Stats
-
-Docker bundle contains tabix dashboard named "ETH SQL" that shows status of synchronization. You can look at the state of database [here](http://localhost:8080).
-
-![Tabix Dashboard](./images/tabix.png)
-
-This query checks the actual state over all blocks, unsynchronized blocks and contracts.
-
 ### All operations
 ```bash
 $ docker-compose run core --help
@@ -153,11 +160,6 @@ Commands:
   
   test                           Run tests
 ```
-
-### Examples
-
-Usage examples of the crawlers are located in **examples** dir of this repo. The actual list of examples goes below:
-- [Gas price estimator](https://gitlab.com/cyberdrop/core/blob/docker_compose/examples/gas_price_estimation)
 
 ### Schema
 
