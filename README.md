@@ -2,8 +2,6 @@
 
 ## Installation
 
-### With docker-compose
-
 To build all nessesary containers (clickhouse, parity, tabix, core), use command:
 ```bash
 docker-compose up
@@ -16,7 +14,44 @@ docker-compose run core test
 
 Maybe, you'll have to wait a bit while parity will get an actual info from Ethereum chain
 
-### With vanilla docker
+## Usage
+
+### Real-time synchronization
+
+To start real-time synchronization loop, use:
+```bash
+# With vanilla docker
+docker run --network host cyberdrop/core start
+
+# With docker-compose
+docker-compose run core start
+```
+
+To start synchronization with additional info for contracts whitelisted in config.py (extract ABI, parse inputs), use:
+```bash
+# With vanilla docker
+docker run --network host cyberdrop/core start-full
+
+# With docker-compose
+docker-compose run core start-full
+```
+
+### Stats
+
+Docker bundle contains tabix dashboard named "ETH SQL" that shows status of synchronization. You can look at the state of database [here](http://localhost:8080).
+
+![Tabix Dashboard](./images/tabix.png)
+
+This query checks the actual state over all blocks, unsynchronized blocks and contracts.
+
+### Examples
+
+Usage examples of the crawlers are located in **examples** dir of this repo. The actual list of examples goes below:
+- [Gas price estimator](https://gitlab.com/cyberdrop/core/blob/docker_compose/examples/gas_price_estimation)
+
+## Advanced usage
+
+### Installation with vanilla docker
 
 To build docker container, use command
 
@@ -56,43 +91,6 @@ Check the correctness of the installation using
 ```bash
 docker run --network host cyberdrop/core test
 ```
-
-## Usage
-
-### Real-time synchronization
-
-To start real-time synchronization loop, use:
-```bash
-# With vanilla docker
-docker run --network host cyberdrop/core start
-
-# With docker-compose
-docker-compose run core start
-```
-
-To start synchronization with additional info for contracts whitelisted in config.py (extract ABI, parse inputs), use:
-```bash
-# With vanilla docker
-docker run --network host cyberdrop/core start-full
-
-# With docker-compose
-docker-compose run core start-full
-```
-
-### Stats
-
-Docker bundle contains tabix dashboard named "ETH SQL" that shows status of synchronization. You can look at the state of database [here](http://localhost:8080).
-
-![Tabix Dashboard](./images/tabix.png)
-
-This query checks the actual state over all blocks, unsynchronized blocks and contracts.
-
-### Examples
-
-Usage examples of the crawlers are located in **examples** dir of this repo. The actual list of examples goes below:
-- [Gas price estimator](https://gitlab.com/cyberdrop/core/blob/docker_compose/examples/gas_price_estimation)
-
-## Advanced usage
 
 ### Configuration
 
