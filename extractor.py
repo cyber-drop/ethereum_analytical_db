@@ -4,35 +4,39 @@ from operations import clickhouse
 from config import DATABASE
 
 OPERATIONS = {
-    "clickhouse": {
-        "prepare-indices": clickhouse.prepare_indices,
-        "prepare-blocks": clickhouse.prepare_blocks,
-        "prepare-contracts-view": clickhouse.prepare_contracts_view,
-        "extract-traces": clickhouse.extract_traces,
-        "extract-contracts-abi": clickhouse.extract_contracts_abi,
-        "extract-events": clickhouse.extract_events,
-        "parse-transactions-inputs": clickhouse.parse_transactions_inputs,
-        "parse-events-inputs": clickhouse.parse_events_inputs,
-        "prepare-erc20-transactions-view": clickhouse.extract_token_transactions,
-        "extract-prices": clickhouse.extract_prices,
-        "extract-tokens": clickhouse.extract_tokens,
-        "prepare-database": clickhouse.prepare_indices_and_views,
-        "start": clickhouse.synchronize,
-        "start-full": clickhouse.synchronize_full,
-        "test": clickhouse.run_tests
-    }
+    "clickhouse": [
+        ("prepare-database", clickhouse.prepare_indices_and_views),
+        ("start", clickhouse.synchronize),
+        ("start-full", clickhouse.synchronize_full),
+        ("prepare-indices", clickhouse.prepare_indices),
+        ("prepare-erc-transactions-view", clickhouse.extract_token_transactions),
+        ("prepare-contracts-view", clickhouse.prepare_contracts_view),
+        ("extract-blocks", clickhouse.prepare_blocks),
+        ("extract-traces", clickhouse.extract_traces),
+        ("extract-events", clickhouse.extract_events),
+        ("extract-tokens", clickhouse.extract_tokens),
+        ("download-contracts-abi", clickhouse.extract_contracts_abi),
+        ("parse-transactions-inputs", clickhouse.parse_transactions_inputs),
+        ("parse-events-inputs", clickhouse.parse_events_inputs),
+        ("download-prices", clickhouse.extract_prices),
+        ("test", clickhouse.run_tests)
+    ]
 }
 
 
-def get_operation(name):
-    return OPERATIONS[DATABASE][name]
+@click.group()
+def start_process():
+    """
+    Ethereum extractor
+    """
+    pass
 
 
-@click.command()
-@click.option('--operation', help='Action to perform', default='start')
-def start_process(operation):
-    get_operation(operation)()
+def wrap_operations():
+    for name, operation in OPERATIONS[DATABASE]:
+        start_process.command(name)(operation)
 
 
+wrap_operations()
 if __name__ == '__main__':
     start_process()

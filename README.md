@@ -182,51 +182,34 @@ TODO Will be updated
 ![Architecture](./images/core.png)
 
 ### Operations
+```bash
+$ docker-compose run core --help
+
+Usage: extractor.py [OPTIONS] COMMAND [ARGS]...
+
+  Ethereum extractor
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  prepare-database               Prepare all indices and views in database
+  start                          Run partial synchronization of the database.
+  start-full                     Run full synchronization of the database
+  
+  prepare-contracts-view         Prepare material view with contracts
+  prepare-erc-transactions-view  Prepare material view with erc20
+                                 transactions
+  prepare-indices                Prepare tables in database
+  extract-blocks                 Extract blocks with timestamp
+  extract-events                 Extract events
+  extract-traces                 Extract internal transactions
+  extract-tokens                 Extract ERC20 token names, symbols, 
+                                 total supply and etc.
+  download-contracts-abi         Extract ABI description from etherscan.io
+  download-prices                Download exchange rates
+  parse-events-inputs            Start input parsing for events.
+  parse-transactions-inputs      Start input parsing for transactions.
+  
+  test                           Run tests
 ```
-TODO add syntax from command line run with --help arg
-```
-
-Operation type can be selected from list below:
-
-- prepare-indices (indices.py)
-
-Prepare tables in Clickhouse database
-
-- prepare-blocks (blocks.py)
-
-Extract blocks with timestamps to Clickhouse
-
-- extract-traces (internal_transactions.py)
-
-Starts extraction of internal ethereum transactions
-
-- extract-events (events.py)
-
-Starts extraction of ethereum events
-
-- prepare-contracts-view (contract_transactions.py)
-
-Prepare material view with contracts extracted from transactions table
-
-- extract-contracts-abi (contracts.py)
-
-Extract ABI description from etherscan.io for contracts specified in config
-
-- parse-transactions-inputs, parse-events-inputs (contracts.py)
-
-Starts input parsing for transaction or event. 
-There will be created a table with names of called methods and arguments description.
-Works only for contracts specified in config
-
-- prepare-erc20-transactions-view (token_holders.py)
-
-Prepare material view with erc20 transactions extracted from transactions table.
-
-- search-methods (contract_methods.py)
-
-Checks if contracts contain signatures of standards-specific methods. The list of standards stored in 'standards' field.
-It also saves ERC20 token names, symbols, total supply and etc.
-
-- extract-prices (token_prices.py)
-
-Download token capitalization, ETH, BTC and USD prices from cryptocompare and coinmarketcap
