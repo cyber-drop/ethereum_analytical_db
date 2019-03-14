@@ -11,7 +11,7 @@ services:
     depends_on:
       - clickhouse
       - parity
-    command: --operation prepare-database
+    command: prepare-database
 
   clickhouse:
     image: yandex/clickhouse-server:18.12.17
