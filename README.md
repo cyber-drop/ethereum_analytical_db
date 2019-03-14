@@ -91,15 +91,6 @@ ETHERSCAN_API_KEY = "..."
 ...
 ```
 
-- INDICES - 
-- PARITY_HOSTS - 
-- NUMBER_OF_JOBS - 
-- EVENTS_RANGE_SIZE - 
-- INPUT_PARSING_PROCESSES - 
-- PROCESSED_CONTRACTS - 
-- ETHERSCAN_API_KEY - 
-- ETHEREUM_START_DATE - 
-
 ## Usage
 
 ### Real-time synchronization
