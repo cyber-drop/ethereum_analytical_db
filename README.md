@@ -60,14 +60,45 @@ docker run --network host cyberdrop/core test
 ### Configuration
 
 Configuration is located in config.py file. Please check this list before installation:
-- INDICES - Dictionary of table names in Clickhouse. Meaning of each table explained below
-- PARITY_HOSTS - URLs of parity APIs. You can specify block range for each URL to use different nodes for each request
-- NUMBER_OF_JOBS - Size of pages received from Clickhouse
-- EVENTS_RANGE_SIZE - Number of blocks processed simultaneously during events extraction
-- INPUT_PARSING_PROCESSES - Number of chunks processed simultaneously during input parsing
-- PROCESSED_CONTRACTS - List of contract addresses to process in several operations. All other contracts will be skipped during certain operations
-- ETHERSCAN_API_KEY - API key for etherscan.io ABI extraction
-- ETHEREUM_START_DATE - The date of zero block in target chain
+
+```python
+...
+
+# URLs of parity APIs.
+# You can specify block range for each URL to use different nodes for each request
+PARITY_HOSTS = [...]
+
+# Dictionary of table names in database.
+# Meaning of each table explained in Schema
+INDICES = {...}
+
+# List of contract addresses to process in several operations.
+# All other contracts will be skipped during certain operations
+PROCESSED_CONTRACTS = [...]
+
+# Size of pages received from Clickhouse
+NUMBER_OF_JOBS = 1000 # recommended
+
+# Number of chunks processed simultaneously during input parsing
+INPUT_PARSING_PROCESSES = 10 # recommended
+
+# Number of blocks processed simultaneously during events extraction
+EVENTS_RANGE_SIZE = 10 # recommended
+
+# API key for etherscan.io ABI extraction
+ETHERSCAN_API_KEY = "..."
+
+...
+```
+
+- INDICES - 
+- PARITY_HOSTS - 
+- NUMBER_OF_JOBS - 
+- EVENTS_RANGE_SIZE - 
+- INPUT_PARSING_PROCESSES - 
+- PROCESSED_CONTRACTS - 
+- ETHERSCAN_API_KEY - 
+- ETHEREUM_START_DATE - 
 
 ## Usage
 
