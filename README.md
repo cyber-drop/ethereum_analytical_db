@@ -183,13 +183,9 @@ ContractABI[ethereum-contract-abi <hr> <b>id#contract</b> <br> contract: string 
 
 ERC20Token[ethereum-contract-token-erc20 <hr><b>id#contract</b><br> decimals: integer <br> contract: string <br> token_name: string <br> token_owner: string <br> total_supply: string <br> token_symbol: string <br> cc_sym: string <br> cmc_id: integer]
 
-ERC721Token[ethereum-contract-token-erc721 <hr><b>id#contract</b><br> contract: string <br> token_name: string <br> token_owner: string <br> token_symbol: string]
-
 ERC20TokenTransaction[ethereum-token-transaction-erc20 <hr> <b>id#tx_hash</b> <br> tx_hash: string <br> block_id: integer <br> token: string <br> valid: boolean <br> value: float <br> to: string <br> from: string <br> method: string]
 
 Price[ethereum-token-price <hr> <b>id#token_symbol + _  + date </b><br> token: string <br> BTC: float <br> USD: float <br> ETH: float <br> USD_cmc: float <br> marketCap: integer <br> timestamp: timestamp]
-
-ERC721TokenTransaction[ethereum-token-transaction-erc721 <hr> <b>id#tx_hash</b> <br> tx_hash: string <br> block_id: integer <br> token: string <br> valid: boolean <br> token_id: string <br> to: string <br> from: string <br> method: string]
 
 BlockTracesExtracted --> |number| Block
 Transaction -->|blockNumber| Block
@@ -199,11 +195,8 @@ Contract -->|blockNumber| Block
 Contract --> |parent_transaction| Transaction
 ContractABI -->|contract| Contract
 ERC20Token -->|contract| Contract
-ERC721Token -->|contract| Contract
 ERC20TokenTransaction --> |token| ERC20Token
-ERC721TokenTransaction --> |token| ERC721Token
 ERC20TokenTransaction -->|block_id| Block
-ERC721TokenTransaction -->|block_id| Block
 Price --> |token:cc_sym|ERC20Token
 
 style Contract fill:#fff;
@@ -212,18 +205,6 @@ style ERC721TokenTransaction fill:#fff;
 
 style TransactionFee stroke-dasharray:3,3;
 style Block stroke-dasharray:3,3;
-
-style Block stroke-width:5px;
-style Transaction stroke-width:5px;
-style BlockTracesExtracted stroke-width:5px;
-style Contract stroke-width:5px;
-style ContractABI stroke-width:5px;
-style TransactionFee stroke-width:5px;
-
-subgraph ERC-721 standard
-ERC721Token
-ERC721TokenTransaction
-end
 ```
 
 ### Architecture
