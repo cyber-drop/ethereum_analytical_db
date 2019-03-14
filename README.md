@@ -20,19 +20,11 @@ Maybe, you'll have to wait a bit while parity will get an actual info from Ether
 
 To start real-time synchronization loop, use:
 ```bash
-# With vanilla docker
-docker run --network host cyberdrop/core start
-
-# With docker-compose
 docker-compose run core start
 ```
 
 To start synchronization with additional info for contracts whitelisted in config.py (extract ABI, parse inputs), use:
 ```bash
-# With vanilla docker
-docker run --network host cyberdrop/core start-full
-
-# With docker-compose
 docker-compose run core start-full
 ```
 
@@ -91,6 +83,8 @@ Check the correctness of the installation using
 ```bash
 docker run --network host cyberdrop/core test
 ```
+
+You can run other operations the same way
 
 ### Configuration
 
