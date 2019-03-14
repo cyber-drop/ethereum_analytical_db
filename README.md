@@ -165,7 +165,7 @@ Commands:
 
 Current data schema is going below:
 
-![Schema](./images/schema.svg)
+![Schema](./images/schema.png)
 
 ### Architecture
 
