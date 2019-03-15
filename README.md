@@ -22,7 +22,7 @@ To start synchronization with additional info for contracts whitelisted in confi
 docker-compose run core start-full
 ```
 
-### Stats
+### Database state
 
 Docker bundle contains tabix dashboard named "ETH SQL" that shows status of synchronization. You can look at the state of database [here](http://localhost:8080).
 
@@ -41,6 +41,7 @@ Feel free to create an issue for the project, if you have a problem with install
 Please provide us the following info:
 - Your docker and docker-compose versions
 - The list of your modifications in containers
+- Actual state of the database from tabix
 - The log for unit tests:
 ```bash
 docker-compose run core test
