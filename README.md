@@ -1,6 +1,6 @@
 # cyber•Drop core
 
-## Installation
+### Installation
 
 To build all nessesary containers (clickhouse, parity, tabix, core), use command:
 ```bash
@@ -10,7 +10,7 @@ docker-compose up
 Maybe, you'll have to wait a bit while parity will get an actual info from Ethereum chain
 
 
-## Real-time synchronization
+### Real-time synchronization
 
 To start real-time synchronization loop, use:
 ```bash
@@ -22,7 +22,7 @@ To start synchronization with additional info for contracts whitelisted in confi
 docker-compose run core start-full
 ```
 
-## Stats
+### Stats
 
 Docker bundle contains tabix dashboard named "ETH SQL" that shows status of synchronization. You can look at the state of database [here](http://localhost:8080).
 
@@ -30,12 +30,12 @@ Docker bundle contains tabix dashboard named "ETH SQL" that shows status of sync
 
 This query checks the actual state over all blocks, unsynchronized blocks and contracts.
 
-## Examples
+### Examples
 
 Usage examples of the crawlers are located in **examples** dir of this repo. The actual list of examples goes below:
 - [Gas price estimator](https://gitlab.com/cyberdrop/core/blob/docker_compose/examples/gas_price_estimation)
 
-## Bug reports
+### Bug reports
 
 Feel free to create an issue for the project, if you have a problem with installation. 
 Please provide us the following info:
