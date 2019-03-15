@@ -7,11 +7,6 @@ To build all nessesary containers (clickhouse, parity, tabix, core), use command
 docker-compose up
 ```
 
-Check the correctness of the installation using
-```bash
-docker-compose run core test
-```
-
 Maybe, you'll have to wait a bit while parity will get an actual info from Ethereum chain
 
 ## Usage
@@ -118,6 +113,17 @@ EVENTS_RANGE_SIZE = 10 # recommended
 ETHERSCAN_API_KEY = "..."
 
 ...
+```
+
+### Bug reports
+
+```
+TODO will be updated
+```
+
+Before submitting bug reports, check the correctness of the installation using:
+```bash
+docker-compose run core test
 ```
 
 ### All operations
