@@ -116,10 +116,12 @@ def _send_jsonrpc_request(parity_url, request, getter):
         headers={"content-type": "application/json"}
     ).json()
     full_response = []
+    assert type(responses) == list
     for response in responses:
         try:
             full_response += getter(response)
         except Exception as e:
+            print("Exception while processing response:")
             print(e)
     return full_response
 

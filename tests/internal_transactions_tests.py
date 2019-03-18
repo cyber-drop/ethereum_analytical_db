@@ -16,6 +16,7 @@ from clients.custom_clickhouse import CustomClickhouse
 from operations.indices import ClickhouseIndices
 import os
 from pprint import pprint
+from config import TEST_PARITY_NODE
 
 
 class InternalTransactionsTestCase(unittest.TestCase):
@@ -29,7 +30,7 @@ class InternalTransactionsTestCase(unittest.TestCase):
             "block_flag": TEST_BLOCKS_TRACES_EXTRACTED_INDEX
         }
         self.client.prepare_indices(self.indices)
-        self.parity_hosts = [(None, None, "http://localhost:8545")]
+        self.parity_hosts = [(None, None, TEST_PARITY_NODE)]
         self.internal_transactions = ClickhouseInternalTransactions(self.indices, parity_hosts=self.parity_hosts)
 
     def test_split_on_chunks(self):

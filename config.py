@@ -2,6 +2,9 @@ from datetime import datetime
 
 # URLs of parity APIs.
 # You can specify block range for each URL to use different nodes for each request
+# Make sure you have the same config as in dockerfile.yml for each node:
+# --tracing=on
+# --jsonrpc-interface=all
 PARITY_HOSTS = [
     (None, None, "http://localhost:8545")
 ]
@@ -46,3 +49,6 @@ ETHERSCAN_API_KEY = "YourApiKeyToken"
 DATABASE = "clickhouse"
 GENESIS = "genesis.json"
 ETHEREUM_START_DATE = datetime(2015, 7, 30)
+
+# Node URL for tests
+TEST_PARITY_NODE = "http://127.0.0.1:8545"

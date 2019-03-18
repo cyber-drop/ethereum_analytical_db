@@ -8,10 +8,10 @@ from unittest.mock import MagicMock, Mock, call
 from datetime import datetime, timedelta
 from web3 import Web3, HTTPProvider
 from pprint import pprint
-from config import ETHEREUM_START_DATE
+from config import ETHEREUM_START_DATE, TEST_PARITY_NODE
 
 TEST_BLOCKS_INDEX = "test_ethereum_blocks"
-TEST_PARITY_URL = "http://localhost:8545"
+TEST_PARITY_URL = TEST_PARITY_NODE
 
 
 class ClickhouseBlocksTestCase(unittest.TestCase):
@@ -30,7 +30,7 @@ class ClickhouseBlocksTestCase(unittest.TestCase):
         test_block = 100
         httpretty.register_uri(
             httpretty.POST,
-            "http://localhost:8545/",
+            TEST_PARITY_URL,
             body=json.dumps({
                 "id": 1,
                 "jsonrpc": "2.0",
@@ -54,7 +54,7 @@ class ClickhouseBlocksTestCase(unittest.TestCase):
         self.blocks.w3.eth.getBlock = eth.getBlock
         httpretty.register_uri(
             httpretty.POST,
-            "http://localhost:8545/",
+            TEST_PARITY_URL,
             body=json.dumps({
                 "id": 1,
                 "jsonrpc": "2.0",
