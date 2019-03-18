@@ -30,7 +30,7 @@ class ClickhouseBlocksTestCase(unittest.TestCase):
         test_block = 100
         httpretty.register_uri(
             httpretty.POST,
-            TEST_PARITY_URL,
+            TEST_PARITY_NODE,
             body=json.dumps({
                 "id": 1,
                 "jsonrpc": "2.0",
@@ -43,6 +43,7 @@ class ClickhouseBlocksTestCase(unittest.TestCase):
         )
 
         max_block = self.blocks._get_max_parity_block()
+        print(max_block)
 
         assert max_block == test_block + 1
 
@@ -54,7 +55,7 @@ class ClickhouseBlocksTestCase(unittest.TestCase):
         self.blocks.w3.eth.getBlock = eth.getBlock
         httpretty.register_uri(
             httpretty.POST,
-            TEST_PARITY_URL,
+            "http://localhost:8545/",
             body=json.dumps({
                 "id": 1,
                 "jsonrpc": "2.0",
@@ -64,7 +65,6 @@ class ClickhouseBlocksTestCase(unittest.TestCase):
             })
         )
         max_block = self.blocks._get_max_parity_block()
-        print(max_block)
 
         assert max_block == test_max_block
 

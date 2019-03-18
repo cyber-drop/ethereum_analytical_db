@@ -5,7 +5,7 @@ from tests.test_utils import TestClickhouse
 from datetime import datetime, timedelta
 import config
 from tests.test_utils import parity
-
+from config import TEST_PARITY_NODE
 
 class ClickhouseTokenPricesTestCase(unittest.TestCase):
     def setUp(self):
@@ -134,7 +134,7 @@ class ClickhouseTokenPricesTestCase(unittest.TestCase):
         assert len(prices)
 
 
-TEST_PARITY_URL = "http://localhost:8545"
+TEST_PARITY_URL = TEST_PARITY_NODE
 TEST_PRICES_INDEX = 'test_token_prices'
 TEST_CONTRACT_INDEX = 'test_ethereum_contract'
 TEST_CONTRACT_BLOCK_INDEX = 'test_ethereum_contract_block'

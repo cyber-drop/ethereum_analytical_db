@@ -8,7 +8,7 @@ def parity(test_function):
     def wrap(*args, **kwargs):
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            host, port = TEST_PARITY_NODE.split("//")[-1].split(":")
+            host, port = TEST_PARITY_NODE.split("//")[-1].split(":")[:-1]
             result = sock.connect_ex((host, int(port)))
             port_is_open = result == 0
             if not port_is_open:

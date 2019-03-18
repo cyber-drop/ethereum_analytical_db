@@ -51,4 +51,4 @@ GENESIS = "genesis.json"
 ETHEREUM_START_DATE = datetime(2015, 7, 30)
 
 # Node URL for tests
-TEST_PARITY_NODE = "http://127.0.0.1:8545"
+TEST_PARITY_NODE = "http://localhost:8545/"
