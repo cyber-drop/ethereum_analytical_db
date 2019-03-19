@@ -28,6 +28,10 @@ Docker bundle contains grafana with dashboard. You can look at the state of data
 
 ![Dashboard](./images/dashboard.png)
 
+**Username**: admin
+
+**Password**: admin
+
 ### Examples
 
 Usage examples of the crawlers are located in **examples** dir of this repo. The actual list of examples goes below:
