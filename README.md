@@ -24,9 +24,13 @@ docker-compose run core start-full
 
 ### Database state
 
-Docker bundle contains grafana with dashboard. You can look at the state of database [here](http://localhost:3000).
+Docker bundle contains grafana with dashboard. You can look at the state of database [here](http://localhost:3000/dashboard/db/cyberdrop).
 
 ![Dashboard](./images/dashboard.png)
+
+**Username**: admin
+
+**Password**: admin
 
 ### Examples
 
