@@ -19,7 +19,7 @@ INDICES = {
     "listed_token": "eth_listed_token",
     "token_tx": "eth_token_transaction",
     "block": "eth_block",
-    "token_price": "eth_token_price",
+    "price": "eth_token_price",
     "block_flag": "eth_block_flag",
     "contract_abi": "eth_contract_abi",
     "contract_block": "eth_contract_block",
@@ -27,7 +27,7 @@ INDICES = {
     "event_input": "eth_event_input",
     "miner_transaction": "eth_miner_transaction",
     "event": "eth_event",
-    "contract_description": "eth_contract_description"
+    "contract_description": "eth_contract_description",
 }
 
 # List of contract addresses to process in several operations.
