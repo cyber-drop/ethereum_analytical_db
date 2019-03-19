@@ -18,6 +18,11 @@ services:
     ports:
       - "9000:9000"
       - "8123:8123"
+    logging:
+      options:
+        max-size: "50m"
+    volumes:
+      - ./clickhouse:/var/lib/clickhouse:Z
 
   parity:
     image: parity/parity:stable
