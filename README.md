@@ -24,11 +24,9 @@ docker-compose run core start-full
 
 ### Database state
 
-Docker bundle contains tabix dashboard named "ETH SQL" that shows status of synchronization. You can look at the state of database [here](http://localhost:8080).
+Docker bundle contains grafana with dashboard. You can look at the state of database [here](http://localhost:3000).
 
-![Tabix Dashboard](./images/tabix.png)
-
-This query checks the actual state over all blocks, unsynchronized blocks and contracts.
+![Dashboard](./images/dashboard.png)
 
 ### Examples
 
