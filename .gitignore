@@ -32,3 +32,5 @@ quickBlocks
 ethdrain
 !parity/.gitkeep
 parity/*
+!clickhouse/.gitkeep
+clickhouse/*

@@ -32,9 +32,10 @@ services:
     volumes:
       - ./parity:/db:Z
 
-  tabix:
-    build: ./tabix/
+  grafana:
+    network_mode: host
+    build: ./grafana/
     depends_on:
       - clickhouse
     ports:
-      - "8080:80"
+      - "3000:3000"

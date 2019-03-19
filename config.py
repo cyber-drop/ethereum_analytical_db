@@ -12,22 +12,22 @@ PARITY_HOSTS = [
 # Dictionary of table names in database.
 # Meaning of each table explained in Schema
 INDICES = {
-    "contract": "ethereum_contract",
-    "token_transaction": "ethereum_token_transaction",
-    "transaction": "ethereum_transaction",
-    "internal_transaction": "ethereum_internal_transaction",
-    "listed_token": "ethereum_listed_token",
-    "token_tx": "ethereum_token_transaction",
-    "block": "ethereum_block",
-    "token_price": "ethereum_token_price",
-    "block_flag": "ethereum_block_flag",
-    "contract_abi": "ethereum_contract_abi",
-    "contract_block": "ethereum_contract_block",
-    "transaction_input": "ethereum_transaction_input",
-    "event_input": "ethereum_event_input",
-    "miner_transaction": "ethereum_miner_transaction",
-    "event": "ethereum_event",
-    "contract_description": "ethereum_contract_description"
+    "contract": "eth_contract",
+    "token_transaction": "eth_token_transaction",
+    "transaction": "eth_transaction",
+    "internal_transaction": "eth_internal_transaction",
+    "listed_token": "eth_listed_token",
+    "token_tx": "eth_token_transaction",
+    "block": "eth_block",
+    "token_price": "eth_token_price",
+    "block_flag": "eth_block_flag",
+    "contract_abi": "eth_contract_abi",
+    "contract_block": "eth_contract_block",
+    "transaction_input": "eth_transaction_input",
+    "event_input": "eth_event_input",
+    "miner_transaction": "eth_miner_transaction",
+    "event": "eth_event",
+    "contract_description": "eth_contract_description"
 }
 
 # List of contract addresses to process in several operations.

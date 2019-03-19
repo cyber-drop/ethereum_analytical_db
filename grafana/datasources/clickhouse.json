@@ -1,0 +1,1 @@
+{"id":1,"orgId":1,"name":"cyberdrop","type":"vertamedia-clickhouse-datasource","typeLogoUrl":"public/plugins/vertamedia-clickhouse-datasource/img/clickhouse_logo.svg","access":"direct","url":"http://localhost:8123","password":"","user":"","database":"","basicAuth":false,"isDefault":true,"jsonData":{"addCorsHeader":true}}
