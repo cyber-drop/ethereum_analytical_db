@@ -36,8 +36,10 @@ Make sure you have 8123 and 3000 ports enabled
 
 ### Examples
 
-Usage examples of the crawlers are located in **examples** dir of this repo. The actual list of examples goes below:
-- [Gas price estimator](https://gitlab.com/cyberdrop/core/blob/docker_compose/examples/gas_price_estimation)
+Usage examples of the crawlers are located in [**examples**](https://gitlab.com/cyberdrop/core/blob/docker_compose/examples) dir of this repo. The actual list of examples goes below:
+- [API]()
+- [Jupyter Notebook Gas price estimator](https://gitlab.com/cyberdrop/core/blob/docker_compose/examples/gas_price_estimation)
+- [SQL queries]()  
 
 ### Bug reports
 
