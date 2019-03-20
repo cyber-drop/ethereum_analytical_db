@@ -32,6 +32,8 @@ Docker bundle contains grafana with dashboard. You can look at the state of data
 
 **Password**: admin
 
+Make sure you have 8123 and 3000 ports enabled
+
 ### Examples
 
 Usage examples of the crawlers are located in **examples** dir of this repo. The actual list of examples goes below:
