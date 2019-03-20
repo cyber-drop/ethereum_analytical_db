@@ -1,39 +1,42 @@
 graph LR
-Block[ethereum-block <hr> <b>id #number</b> <br> number: integer <br> timestamp: timestamp]
+Block[eth_block <hr> <b>id #number</b> <br> number: Int64 <br> timestamp: DateTime]
 
-BlockTracesExtracted[ ethereum-block-traces-extracted <hr> <b>id #number</b> <br> number: integer ]
+BlockFlag[ eth_block_flag <hr> <b>id #number</b> <br> number: UInt8 <br> name: String ]
 
-Transaction[ethereum-internal-transaction <hr> <b>id #hash + position in trace</b> <br> blockNumber: integer <br> hash: string <br> from: string <br> to: string <br> value: float <br> input: string <br> output: string <br> gas: string <br> gasUsed: string <br> blockHash:string <br> transactionHash:string <br> transactionPosition:integer <br> subtraces: integer <br>traceAddress: array <br> type: string <br> callType:string <br> address:string <br> code:text <br> init: text <br> refundAddress:string <br>error: text <br>parent_error: boolean <br> balance: string <br> author: string <br> rewardType: string]
+Contract[eth_contract <hr><b> id #address</b> <br>  address: String <br> blockNumber: Int64 <br> bytecode: String <br> owner: String <br> standard_erc20: UInt8 ]
 
-TransactionInput[ethereum-transaction-input <hr> <b> id#transaction id </b> <br> decoded_input: object]
+ContractABI[eth_contract_abi <hr> <b>id #contract</b> <br> abi: String <br> abi_extracted: UInt8]
 
-TransactionFee[ethereum-transaction-fee <hr> <b> id#transaction id </b> <br> gasUsed: integer <br> gasPrice: float]
+ContractBlock[ eth_contract_block <hr> <b>id #number</b> <br> name: String <br> value: Int64 ]
 
-Contract[ethereum-contract <hr><b> id #transaction hash</b> <br>  address: string <br> blockNumber: integer <br> bytecode: text <br> creator: string <br> standards: array]
+ContractDescription[ eth_contract_description <hr><b>id #contract</b><br> decimals: UInt8 <br> token_name: String <br> token_owner: String <br> total_supply: Int64 <br> token_symbol: String <br> cmc_id: String <br> website_slug: String ]
 
-ContractABI[ethereum-contract-abi <hr> <b>id#contract</b> <br> contract: string <br> abi: string <br> abi_extracted: boolean]
+Event[ eth_event <hr> <b>id #hash + position in trace</b> <br> blockNumber: Int32 <br> blockHash: String <br> address: String <br> data: String <br> topics: Array <br> transactionHash: String <br> transactionIndex: Int32 <br> transactionLogIndex: Int32 <br> logIndex: Int32 <br> type: String ]
 
-ERC20Token[ethereum-contract-token-erc20 <hr><b>id#contract</b><br> decimals: integer <br> contract: string <br> token_name: string <br> token_owner: string <br> total_supply: string <br> token_symbol: string <br> cc_sym: string <br> cmc_id: integer]
+EventInput[eth_event_input <hr> <b> id #event id </b> <br> name: String <br> params.type: Array <br> params.value: Array ]
 
-ERC20TokenTransaction[ethereum-token-transaction-erc20 <hr> <b>id#tx_hash</b> <br> tx_hash: string <br> block_id: integer <br> token: string <br> valid: boolean <br> value: float <br> to: string <br> from: string <br> method: string]
+Transaction[eth_internal_transaction <hr> <b>id #hash + position in trace</b> <br> blockNumber: Int64 <br> transactionHash: String <br> from: String <br> to: String <br> value: Float64 <br> input: String <br> output: String <br> gas: String <br> gasUsed: String <br> gasPrice: Float64 <br> blockHash: String <br> transactionPosition: Int32 <br> subtraces: Int32 <br>traceAddress: Array <br> type: String <br> callType: String <br> rewardType: String <br> address: String <br> code: String <br> init: String <br> refundAddress: String <br> error: String <br> parent_error: UInt8 <br> balance: String <br> author: String <br> result: String ]
 
-Price[ethereum-token-price <hr> <b>id#token_symbol + _  + date </b><br> token: string <br> BTC: float <br> USD: float <br> ETH: float <br> USD_cmc: float <br> marketCap: integer <br> timestamp: timestamp]
+TokenTransaction[eth_token_transaction <hr> <b>id #event id</b> <br> transactionHash: String <br> blockNumber: Int32 <br> token: String <br> value: Float64 <br> value_raw: String <br> from: String <br> to: String]
 
-BlockTracesExtracted --> |number| Block
+TransactionInput[eth_transaction_input <hr> <b> id #event id </b> <br> name: String <br> params.type: Array <br> params.value: Array ]
+
+Price[eth_token_price <hr> <b>id #address </b><br> address: String <br> BTC: Float64 <br> USD: Float64 <br> ETH: Float64 <br> timestamp: DateTime]
+
+BlockFlag --> |id| Block
 Transaction -->|blockNumber| Block
+Event -->|blockNumber| Block
 TransactionInput -->|id|Transaction
-TransactionFee -->|id|Transaction
+EventInput -->|id|Event
 Contract -->|blockNumber| Block
-Contract --> |parent_transaction| Transaction
-ContractABI -->|contract| Contract
-ERC20Token -->|contract| Contract
-ERC20TokenTransaction --> |token| ERC20Token
-ERC20TokenTransaction -->|block_id| Block
-Price --> |token:cc_sym|ERC20Token
+Contract -->|blockNumber| Block
+ContractABI -->|id| Contract
+ContractBlock -->|id| Contract
+TokenTransaction --> |token| ContractDescription
+TokenTransaction -->|blockNumber| Block
+Price --> |address| Contract
 
 style Contract fill:#fff;
-style ERC20TokenTransaction fill:#fff;
-style ERC721TokenTransaction fill:#fff;
+style TokenTransaction fill:#fff;
 
-style TransactionFee stroke-dasharray:3,3;
 style Block stroke-dasharray:3,3;
