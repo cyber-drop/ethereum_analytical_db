@@ -114,7 +114,7 @@ INDICES = {...}
 PROCESSED_CONTRACTS = [...]
 
 # Size of pages received from Clickhouse
-NUMBER_OF_JOBS = 1000 # recommended
+BATCH_SIZE = 1000 # recommended
 
 # Number of chunks processed simultaneously during input parsing
 INPUT_PARSING_PROCESSES = 10 # recommended
