@@ -39,3 +39,9 @@ services:
       - clickhouse
     ports:
       - "3000:3000"
+
+  clickhouse_client:
+    network_mode: host
+    image: yandex/clickhouse-client:latest
+    depends_on:
+      - clickhouse

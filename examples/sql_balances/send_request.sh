@@ -1,0 +1,1 @@
+docker-compose -f ../../docker-compose.yml run clickhouse_client --query "`cat $1`" --max_memory_usage 100000000000
