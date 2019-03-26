@@ -178,7 +178,7 @@ class ClickhouseContractMethods():
                 if response:
                     return response
             except Exception as e:
-                print(e)
+                pass
         if type(response) != int:
             return placeholder
         else:
