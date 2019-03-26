@@ -3,6 +3,7 @@ from operations.token_holders import ClickhouseTokenHolders
 from unittest.mock import MagicMock, ANY, patch
 from tests.test_utils import TestClickhouse
 import numpy as np
+import math
 
 TRANSFER_EVENT = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 EVENT_ADDRESS_LENGTH = len("0x000000000000000000000000263627126a771fa9745763495d3975614e235298")
@@ -15,33 +16,42 @@ class ClickhouseTokenHoldersTestCase(unittest.TestCase):
         self.indices = {
             "token_transaction": TEST_TOKEN_TX_INDEX,
             "event": TEST_EVENTS_INDEX,
-            "contract": TEST_CONTRACT_INDEX
+            "contract_description": TEST_CONTRACT_INDEX
         }
         self.client = TestClickhouse()
         self.client.prepare_indices({
             "event": TEST_EVENTS_INDEX,
-            "contract": TEST_CONTRACT_INDEX
+            "contract_description": TEST_CONTRACT_INDEX
         })
         self.client.send_sql_request("DROP TABLE IF EXISTS {}".format(self.indices["token_transaction"]))
         self.token_holders = ClickhouseTokenHolders(self.indices)
         self.token_holders.extract_token_transactions()
 
     def test_big_hex_to_float_clickhouse(self):
-        number = 22418.8
-        big_hex = "0x0000000000000000000000000000000000000000000004bf53596c1b5f580000"
-        self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=[{
-            "id": 1,
-            "data": big_hex
-        }])
-        request_string = self.token_holders._generate_sql_for_data()
-        result = self.client.send_sql_request("""
-      SELECT 
-        {}  
-      FROM {} 
-      LIMIT 1
-    """.format(request_string, TEST_EVENTS_INDEX))
-        print(result)
-        assert np.abs(result - number) < 1
+        hexes = {
+            ("0x0000000000000000000000000000000000000000000004bf53596c1b5f580000", 18): 22418.8,
+            ("0x0000000000000000000000000000000000000000000000000000000000000001", 18): 1e-18,
+            ("0x0000000000000000000000000000000010000000000000000000000000000000", 0): 0x10000000000000000000000000000000,
+        }
+        for (big_hex, decimals), number in hexes.items():
+            self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=[{
+                "id": big_hex,
+                "data": big_hex
+            }])
+            request_string = self.token_holders._generate_sql_for_data()
+            sql = """
+                SELECT value
+                FROM (
+                    SELECT
+                        {} AS decimals, 
+                        {}
+                    FROM {}
+                    WHERE id = '{}'
+                    LIMIT 1
+                )
+            """.format(decimals, request_string, TEST_EVENTS_INDEX, big_hex)
+            result = self.client.send_sql_request(sql)
+            self.assertAlmostEqual(result, number)
 
     def _create_transfer_event(self, id, from_address, to_address, value, address):
         return {
@@ -59,9 +69,8 @@ class ClickhouseTokenHoldersTestCase(unittest.TestCase):
 
     def test_extract_token_transactions_from_erc20_transfer_events(self):
         test_contracts = [{
-            "id": 1,
-            "address": "0x01",
-            "standard_erc20": 1,
+            "id": "0x01",
+            "decimals": 17
         }]
         test_events = [
             self._create_transfer_event("0x1.0", "0x1", "0x2", 100, "0x01"),
@@ -81,46 +90,23 @@ class ClickhouseTokenHoldersTestCase(unittest.TestCase):
             "to": "{0:#0{1}x}".format(2, TRANSACTION_ADDRESS_LENGTH),
             "transactionHash": "0x1.0",
             "blockNumber": 10,
-            "value": 100
+            "value": 1000
         }]
         test_transactions_ids = ["0x1.0"]
         self.client.bulk_index(index=TEST_CONTRACT_INDEX, docs=test_contracts)
         self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=test_events)
         token_transactions = self.client.search(index=TEST_TOKEN_TX_INDEX,
                                                 fields=["id", "to", "from", "value", "blockNumber", "transactionHash"])
-        for transaction in token_transactions:
-            transaction["_source"]["value"] = round(transaction["_source"]["value"])
         self.assertCountEqual([transaction["_id"] for transaction in token_transactions], test_transactions_ids)
         self.assertCountEqual([transaction["_source"] for transaction in token_transactions], test_token_transactions)
-
-    def test_extract_events_ignore_not_erc20_contracts(self):
-        test_contracts = [{
-            "id": 1,
-            "address": "0x01",
-            "standard_erc20": 1,
-        }, {
-            "id": 2,
-            "address": "0x02",
-            "standard_erc20": 0,
-        }]
-        test_events = [
-            self._create_transfer_event("0x1.0", "0x1", "0x2", 100, "0x01"),
-            self._create_transfer_event("0x1.1", "0x2", "0x1", 100, "0x02"),
-        ]
-        self.client.bulk_index(index=TEST_CONTRACT_INDEX, docs=test_contracts)
-        self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=test_events)
-        token_transactions = self.client.search(index=TEST_TOKEN_TX_INDEX, fields=["token"])
-        self.assertCountEqual([transaction["_id"] for transaction in token_transactions], ["0x1.0"])
-        self.assertCountEqual([transaction["_source"]["token"] for transaction in token_transactions], ["0x01"])
 
     def test_extract_token_transactions_if_exists(self):
         self.token_holders.extract_token_transactions()
 
     def test_extract_token_transactions_ignore_duplicates(self):
         test_contract = {
-            "id": 1,
-            "address": "0x01",
-            "standard_erc20": 1,
+            "id": "0x01",
+            "decimals": 18,
         }
         test_event = self._create_transfer_event("0x1.0", "0x1", "0x2", 100, "0x01")
         self.client.bulk_index(index=TEST_CONTRACT_INDEX, docs=[test_contract])
@@ -130,9 +116,8 @@ class ClickhouseTokenHoldersTestCase(unittest.TestCase):
 
     def test_extract_contract_addresses_recreate(self):
         test_contract = {
-            "id": 1,
-            "address": "0x01",
-            "standard_erc20": 1,
+            "id": "0x01",
+            "decimals": 18,
         }
         self.client.send_sql_request("DROP TABLE {}".format(TEST_TOKEN_TX_INDEX))
         self.client.bulk_index(index=TEST_CONTRACT_INDEX, docs=[test_contract])

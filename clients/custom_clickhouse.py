@@ -4,11 +4,13 @@ from config import NUMBER_OF_JOBS
 from clients.custom_client import CustomClient
 from tqdm import tqdm
 import json
-
+from config import MAX_MEMORY_USAGE
 
 class CustomClickhouse(CustomClient):
     def _create_client(self):
-        return Client('localhost', send_receive_timeout=10000)
+        client = Client('localhost', send_receive_timeout=10000)
+        client.execute("SET max_memory_usage = {}".format(MAX_MEMORY_USAGE))
+        return client
 
     def __init__(self):
         self.client = self._create_client()

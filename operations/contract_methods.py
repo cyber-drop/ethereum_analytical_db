@@ -32,6 +32,25 @@ class ClickhouseContractMethods():
       List of tuples that includes 3 elements: start block, end_block, and Parity URL
     '''
     _external_links = {}
+    _constants_types = [
+        ('name', {
+            "string": lambda x: str(x).replace("\\x00", ""),
+            "bytes32": lambda x: str(x).replace("\\x00", "")[2:-1].strip()
+        }, ''),
+        ('symbol', {
+            "string": lambda x: str(x).replace("\\x00", ""),
+            "bytes32": lambda x: str(x).replace("\\x00", "")[2:-1].strip()
+        }, ''),
+        ('decimals', {
+            "uint8": None
+        }, 18),
+        ('totalSupply', {
+            "uint256": None
+        }, 0),
+        ('owner', {
+            "address": lambda x: x.lower()
+        }, None)
+    ]
 
     def __init__(self, indices=INDICES, parity_hosts=PARITY_HOSTS):
         self.indices = indices
@@ -39,7 +58,6 @@ class ClickhouseContractMethods():
         self.w3 = Web3(HTTPProvider(parity_hosts[0][2]))
         self.standard_token_abi = standard_token_abi
         self.standards = self._extract_methods_signatures()
-        self.constants = ['name', 'symbol', 'decimals', 'total_supply', 'owner']
         self._set_external_links()
 
     def _set_external_links(self):
@@ -136,27 +154,35 @@ class ClickhouseContractMethods():
 
         return min(supply, MAX_TOTAL_SUPPLY)
 
-    def _constant_methods(self, contract_instance):
-        '''
-        Return dict with methods used to extract values of contract public variables
-
-        Parameters
-        ----------
-        contract_instance
-          An instance of Web3.eth.contract object
-
-        Returns
-        -------
-        dict
-          Dictionary whose keys are methods used to extract public variables
-        '''
-        return {
-            'name': {'func': contract_instance.functions.name(), 'placeholder': None},
-            'symbol': {'func': contract_instance.functions.symbol(), 'placeholder': None},
-            'decimals': {'func': contract_instance.functions.decimals(), 'placeholder': 18},
-            'total_supply': {'func': contract_instance.functions.totalSupply(), 'placeholder': 0},
-            'owner': {'func': contract_instance.functions.owner(), 'placeholder': None}
-        }
+    def _get_constant(self, address, constant, types, placeholder=None):
+        contract_checksum_addr = self.w3.toChecksumAddress(address)
+        contract_abi = [{
+            "constant": True,
+            "inputs": [],
+            "name": constant,
+            "outputs": [{
+                "name": "",
+                "type": None
+            }],
+            "payable": False,
+            "type": "function"
+        }]
+        response = None
+        for constant_type, convert in types.items():
+            try:
+                contract_abi[0]["outputs"][0]["type"] = constant_type
+                contract_instance = self.w3.eth.contract(address=contract_checksum_addr, abi=contract_abi)
+                response = getattr(contract_instance.functions, constant)().call()
+                if convert:
+                    response = convert(response)
+                if response:
+                    return response
+            except Exception as e:
+                pass
+        if type(response) != int:
+            return placeholder
+        else:
+            return response
 
     def _get_constants(self, address):
         '''
@@ -172,20 +198,11 @@ class ClickhouseContractMethods():
         list
           List of values of available contract public variables
         '''
-        contract_checksum_addr = self.w3.toChecksumAddress(address)
-        contract_instance = self.w3.eth.contract(address=contract_checksum_addr, abi=self.standard_token_abi)
-        methods = self._constant_methods(contract_instance)
         contract_constants = []
-        for constant in self.constants:
-            try:
-                response = methods[constant]['func'].call()
-            except:
-                response = methods[constant]['placeholder']
-            if constant == 'owner' and response:
-                response = response.lower()
-            if constant == 'total_supply' and response != 0:
-                response = self._round_supply(response, contract_constants[2])
+        for constant, types, placeholder in self._constants_types:
+            response = self._get_constant(address, constant, types, placeholder)
             contract_constants.append(response)
+        contract_constants[3] = self._round_supply(contract_constants[3], contract_constants[2])
         return contract_constants
 
     def _update_contract_descr(self, doc_id, body):

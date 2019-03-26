@@ -2,7 +2,7 @@
 
 ### Installation
 
-To build all nessesary containers (clickhouse, parity, tabix, core), use command:
+To build all nessesary containers (clickhouse, parity, grafana, core), use command:
 ```bash
 docker-compose up
 ```
@@ -47,7 +47,7 @@ Feel free to create an issue for the project, if you have a problem with install
 Please provide us the following info:
 - Your docker and docker-compose versions
 - The list of your modifications in containers
-- Actual state of the database from tabix
+- Actual state of the database (as a screenshot from grafana)
 - The log for unit tests:
 ```bash
 docker-compose run core test

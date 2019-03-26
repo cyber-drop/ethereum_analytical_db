@@ -14,7 +14,7 @@ services:
     command: prepare-database
 
   clickhouse:
-    image: yandex/clickhouse-server:18.12.17
+    image: yandex/clickhouse-server:19.3.5
     ports:
       - "9000:9000"
       - "8123:8123"

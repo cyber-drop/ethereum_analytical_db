@@ -6,18 +6,18 @@ from config import TEST_PARITY_NODE
 
 def parity(test_function):
     def wrap(*args, **kwargs):
+        port_is_open = True
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            host, port = TEST_PARITY_NODE.split("//")[-1].split(":")[:-1]
+            host, port = TEST_PARITY_NODE.split("//")[-1][:-1].split(":")
             result = sock.connect_ex((host, int(port)))
             port_is_open = result == 0
-            if not port_is_open:
-                raise Exception("Parity port is not open")
         except Exception as e:
             print("Can't validate parity port acceptance: ")
             print(e)
             test_function(*args, **kwargs)
-
+        if not port_is_open:
+            raise Exception("Parity port is not open")
         test_function(*args, **kwargs)
 
     wrap.__setattr__("__name__", test_function.__name__)
