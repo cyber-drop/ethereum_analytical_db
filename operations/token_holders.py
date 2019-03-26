@@ -10,11 +10,17 @@ class ClickhouseTokenHolders():
         self.client = CustomClickhouse()
 
     def _generate_sql_for_data(self):
-        return " + ".join([
-            "reinterpretAsUInt64(reverse(unhex(substring(data, {}, 16)))) * {}".format(i + 5,
-                                                                                       16 ** (64 - i - 18) / (10 ** 18))
-            for i in range(0, 64, 16)
-        ])
+        return """
+            data, 
+            substring(data, 35) AS data_partial,
+            length(data_partial) AS xlen, 
+            substring(data_partial, 1, xlen - 16) AS first, 
+            substring(data_partial, (xlen - 16) + 1, 16) AS last, 
+            reinterpretAsUInt64(reverse(unhex(first))) AS high, 
+            reinterpretAsUInt64(reverse(unhex(last))) AS low, 
+            reinterpretAsInt64(reverse(unhex('100000000'))) AS pwr, 
+            toFloat64((((toDecimal128(high, 0) * pwr) * pwr) + low)) / POW(10, decimals) AS value
+        """
 
     def extract_token_transactions(self):
         value_sql = self._generate_sql_for_data()
@@ -27,17 +33,15 @@ class ClickhouseTokenHolders():
         SELECT 
           concat('0x', substring(topics[2], 27, 40)) AS from,
           concat('0x', substring(topics[3], 27, 40)) AS to,
-          ({value_sql}) AS value,
-          data AS value_raw,
+          {value_sql},
           id,
           address AS token,
           transactionHash,
           blockNumber
         FROM {event}
         ANY INNER JOIN (
-          SELECT address 
+          SELECT id AS address, decimals
           FROM {contract} 
-          WHERE standard_erc20 = 1
         )
         USING address
         WHERE
@@ -48,6 +52,6 @@ class ClickhouseTokenHolders():
             value_sql=value_sql,
             transfer_topic=TRANSFER_EVENT,
             event=self.indices["event"],
-            contract=self.indices["contract"]
+            contract=self.indices["contract_description"],
         )
         self.client.send_sql_request(sql)
