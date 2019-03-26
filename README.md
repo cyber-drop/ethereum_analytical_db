@@ -38,8 +38,8 @@ Make sure you have 8123 and 3000 ports enabled
 
 Usage examples of the crawlers are located in [**examples**](https://gitlab.com/cyberdrop/core/blob/docker_compose/examples) dir of this repo. The actual list of examples goes below:
 - [SQL queries](https://gitlab.com/cyberdrop/core/blob/docker_compose/examples/sql_balances)
-- [API](https://gitlab.com/cyberdrop/core/blob/docker_compose/examples/gas_price_estimation)
-- [Jupyter Notebook : gas price estimator](https://gitlab.com/cyberdrop/core/blob/docker_compose/examples/balances_api)
+- [API](https://gitlab.com/cyberdrop/core/blob/docker_compose/examples/balances_api)
+- [Jupyter Notebook : gas price estimator](https://gitlab.com/cyberdrop/core/blob/docker_compose/examples/gas_price_estimation)
 
 ### Bug reports
 
@@ -171,12 +171,6 @@ Current data schema is going below:
 
 ![Schema](./images/schema.png)
 
-### Architecture
+### Acknowledgments
 
-All components of this repo and their interactions can be found below:
-
-```
-TODO Will be updated
-```
-
-![Architecture](./images/core.png)
+Copyright 2019 Serge Nedashkovsky (github.com/Snedashkovsky), released under the AGPLv3.
