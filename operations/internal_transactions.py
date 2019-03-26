@@ -66,6 +66,9 @@ def _make_requests(parity_hosts, blocks, request):
 
 
 def _make_trace_requests(parity_hosts, blocks):
+    """
+    Make requests to get trace by the same parameters as in _make_requests
+    """
     def request(block_number):
         return {
             "jsonrpc": "2.0",
@@ -78,6 +81,9 @@ def _make_trace_requests(parity_hosts, blocks):
 
 
 def _make_transactions_requests(parity_hosts, blocks):
+    """
+    Make requests to get trace by the same parameters as in _make_requests
+    """
     def request(block_number):
         return {
             "jsonrpc": "2.0",
@@ -90,6 +96,23 @@ def _make_transactions_requests(parity_hosts, blocks):
 
 
 def _merge_block(internal_transactions, transactions, whitelist):
+    """
+    Merge responses with trace and chain transactions. Remove non-whitelisted fields
+
+    Parameters
+    ----------
+    internal_transactions : list
+        List of trace transactions
+    transactions : list
+        List of chain transactions
+    whitelist : list
+        List of allowed fields
+
+    Returns
+    -------
+    list
+        List of trace transactions extended with whitelisted fields from related chain transactions
+    """
     transactions_by_id = {
         (transaction["hash"], transaction["blockHash"]): transaction
         for transaction in transactions
@@ -109,6 +132,24 @@ def _merge_block(internal_transactions, transactions, whitelist):
 
 
 def _send_jsonrpc_request(parity_url, request, getter):
+    """
+    Send a bunch of requests to parity node
+
+    Parameters
+    ----------
+    parity_url : str
+        URL of parity node JSONRPC API
+    request : list
+        All parity requests to send
+    getter : function
+        Function to get target field from response
+
+    Returns
+    -------
+    list
+        List of all responses.
+        Responses with errors will be skipped
+    """
     request_string = json.dumps(request)
     responses = requests.post(
         parity_url,
@@ -129,6 +170,8 @@ def _send_jsonrpc_request(parity_url, request, getter):
 def _get_traces_sync(parity_hosts, blocks):
     """
     Get traces for specified blocks in one array
+
+    Will be extended with gasUsed and gasPrice info from transactions in chain
 
     Parameters
     ----------
@@ -168,20 +211,7 @@ class InternalTransactions:
         self.parity_hosts = parity_hosts
 
     def _split_on_chunks(self, iterable, size):
-        """
-        Split given iterable onto chunks
-
-        Parameters
-        ----------
-        iterable : generator
-            Iterable that will be splitted
-        size : int
-            Max size of chunk
-        Returns
-        -------
-        generator
-            Generator that returns chunk on each iteration
-        """
+        """Split given iterable onto chunks"""
         return utils.split_on_chunks(iterable, size)
 
     def _get_traces(self, blocks):
@@ -204,7 +234,7 @@ class InternalTransactions:
 
     def _set_trace_hashes(self, trace):
         """
-        Set hash for each transaction in trace based on ethereum transaction hash
+        Set hash for each transaction in trace based on Ethereum transaction hash
         and position in trace for this transaction
 
         Parameters
@@ -247,12 +277,17 @@ class InternalTransactions:
         """
         Preprocess specified transaction
 
-        Flatten 'action' and 'result' field, convert value in wei to eth
+        Flattens array fields, unhexes numeric fields
 
         Parameters
         ----------
         transaction : dict
             Transactions to process
+
+        Returns
+        -------
+        dict
+            Processed transaction
         """
         transaction = transaction.copy()
         for field in ["action", "result"]:
@@ -269,7 +304,7 @@ class InternalTransactions:
 
     def _save_internal_transactions(self, blocks_traces):
         """
-        Save specified transactions to ElasticSearch in multiple chunks
+        Save specified transactions to the database in multiple chunks
 
         Save only those which are attached to an ethereum transaction
 
@@ -305,6 +340,22 @@ class InternalTransactions:
                                refresh=True)
 
     def _save_genesis_block(self, genesis_file=GENESIS):
+        """
+        Save transaction from given genesis file to a database
+
+        Parameters
+        ----------
+        genesis_file : str
+            Path to json file with the list of genesis transactions in a format given below:
+            {
+                "hash": "GENESIS_...",
+                "to": ...,
+                "from": ...,
+                "blockHash": "0x0",
+                "blockNumber": 0,
+                "value": ...
+            }
+        """
         genesis = json.load(open(genesis_file))
         self.client.bulk_index(docs=genesis, index=self.indices["internal_transaction"], doc_type="itx",
                                id_field="hash", refresh=True)
@@ -348,6 +399,14 @@ class ClickhouseInternalTransactions(InternalTransactions):
         self.indices["miner_transaction"] = self.indices["internal_transaction"]
 
     def _iterate_blocks(self):
+        """
+        Iterate through unprocessed blocks
+
+        Returns
+        -------
+        generator
+            Generator that returns next chunk of unprocessed blocks
+        """
         ranges = [host_tuple[0:2] for host_tuple in self.parity_hosts]
         flags_sql = "SELECT id, value FROM {} FINAL WHERE name = 'traces_extracted'".format(self.indices["block_flag"])
         return self.client.iterate(
@@ -360,5 +419,13 @@ class ClickhouseInternalTransactions(InternalTransactions):
         )
 
     def _save_traces(self, blocks):
+        """
+        Save traces_extracted flag for specified block to a database
+
+        Parameters
+        ----------
+        blocks :
+            List of blocks numbers
+        """
         docs = [{"id": block, "name": "traces_extracted", "value": True} for block in blocks]
         self.client.bulk_index(index=self.indices["block_flag"], docs=docs)

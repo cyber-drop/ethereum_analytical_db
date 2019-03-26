@@ -26,183 +26,75 @@ class ClickhouseTokenPrices(ClickhouseContractTransactionsIterator):
         self.client = CustomClickhouse()
         self.web3 = Web3(HTTPProvider(parity_host))
 
-    def _chunks(self, l, n):
-        '''
-        Break list into list of n list of equal size
-
-        Parameters
-        ----------
-        l: list
-          Lisymbol_listst that will be breaked into chunks
-        n: int
-          Number of chunks
-        '''
-        for i in range(0, len(l), n):
-            yield l[i:i + n]
-
-    def _to_usd(self, value, price):
-        '''
-        Convert token BTC price to USD price
-
-        Parameters
-        ----------
-        value: float
-          Token price
-        price: float
-          BTC price in USD
-
-        Returns
-        -------
-        float
-          Token price in USD
-        '''
-        return value * price
-
-    def _from_usd(self, value, price):
-        '''
-        Convert token USD price to BTC or ETH price
-
-        Parameters
-        ----------
-        value: float
-          Token price
-        price: float
-          USD price in BTC or ETH
-
-        Returns
-        -------
-        float
-          Token price in BTC or ETH
-        '''
-        return value / price
-
     def _iterate_cc_tokens(self):
-        '''
-        Iterate over token contracts that are listed on Cryptocompare
+        """
+        Iterate over ERC20 tokens
 
         Returns
         -------
         generator
-          Generator that iterates over listed token contracts in Elasticsearch
-        '''
+            Generator that iterates over ERC20 tokens
+        """
         return self._iterate_contracts(partial_query='WHERE standard_erc20 = 1', fields=["address"])
 
     def _get_cc_tokens(self):
-        '''
-        Extract list of tokens listed on Cryptocompare
+        """
+        Extract list of tokens
 
         Returns
         -------
         list
-          List of listed tokens contracts
-        '''
+            List of ERC20 contracts
+        """
         tokens = [token_chunk for token_chunk in self._iterate_cc_tokens()]
         token_list = [t['_source'] for token_chunk in tokens for t in token_chunk]
         return token_list
 
-    def _get_prices_for_fsyms(self, symbol_list):
-        '''
-        Extract tokens historical prices from CryptoCompare
-
-        Parameters
-        ----------
-        symbol_list: list
-          List of token symbols
-
-        Returns
-        -------
-        list
-          List of tokens prices
-        '''
-        fsyms = ','.join(symbol_list)
-        url = 'https://min-api.cryptocompare.com/data/pricemulti?fsyms={}&tsyms=BTC'.format(fsyms)
-        try:
-            prices = requests.get(url).json()
-        except:
-            prices = None
-        return prices
-
-    def _make_multi_prices_req(self, tokens):
-        '''
-        Extract tokens BTC prices from CryptoCompare
-
-        Parameters
-        ----------
-        tokens: list
-          List of tokens
-
-        Returns
-        -------
-        list
-          List of tokens prices
-        '''
-        token_list_chunks = list(self._chunks(tokens, 60))
-        all_prices = []
-        for symbols in token_list_chunks:
-            prices = self._get_prices_for_fsyms(symbols)
-            if prices != None:
-                prices = [{'address': key, 'BTC': float('{:0.10f}'.format(prices[key]['BTC']))} for key in
-                          prices.keys()]
-                all_prices.append(prices)
-        all_prices = [price for prices in all_prices for price in prices]
-        return all_prices
-
-    def _get_multi_prices(self):
-        '''
-        Extract listed tokens current prices from CryptoCompare
-
-        Returns
-        -------
-        list
-          List of tokens prices
-        '''
-        now = datetime.datetime.now()
-        self._get_btc_eth_current_prices()
-        token_syms = [token['address'] for token in self._get_cc_tokens()]
-        prices = self._make_multi_prices_req(token_syms)
-        for price in prices:
-            price['USD'] = float('{:0.10f}'.format(self._to_usd(price['BTC'], self.btc_price)))
-            price['ETH'] = float('{:0.10f}'.format(self._from_usd(price['USD'], self.eth_price)))
-            price['timestamp'] = now.strftime("%Y-%m-%d")
-        return prices
-
     def _construct_bulk_insert_ops(self, docs):
-        '''
-        Iterate over docs and create document-inserting operations used in bulk insert
+        """
+        Assign id to each document
 
         Parameters
         ----------
         docs: list
-          List of dictionaries with new data
-        '''
+            List of price records
+        """
         for doc in docs:
             doc["id"] = doc['address'] + '_' + doc['timestamp'].strftime("%Y-%m-%d")
 
     def _insert_multiple_docs(self, docs, index_name):
-        '''
+        """
         Index multiple documents simultaneously
 
         Parameters
         ----------
         docs: list
-          List of dictionaries with new data
+            List of dictionaries with new data
         doc_type: str
-          Type of inserted documents
+            Type of inserted documents
         index_name: str
-          Name of the index that contains inserted documents
-        '''
+            Name of the index that contains inserted documents
+        """
         for chunk in bulk_chunks(docs, docs_per_chunk=1000):
             self._construct_bulk_insert_ops(chunk)
             self.client.bulk_index(index=index_name, docs=chunk)
 
-    def get_recent_token_prices(self):
-        '''
-        Extract listed tokens current prices from CryptoCompare and saves in Elasticsearch
-        '''
-        prices = self._get_multi_prices()
-        self._insert_multiple_docs(prices, 'price', self.indices['price'])
-
     def _set_moving_average(self, prices, window_size=MOVING_AVERAGE_WINDOW):
+        """
+        Perform moving average procedure over a daily close prices
+
+        Parameters
+        ----------
+        prices: list
+            List of prices
+        window_size: str
+            Size of window
+
+        Returns
+        -------
+        list
+            Prices processed with moving average
+        """
         prices_stack = []
         for price in prices:
             prices_stack.append(price["close"])
@@ -213,19 +105,19 @@ class ClickhouseTokenPrices(ClickhouseContractTransactionsIterator):
                 price["average"] = price["close"]
 
     def _process_hist_prices(self, prices):
-        '''
-        Convert tokens historical prices from BTC to USD and ETH
+        """
+        TODO
 
         Parameters
         ----------
         prices: list
-          List of tokens prices
+            List of tokens prices
 
         Returns
         -------
         list
-          List of tokens prices
-        '''
+            List if converted prices
+        """
         points = []
         self._set_moving_average(prices)
         for price in prices:
@@ -275,40 +167,6 @@ class ClickhouseTokenPrices(ClickhouseContractTransactionsIterator):
         '''
         return self.client.send_sql_request('SELECT MAX(timestamp) FROM {}'.format(self.indices['price']))
 
-    def _convert_btc_eth_prices(self, price):
-        '''
-        Convert BTC and ETH prices into usable format
-
-        Parameters
-        ----------
-        price: dict
-          A dictionary with raw data from cryptocompare
-
-        Returns
-        -------
-        dict
-          A dictionary with converted price data
-        '''
-        point = {}
-        point['USD'] = (price['open'] + price['close']) / 2
-        point['date'] = datetime.datetime.fromtimestamp(price['time']).strftime("%Y-%m-%d")
-        return point
-
-    def _get_btc_eth_prices(self):
-        '''
-        Extract BTC and ETH historcial data and convert it into usable format
-        '''
-        btc_prices = \
-        requests.get('https://min-api.cryptocompare.com/data/histoday?fsym=BTC&tsym=USD&allData=true').json()['Data']
-        eth_prices = \
-        requests.get('https://min-api.cryptocompare.com/data/histoday?fsym=ETH&tsym=USD&allData=true').json()['Data']
-        btc_prices = [self._convert_btc_eth_prices(price) for price in btc_prices]
-        eth_prices = [self._convert_btc_eth_prices(price) for price in eth_prices]
-        btc_prices_dict = {price['date']: price['USD'] for price in btc_prices}
-        eth_prices_dict = {price['date']: price['USD'] for price in eth_prices}
-        self.btc_prices = btc_prices_dict
-        self.eth_prices = eth_prices_dict
-
     def _get_days_count(self, now, last_price_date, limit=DAYS_LIMIT):
         '''
         Count number of days for that prices are unavailable
@@ -344,8 +202,8 @@ class ClickhouseTokenPrices(ClickhouseContractTransactionsIterator):
             "type": "function"
         }]
 
+    # TODO replace with contract_methods.py call
     def _get_symbol_by_address(self, address):
-        print(address)
         address = self.web3.toChecksumAddress(address)
         symbols = {}
         for output_type in ['string', 'bytes32']:

@@ -44,7 +44,7 @@ INPUT_PARSING_PROCESSES = 10 # recommended
 EVENTS_RANGE_SIZE = 10 # recommended
 
 # Max memory usage for clickhouse
-MAX_MEMORY_USAGE = 20000000000 # recommended
+MAX_MEMORY_USAGE = 100000000000 # recommended
 
 # API key for etherscan.io ABI extraction
 ETHERSCAN_API_KEY = "YourApiKeyToken"

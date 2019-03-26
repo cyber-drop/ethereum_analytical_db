@@ -8,6 +8,15 @@ from config import MAX_MEMORY_USAGE
 
 class CustomClickhouse(CustomClient):
     def _create_client(self):
+        """
+        Create clickhouse connection and set initial parameters (for example, max memory usage)
+
+        Returns
+        -------
+        client : clickhouse_driver.Client
+            Initialized connection to a clickhouse
+        """
+        # TODO wait for clickhouse port
         client = Client('localhost', send_receive_timeout=10000)
         client.execute("SET max_memory_usage = {}".format(MAX_MEMORY_USAGE))
         return client
@@ -34,16 +43,74 @@ class CustomClickhouse(CustomClient):
         return documents
 
     def search(self, index, fields, query=None, **kwargs):
+        """
+        Search records in a given table
+        Each record will be represented only with given fields
+
+        Parameters
+        -------
+        index : str
+            Name of table
+        fields : list
+            List with field names
+        query : str
+            Last part of query
+
+        Returns
+        -------
+        list
+            List of records returned by given conditions
+        """
         fields += ["id"]
         sql = self._create_sql_query(index, query, fields)
         values = self.client.execute(sql)
         return self._convert_values_to_dict(values, fields)
 
     def count(self, index, query=None, final=True, **kwargs):
+        """
+        Count records in a given table
+
+        Parameters
+        -------
+        index : str
+            Name of table
+        query : str
+            Last part of query
+        final : bool
+            To skip or not to skip repeating records in tables with updated records
+
+        Returns
+        -------
+        int
+            Number of records in database
+        """
         sql = self._create_sql_query(index, query, ["COUNT(*)"], final)
         return self.client.execute(sql)[0][0]
 
     def iterate(self, index, fields, query=None, per=NUMBER_OF_JOBS, return_id=True, final=True):
+        """
+        Iterate over records in a table
+
+        Parameters
+        -------
+        index : str
+            Name of table
+        fields : list
+            List with field names
+        query : str
+            Last part of query
+        per : int
+            Size of page
+        return_id : bool
+            To return id in _id field of document
+        final : bool
+            To skip or not to skip repeating records in tables with updated records
+
+        Returns
+        -------
+        int
+            Number of records in database
+        """
         iterate_client = self._create_client()
         if return_id:
             fields += ["id"]
@@ -79,6 +146,18 @@ class CustomClickhouse(CustomClient):
                 del document[key]
 
     def bulk_index(self, index, docs, id_field="id", **kwargs):
+        """
+        Add given records to a table within one query
+
+        Parameters
+        -------
+        index : str
+            Name of table
+        docs : list
+            List of records
+        id_field : str
+            Name of field with record id
+        """
         self._set_id(docs, id_field)
         self._filter_schema(docs, index)
         fields = list(set([field for doc in docs for field in doc.keys()]))
@@ -90,6 +169,18 @@ class CustomClickhouse(CustomClient):
         )
 
     def send_sql_request(self, sql):
+        """
+        Send sql query and return result as scalar table
+
+        Parameters
+        -------
+        sql : str
+            Query to send
+
+        Returns
+        -------
+        Content of the first cell of returned table
+        """
         result = self.client.execute(sql)
         if result:
             return result[0][0]
