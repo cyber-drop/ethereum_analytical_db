@@ -67,6 +67,19 @@ class ContractMethodsTestCase(unittest.TestCase):
         }])
 
     @parity
+    def test_get_constant(self):
+        types = {
+            "string": lambda x: str(x).replace("\\x00", ""),
+            "bytes32": lambda x: str(x).replace("\\x00", "")[2:-1].strip()
+        }
+        symbol_eos = self.contract_methods._get_constant('0x86fa049857e0209aa7d9e616f7eb3b3b78ecfdb0', 'symbol', types)
+        symbol_tronix = self.contract_methods._get_constant('0xf230b790e05390fc8295f4d3f60332c93bed42e2', 'symbol', types)
+        symbol_empty = self.contract_methods._get_constant(TEST_EMPTY_CONTRACT, 'symbol', types, "TEST")
+        assert symbol_eos == "EOS"
+        assert symbol_tronix == "TRX"
+        assert symbol_empty == "TEST"
+
+    @parity
     def test_get_constants(self):
         constants = self.contract_methods._get_constants('0xd26114cd6EE289AccF82350c8d8487fedB8A0C07')
         self.assertCountEqual(('OMGToken', 'OMG', 140245398, 18, '0x000000000000000000000000000000000000dead'),
@@ -75,12 +88,15 @@ class ContractMethodsTestCase(unittest.TestCase):
     @parity
     def test_get_empty_constants(self):
         empty_constants = self.contract_methods._get_constants(TEST_EMPTY_CONTRACT)
+        print(empty_constants)
         self.assertCountEqual(('', '', 0, 0, None,), empty_constants)
 
     @parity
     def test_default_decimals(self):
         dec_exists = self.contract_methods._get_constants('0xa0e89120768bf166d228988627e4ac8af350220a')
         dec_non_exists = self.contract_methods._get_constants('0xc569a08db1a5f2cd3ef9c2c3bfbc4f42f74de51b')
+        print(dec_exists)
+        print(dec_non_exists)
         assert dec_exists[2] == 0
         assert dec_non_exists[2] == 18
 
