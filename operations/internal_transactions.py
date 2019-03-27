@@ -338,8 +338,6 @@ class InternalTransactions:
                 not transaction["transactionHash"]]
         self.client.bulk_index(docs=docs, index=self.indices["miner_transaction"], doc_type="tx", id_field="hash",
                                refresh=True)
-        import pdb
-        pdb.set_trace()
 
     def _save_genesis_block(self, genesis_file=GENESIS):
         """
