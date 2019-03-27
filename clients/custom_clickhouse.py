@@ -24,6 +24,9 @@ class CustomClickhouse(CustomClient):
     def __init__(self):
         self.client = self._create_client()
 
+    def __del__(self):
+        self.client.disconnect()
+
     def _create_sql_query(self, index, query, fields, final=True):
         fields_string = ",".join(fields)
         sql = 'SELECT {} FROM {}'.format(fields_string, index)

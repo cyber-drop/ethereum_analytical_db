@@ -8,7 +8,7 @@ def make_range_query(field, range_tuple, *args):
     Parameters
     ----------
     field : string
-        Contracts info in ElasticSearch JSON format, i.e.
+        Contracts info in JSON format, i.e.
         {"_id": TRANSACTION_ID, "_source": {"document": "fields"}}
     range_tuple : int
         Tuple in a format of (start_block, end_block)
@@ -90,13 +90,13 @@ class ClickhouseContractTransactionsIterator():
 
     def _create_transactions_request(self, contracts, max_block):
         """
-        Create ElasticSearch request to get transactions for all contracts
+        Create SQL request to get transactions for all contracts
         from last processed block to specified block
 
         Parameters
         ----------
         contracts : list
-            Contracts info in ElasticSearch JSON format, i.e.
+            Contracts info in JSON format, i.e.
             {"_id": TRANSACTION_ID, "_source": {"document": "fields"}}
         max_block : int
             Block number
@@ -139,7 +139,7 @@ class ClickhouseContractTransactionsIterator():
         Parameters
         ----------
         contracts : list
-            Contracts info in ElasticSearch JSON format, i.e.
+            Contracts info in JSON format, i.e.
             {"_id": TRANSACTION_ID, "_source": {"document": "fields"}}
         max_block : int
             Block number
