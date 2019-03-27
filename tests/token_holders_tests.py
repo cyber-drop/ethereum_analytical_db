@@ -27,6 +27,9 @@ class ClickhouseTokenHoldersTestCase(unittest.TestCase):
         self.token_holders = ClickhouseTokenHolders(self.indices)
         self.token_holders.extract_token_transactions()
 
+    def tearDown(self):
+        self.client.send_sql_request("DROP TABLE IF EXISTS {}".format(self.indices["token_transaction"]))
+
     def test_big_hex_to_float_clickhouse(self):
         hexes = {
             ("0x0000000000000000000000000000000000000000000004bf53596c1b5f580000", 18): 22418.8,

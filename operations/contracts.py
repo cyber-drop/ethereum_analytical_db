@@ -1,13 +1,13 @@
 import os
 import json
 from multiprocessing import Pool
-from config import PARITY_HOSTS, INDICES, ETHERSCAN_API_KEY
+from config import PARITY_HOSTS, INDICES, ETHERSCAN_API_KEY, INPUT_PARSING_PROCESSES
 import utils
 from clients.custom_clickhouse import CustomClickhouse
 import requests
 
 ETHERSCAN_ABI_API = "https://api.etherscan.io/api?module=contract&action=getabi&address={}&apikey=" + ETHERSCAN_API_KEY
-NUMBER_OF_PROCESSES = 10
+NUMBER_OF_PROCESSES = INPUT_PARSING_PROCESSES
 
 def _get_contracts_abi_sync(addresses):
     """
@@ -49,17 +49,6 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
     def _split_on_chunks(self, iterable, size):
         """
         Split given iterable onto chunks
-
-        Parameters
-        ----------
-        iterable : generator
-            Iterable that will be splitted
-        size : int
-            Max size of chunk
-        Returns
-        -------
-        generator
-            Generator that returns chunk on each iteration
         """
         return utils.split_on_chunks(iterable, size)
 
@@ -89,8 +78,7 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
         Returns
         -------
         str
-            ElasticSearch query in a form of:
-            (blockNumber:[1 TO 2] OR blockNumber:[4 TO *])
+            SQL query for blockNumber located in specified range
         """
         ranges = [range_tuple[0:2] for range_tuple in self.parity_hosts]
         range_query = utils.make_range_query("blockNumber", *ranges)
@@ -98,7 +86,7 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
 
     def _iterate_contracts_without_abi(self):
         """
-        Iterate through contracts without an attemp to extract ABI from etherscan.io
+        Iterate through contracts without previous attemp to extract ABI from etherscan.io
         within block range specified in config.py.
 
         Returns
@@ -113,6 +101,9 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
         return self._iterate_contracts(partial_query=query, fields=["address"])
 
     def _convert_abi(self, abi):
+        """
+        Return JSON string for given ABI if it is not empty. Otherwise return None
+        """
         if abi:
             return json.dumps(abi)
         else:
@@ -120,9 +111,9 @@ class ClickhouseContracts(utils.ClickhouseContractTransactionsIterator):
 
     def save_contracts_abi(self):
         """
-        Save contracts ABI to ElasticSearch
+        Save contracts ABI to a database
 
-        This function is an entry point for extract-contracts-abi operation
+        This function is an entry point for download-contracts-abi operation
         """
         for contracts in self._iterate_contracts_without_abi():
             abis = self._get_contracts_abi([contract["_source"]["address"] for contract in contracts])

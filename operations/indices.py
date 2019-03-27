@@ -2,32 +2,6 @@ from config import INDICES
 from clients.custom_clickhouse import CustomClickhouse
 from schema.schema import SCHEMA
 
-STRING_PROPERTIES = {
-    "tx": ["from", "hash", "blockTimestamp", "creates", "to"],
-    "itx": [
-        "from", "hash",
-        "blockTimestamp", "callType",
-        "gas", "gasUsed",
-        "callType", "blockHash", "transactionHash",
-        "refundAddress", "to",
-        "type", "address", "balance", "blockNumber"
-    ]
-}
-
-OBJECT_PROPERTIES = {
-    "tx": ["decoded_input"],
-    "itx": ["decoded_input", "traceAddress"]
-}
-
-TEXT_PROPERTIES = {
-    "tx": ["input"],
-    "itx": ["code", "input", "init", "error", "output"]
-}
-
-FAST_INDICES = {
-    "internal_transaction": "itx"
-}
-
 INDEX_FIELDS = SCHEMA
 
 PRIMARY_KEYS = {
@@ -42,6 +16,18 @@ class ClickhouseIndices:
         self.indices = indices
 
     def _create_index(self, index, fields={}, primary_key=["id"]):
+        """
+        Create specified index in database with specified field types and primary key
+
+        Parameters
+        ----------
+        index : str
+            Name of index
+        fields : dict
+            Fields and their types and index
+        primary_key : list
+            All possible primary keys in index
+        """
         fields["id"] = "String"
         fields_string = ", ".join(["{} {}".format(name, type) for name, type in fields.items()])
         primary_key_string = ",".join(primary_key)
@@ -51,6 +37,11 @@ class ClickhouseIndices:
         self.client.send_sql_request(create_sql)
 
     def prepare_indices(self):
+        """
+        Create all indices specified in schema/schema.py
+
+        This function is an entry point for prepare-indices operation
+        """
         for key, index in self.indices.items():
             if key in INDEX_FIELDS:
                 self._create_index(index, INDEX_FIELDS[key], PRIMARY_KEYS.get(key, ["id"]))

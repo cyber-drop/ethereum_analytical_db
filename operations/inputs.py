@@ -84,7 +84,7 @@ class ClickhouseInputs(utils.ClickhouseContractTransactionsIterator):
         self.parity_hosts = parity_hosts
 
     def _set_contracts_abi(self, abis):
-        """Sets current contracts ABI"""
+        """Sets current contracts ABI for this object"""
         self._contracts_abi = {
             address: json.loads(abi)
             for address, abi in abis.items()
@@ -93,17 +93,6 @@ class ClickhouseInputs(utils.ClickhouseContractTransactionsIterator):
     def _split_on_chunks(self, iterable, size):
         """
         Split given iterable onto chunks
-
-        Parameters
-        ----------
-        iterable : generator
-            Iterable that will be splitted
-        size : int
-            Max size of chunk
-        Returns
-        -------
-        generator
-            Generator that returns chunk on each iteration
         """
         return utils.split_on_chunks(iterable, size)
 
@@ -133,8 +122,7 @@ class ClickhouseInputs(utils.ClickhouseContractTransactionsIterator):
         Returns
         -------
         str
-            ElasticSearch query in a form of:
-            (blockNumber:[1 TO 2] OR blockNumber:[4 TO *])
+            SQL query to find blocks located in range specified in conig
         """
         ranges = [range_tuple[0:2] for range_tuple in self.parity_hosts]
         range_query = utils.make_range_query("blockNumber", *ranges)
@@ -163,6 +151,14 @@ class ClickhouseInputs(utils.ClickhouseContractTransactionsIterator):
         return self._iterate_contracts(max_block, query, fields=["abi", "address"])
 
     def _add_id_to_inputs(self, decoded_inputs):
+        """
+        Add transaction hash as id to decoded_inputs
+
+        Parameters
+        ----------
+        decoded_inputs : dict
+            Dictionary with transaction hashes and input info dicts
+        """
         for hash, input in decoded_inputs.items():
             input.update({
                 "id": hash
@@ -177,7 +173,7 @@ class ClickhouseInputs(utils.ClickhouseContractTransactionsIterator):
         Parameters
         ----------
         contracts : list
-            Contracts info in ElasticSearch JSON format, i.e.
+            Contracts info in JSON format, i.e.
             {"_id": TRANSACTION_ID, "_source": {"document": "fields"}}
         max_block : int
             Block number
@@ -201,7 +197,7 @@ class ClickhouseInputs(utils.ClickhouseContractTransactionsIterator):
         """
         Decode inputs for all transactions to contracts with ABI in ElasticSearch
 
-        This function is an entry point for parse-inputs operation
+        This function is an entry point for parse-*-inputs operation
         """
         max_block = self._get_max_block({self.block_flag_name: 1})
         for contracts in self._iterate_contracts_with_abi(max_block):
@@ -219,6 +215,7 @@ class ClickhouseTransactionsInputs(ClickhouseInputs):
     contract_field = "to"
 
     def _iterate_transactions_by_targets(self, contracts, max_block):
+        """Iterate through transactions with 'call' type"""
         return self._iterate_transactions(contracts, max_block, "WHERE error IS NULL AND callType = 'call'",
                                           fields=["input", "to"])
 
@@ -231,6 +228,11 @@ class ClickhouseEventsInputs(ClickhouseInputs):
     contract_field = "address"
 
     def _iterate_transactions_by_targets(self, contracts, max_block):
+        """
+        Iterate through all events with an id
+
+        Converts it to a supported format for _decode_input method
+        """
         for transactions in self._iterate_transactions(contracts, max_block, "WHERE id IS NOT NULL",
                                                        fields=["topics", "data", "address"]):
             for transaction in transactions:

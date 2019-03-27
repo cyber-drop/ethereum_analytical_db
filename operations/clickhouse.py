@@ -165,4 +165,4 @@ def run_tests():
     """
     Run tests
     """
-    os.system("nosetests --nologcapture .")
+    os.system("nosetests --nologcapture -v .")
