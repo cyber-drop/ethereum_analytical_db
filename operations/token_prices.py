@@ -17,9 +17,6 @@ DAYS_LIMIT = 2000
 class ClickhouseTokenPrices(ClickhouseContractTransactionsIterator):
     doc_type = 'token'
     block_prefix = 'prices_extracted'
-    '''
-    Extract token prices from Coinmarketcap and CryptoCompare and save in Elasticsearch
-    '''
 
     def __init__(self, indices=INDICES, parity_host=PARITY_HOSTS[0][-1]):
         self.indices = indices
@@ -106,7 +103,9 @@ class ClickhouseTokenPrices(ClickhouseContractTransactionsIterator):
 
     def _process_hist_prices(self, prices):
         """
-        TODO
+        Prepare extracted prices to a database
+
+        Performs moving average procedure over prices, sets address and timestamp fields
 
         Parameters
         ----------
@@ -116,7 +115,7 @@ class ClickhouseTokenPrices(ClickhouseContractTransactionsIterator):
         Returns
         -------
         list
-            List if converted prices
+            List if prepared prices
         """
         points = []
         self._set_moving_average(prices)
@@ -130,21 +129,21 @@ class ClickhouseTokenPrices(ClickhouseContractTransactionsIterator):
         return points
 
     def _make_historical_prices_req(self, address, days_count):
-        '''
+        """
         Make call to CryptoCompare API to extract token historical data
 
         Parameters
         ----------
-        symbol: str
-          Token symbol
+        address: str
+            Token address
         days_count: int
-          Days limit
+            Days limit
 
         Returns
         -------
         list
-          List of token historical prices
-        '''
+            List of prices for specified symbol
+        """
         symbol = self._get_symbol_by_address(address)
         url = 'https://min-api.cryptocompare.com/data/histoday?fsym={}&tsym=BTC&limit={}'.format(symbol, days_count)
         try:
@@ -157,36 +156,37 @@ class ClickhouseTokenPrices(ClickhouseContractTransactionsIterator):
             return
 
     def _get_last_avail_price_date(self):
-        '''
-        Get last price available in Elasticsearch token_price index
+        """
+        Get last price available in token_price index
 
         Returns
         -------
         string
-          Timestamp of last available date or 2013-01-01 if there are no prices in index
-        '''
+            Timestamp of last available date
+        """
         return self.client.send_sql_request('SELECT MAX(timestamp) FROM {}'.format(self.indices['price']))
 
     def _get_days_count(self, now, last_price_date, limit=DAYS_LIMIT):
-        '''
+        """
         Count number of days for that prices are unavailable
 
         Parameters
         ----------
-        now: str
-          Current date
-        last_price_date: str
-          Timestamp of last available price
+        now: date
+            Current date
+        last_price_date: date
+            Timestamp of last available price
 
         Returns
         -------
         int
-          Number of days
-        '''
+            Number of days between current date and last price in database
+        """
         days_count = (now - last_price_date).days + 1
         return min(days_count, DAYS_LIMIT)
 
     def _get_symbol_abi(self, output_type):
+        """Return mock ABI to get token symbol"""
         return [{
             "constant": True,
             "inputs": [],
@@ -204,6 +204,19 @@ class ClickhouseTokenPrices(ClickhouseContractTransactionsIterator):
 
     # TODO replace with contract_methods.py call
     def _get_symbol_by_address(self, address):
+        """
+        Get symbol of specified token
+
+        Parameters
+        ----------
+        address: str
+            Address of token
+
+        Returns
+        -------
+        str
+           Symbol of specified token
+        """
         address = self.web3.toChecksumAddress(address)
         symbols = {}
         for output_type in ['string', 'bytes32']:
@@ -219,14 +232,14 @@ class ClickhouseTokenPrices(ClickhouseContractTransactionsIterator):
             return symbols.get('bytes32', "".encode('utf-8')).decode('utf-8').rstrip('\0')
 
     def _get_historical_multi_prices(self):
-        '''
+        """
         Extract historical token prices from CryptoCompare
 
         Returns
         -------
         list
-          List ot token historical prices
-        '''
+            List ot token historical prices
+        """
         token_addresses = [
             token['address']
             for token in self._get_cc_tokens()
@@ -246,11 +259,11 @@ class ClickhouseTokenPrices(ClickhouseContractTransactionsIterator):
         return prices
 
     def get_prices_within_interval(self):
-        '''
+        """
         Extract historcial token prices and then add to this prices data from Coinmarketcap
 
-        This function is an entry point for extract-prices operation
-        '''
+        This function is an entry point for download-prices operation
+        """
         prices = self._get_historical_multi_prices()
         if prices != None:
             self._insert_multiple_docs(prices, self.indices['price'])
