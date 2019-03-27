@@ -1,13 +1,13 @@
 import os
 import json
 from multiprocessing import Pool
-from config import PARITY_HOSTS, INDICES, ETHERSCAN_API_KEY
+from config import PARITY_HOSTS, INDICES, ETHERSCAN_API_KEY, INPUT_PARSING_PROCESSES
 import utils
 from clients.custom_clickhouse import CustomClickhouse
 import requests
 
 ETHERSCAN_ABI_API = "https://api.etherscan.io/api?module=contract&action=getabi&address={}&apikey=" + ETHERSCAN_API_KEY
-NUMBER_OF_PROCESSES = 10
+NUMBER_OF_PROCESSES = INPUT_PARSING_PROCESSES
 
 def _get_contracts_abi_sync(addresses):
     """
