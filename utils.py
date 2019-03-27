@@ -1,5 +1,15 @@
 from config import INDICES, PROCESSED_CONTRACTS
+from time import sleep
 
+def repeat_on_exception(target_function):
+    def wrapped(*args):
+        while True:
+            try:
+                return target_function(*args)
+            except Exception as e:
+                print("Exception: ", e)
+                sleep(5)
+    return wrapped
 
 def make_range_query(field, range_tuple, *args):
     """

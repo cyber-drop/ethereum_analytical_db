@@ -1,5 +1,5 @@
 import unittest
-from utils import split_on_chunks, make_range_query
+from utils import split_on_chunks, make_range_query, repeat_on_exception
 from utils import ClickhouseContractTransactionsIterator
 from tests.test_utils import TestClickhouse
 import config
@@ -23,6 +23,22 @@ class UtilsTestCase(unittest.TestCase):
         assert make_range_query("block", (0, 3),
                                 (10, 100)) == "(block >= 0 AND block < 3) OR (block >= 10 AND block < 100)"
 
+    def test_repeat_on_exception(self):
+        index = {"value": 0}
+        @repeat_on_exception
+        def no_exception_on_third_attemp(index):
+            index["value"] += 1
+            if index["value"] < 3:
+                raise Exception("Test")
+        no_exception_on_third_attemp(index)
+        assert index["value"] == 3
+
+    def test_repeat_on_exception_skip_keyboard_interrupt(self):
+        @repeat_on_exception
+        def keyboard_interrupt():
+            raise KeyboardInterrupt()
+        with self.assertRaises(KeyboardInterrupt):
+            keyboard_interrupt()
 
 class ClickhouseIteratorTestCase(unittest.TestCase):
     client_class = CustomClickhouse
