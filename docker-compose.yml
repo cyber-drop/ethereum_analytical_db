@@ -23,7 +23,7 @@ services:
         max-size: "50m"
     volumes:
       - ./clickhouse:/var/lib/clickhouse:Z
-    restart: on-failure
+    restart: always
 
   parity:
     image: parity/parity:stable
@@ -32,7 +32,7 @@ services:
     command: --mode=active --jsonrpc-interface=all --tracing=on --db-path /db
     volumes:
       - ./parity:/db:Z
-    restart: on-failure
+    restart: always
 
   grafana:
     network_mode: host
