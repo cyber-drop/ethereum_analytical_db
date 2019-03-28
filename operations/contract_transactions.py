@@ -9,30 +9,30 @@ class ClickhouseContractTransactions:
         self.client = CustomClickhouse()
 
     def _extract_first_bytes(self, func):
-        '''
+        """
         Create contract method signature and return first 4 bytes of this signature
 
         Parameters
         ----------
         func: str
-          String that contains function name and arguments
+            String that contains function name and arguments
 
         Returns
         -------
         str
-          String with first 4 bytes of method signature in hex format
-        '''
+            String with first 4 bytes of method signature in hex format
+        """
         return str(Web3.toHex(Web3.sha3(text=func)[0:4]))[2:]
 
     def _extract_methods_signatures(self):
-        '''
+        """
         Return dictionary with first bytes of standard method signatures
 
         Returns
         -------
         dict
-          Dictionary with first 4 bytes of methods signatures in hex format
-        '''
+            Dictionary with first 4 bytes of methods signatures in hex format
+        """
         return {
             'erc20': {
                 'totalSupply': self._extract_first_bytes('totalSupply()'),
@@ -48,6 +48,15 @@ class ClickhouseContractTransactions:
         }
 
     def _get_standards(self):
+        """
+        Create dict with sql to create "standard_*" flag fields
+
+        Returns
+        -------
+        dict
+            Dictionary with keys "standard_*", where * is standard name like ERC20, ERC721
+            and values that are queries for database to define related standard
+        """
         standards = self._extract_methods_signatures()
         return {
             "standard_" + standard: " AND ".join([
@@ -57,6 +66,15 @@ class ClickhouseContractTransactions:
         }
 
     def _get_fields(self):
+        """
+        Get string with material view fields names and related queries
+
+        Returns
+        -------
+        str
+            Part of SQL request to create material view.
+            Contains field names and definitions
+        """
         standard_fields = self._get_standards()
         fields = {
             "id": "coalesce(address, id)",
@@ -73,6 +91,11 @@ class ClickhouseContractTransactions:
         return fields_string
 
     def extract_contract_addresses(self):
+        """
+        Create material view for contracts extracted from internal transactions table
+
+        This function is an entry point for prepare-erc-transactions-view operation
+        """
         fields_string = self._get_fields()
         engine_string = 'ENGINE = ReplacingMergeTree() ORDER BY id'
         condition = "type = 'create' AND error IS NULL AND parent_error IS NULL"

@@ -35,13 +35,13 @@ class Blocks:
 
     def _get_max_elasticsearch_block(self):
         """
-        Get last block in ElasticSearch
+        Get last block in database
 
         Returns
         -------
         int:
             Last block number
-            0 if there are no blocks in ElasticSearch
+            0 if there are no blocks in database
         """
         max_block = self.client.send_sql_request('SELECT max(number) FROM {}'.format(self.indices["block"]))
         if max_block:
@@ -95,7 +95,7 @@ class Blocks:
 
     def create_blocks(self):
         """
-        Create blocks from last block in ElasticSearch to last parity block in ElasticSearch
+        Create blocks from last block in database to last parity block and stores them into database
 
         This function is an entry point for prepare-blocks operation
         """

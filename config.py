@@ -38,10 +38,10 @@ PROCESSED_CONTRACTS = ["0xe94327d07fc17907b4db788e5adf2ed424addff6", "0xd850942e
 BATCH_SIZE = 100 # recommended
 
 # Number of chunks processed simultaneously during input parsing
-INPUT_PARSING_PROCESSES = 10 # recommended
+INPUT_PARSING_PROCESSES = 3 # recommended
 
 # Number of blocks processed simultaneously during events extraction
-EVENTS_RANGE_SIZE = 10 # recommended
+EVENTS_RANGE_SIZE = 5 # recommended
 
 # Max memory usage for clickhouse
 MAX_MEMORY_USAGE = 100000000000 # recommended

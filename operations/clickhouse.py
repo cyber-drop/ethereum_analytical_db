@@ -10,8 +10,10 @@ from operations.token_prices import ClickhouseTokenPrices
 from operations.contract_methods import ClickhouseContractMethods
 from time import sleep
 import os
+from utils import repeat_on_exception
 
 
+@repeat_on_exception
 def prepare_indices():
     """
     Prepare tables in database
@@ -21,6 +23,7 @@ def prepare_indices():
     indices.prepare_indices()
 
 
+@repeat_on_exception
 def prepare_blocks():
     """
     Extract blocks with timestamps
@@ -39,6 +42,7 @@ def prepare_contracts_view():
     contract_transactions.extract_contract_addresses()
 
 
+@repeat_on_exception
 def extract_traces():
     """
     Extract internal transactions
@@ -59,6 +63,7 @@ def extract_contracts_abi():
     contracts.save_contracts_abi()
 
 
+@repeat_on_exception
 def extract_events():
     """
     Extract events
@@ -112,6 +117,7 @@ def extract_prices():
     prices.get_prices_within_interval()
 
 
+@repeat_on_exception
 def extract_tokens():
     """
     Extract ERC20 token names, symbols, total supply and etc.
@@ -165,4 +171,4 @@ def run_tests():
     """
     Run tests
     """
-    os.system("nosetests --nologcapture .")
+    os.system("nosetests --nologcapture -v .")

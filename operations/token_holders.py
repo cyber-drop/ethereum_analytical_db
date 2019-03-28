@@ -10,6 +10,11 @@ class ClickhouseTokenHolders():
         self.client = CustomClickhouse()
 
     def _generate_sql_for_data(self):
+        """
+        Generate sql to get transaction value from data field
+
+        Treats only last 128 bytes
+        """
         return """
             data, 
             substring(data, 35) AS data_partial,
@@ -23,6 +28,11 @@ class ClickhouseTokenHolders():
         """
 
     def extract_token_transactions(self):
+        """
+        Creates materialized view with token transactions extracted from Transfer events
+
+        This function is an entry point for prepare-erc-transactions-view operation
+        """
         value_sql = self._generate_sql_for_data()
         sql = """
       CREATE MATERIALIZED VIEW IF NOT EXISTS {index} 
