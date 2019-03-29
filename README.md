@@ -184,7 +184,7 @@ Clickhouse:
 - Space: > 220 GB
 
 ETL:
-- CPU: 4 cores, 2.50 GHz
+- CPU: multi-core
 - RAM: 4 GB
 
 Tested on:
