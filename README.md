@@ -171,6 +171,27 @@ Current data schema is going below:
 
 ![Schema](./images/schema.png)
 
+### Hardware requirements
+
+Parity:
+- CPU: multi-core
+- RAM: 4 GB
+- Space: > 200 GB
+
+Clickhouse:
+- CPU: multi-core
+- RAM: 20 GB
+- Space: > 220 GB
+
+ETL:
+- CPU: 4 cores, 2.50 GHz
+- RAM: 4 GB
+
+Tested on:
+- CPU: 6 cores (12 threads), 3.50 GHz
+- RAM: 252 GB
+- Space: 1 TB SSD
+
 ### Acknowledgments
 
 Copyright 2019 Serge Nedashkovsky (github.com/Snedashkovsky), released under the AGPLv3.
