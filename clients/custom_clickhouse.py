@@ -1,10 +1,11 @@
 from clickhouse_driver import Client
 from utils import split_on_chunks
-from config import NUMBER_OF_JOBS
+from config import NUMBER_OF_JOBS, MAX_CHUNK_SIZE
 from clients.custom_client import CustomClient
 from tqdm import tqdm
 import json
 from config import MAX_MEMORY_USAGE
+import sys
 
 class CustomClickhouse(CustomClient):
     def _create_client(self):
@@ -148,6 +149,21 @@ class CustomClickhouse(CustomClient):
             for key in blacklisted_keys:
                 del document[key]
 
+    def _split_records(self, records, max_bytes=MAX_CHUNK_SIZE):
+        buffer = []
+        current_bytes = 0
+        for record in records:
+            record_bytes = sys.getsizeof(record)
+            if current_bytes + record_bytes > max_bytes:
+                if current_bytes >= 2 * max_bytes:
+                    print("The size of chunk is much bigger then the limit")
+                yield buffer
+                buffer = []
+                current_bytes = 0
+            current_bytes += record_bytes
+            buffer.append(record)
+        yield buffer
+
     def bulk_index(self, index, docs, id_field="id", **kwargs):
         """
         Add given records to a table within one query
@@ -166,10 +182,11 @@ class CustomClickhouse(CustomClient):
         fields = list(set([field for doc in docs for field in doc.keys()]))
         self._prepare_fields(docs, fields)
         fields_string = ",".join(fields)
-        self.client.execute(
-            'INSERT INTO {} ({}) VALUES'.format(index, fields_string),
-            docs
-        )
+        for chunk in self._split_records(docs):
+            self.client.execute(
+                'INSERT INTO {} ({}) VALUES'.format(index, fields_string),
+                chunk
+            )
 
     def send_sql_request(self, sql):
         """
