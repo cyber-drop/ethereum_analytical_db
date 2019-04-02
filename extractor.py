@@ -10,6 +10,7 @@ OPERATIONS = {
         ("start-full", clickhouse.synchronize_full),
         ("prepare-indices", clickhouse.prepare_indices),
         ("prepare-erc-transactions-view", clickhouse.extract_token_transactions),
+        ("prepare-bancor-trades-view", clickhouse.prepare_bancor_trades),
         ("prepare-contracts-view", clickhouse.prepare_contracts_view),
         ("extract-blocks", clickhouse.prepare_blocks),
         ("extract-traces", clickhouse.extract_traces),

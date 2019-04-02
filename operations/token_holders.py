@@ -1,5 +1,6 @@
 from config import INDICES
 from clients.custom_clickhouse import CustomClickhouse
+import utils
 
 TRANSFER_EVENT = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 
@@ -9,31 +10,13 @@ class ClickhouseTokenHolders():
         self.indices = indices
         self.client = CustomClickhouse()
 
-    def _generate_sql_for_data(self):
-        """
-        Generate sql to get transaction value from data field
-
-        Treats only last 128 bytes
-        """
-        return """
-            data, 
-            substring(data, 35) AS data_partial,
-            length(data_partial) AS xlen, 
-            substring(data_partial, 1, xlen - 16) AS first, 
-            substring(data_partial, (xlen - 16) + 1, 16) AS last, 
-            reinterpretAsUInt64(reverse(unhex(first))) AS high, 
-            reinterpretAsUInt64(reverse(unhex(last))) AS low, 
-            reinterpretAsInt64(reverse(unhex('100000000'))) AS pwr, 
-            toFloat64((((toDecimal128(high, 0) * pwr) * pwr) + low)) / POW(10, decimals) AS value
-        """
-
     def extract_token_transactions(self):
         """
         Creates materialized view with token transactions extracted from Transfer events
 
         This function is an entry point for prepare-erc-transactions-view operation
         """
-        value_sql = self._generate_sql_for_data()
+        value_sql = utils.generate_sql_for_value("data")
         sql = """
       CREATE MATERIALIZED VIEW IF NOT EXISTS {index} 
       ENGINE = ReplacingMergeTree() ORDER BY id
@@ -44,6 +27,7 @@ class ClickhouseTokenHolders():
           concat('0x', substring(topics[2], 27, 40)) AS from,
           concat('0x', substring(topics[3], 27, 40)) AS to,
           {value_sql},
+          data_value AS value,
           id,
           address AS token,
           transactionHash,

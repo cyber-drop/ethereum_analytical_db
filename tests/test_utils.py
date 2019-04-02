@@ -52,7 +52,8 @@ class TestClickhouse(CustomClickhouse):
             blockNumber Int64, 
             test UInt8, 
             standards Array(Nullable(String)), 
-            standard_erc20 UInt8
+            standard_erc20 UInt8,
+            standard_bancor_converter UInt8
         """
         if "contract" in indices:
             self.send_sql_request(

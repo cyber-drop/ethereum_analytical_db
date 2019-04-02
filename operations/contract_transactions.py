@@ -44,6 +44,9 @@ class ClickhouseContractTransactions:
             },
             'erc223': {
                 'tokenFallback': self._extract_first_bytes('tokenFallback(address,uint256,bytes)')
+            },
+            'bancor_converter': {
+                'convert': self._extract_first_bytes('convert(address,address,uint256,uint256)')
             }
         }
 

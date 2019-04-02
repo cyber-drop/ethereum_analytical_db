@@ -32,7 +32,6 @@ services:
     command: --mode=active --jsonrpc-interface=all --tracing=on --db-path /db
     volumes:
       - ./parity:/db:Z
-    restart: always
 
   grafana:
     network_mode: host

@@ -1,6 +1,24 @@
 from config import INDICES, PROCESSED_CONTRACTS
 from time import sleep
 
+
+def generate_sql_for_value(field):
+    """
+    Generate sql to get transaction value from data field
+
+    Treats only last 128 bytes
+    """
+    return """
+        substring({field}, 35) AS {field}_partial,
+        length({field}_partial) AS xlen, 
+        substring({field}_partial, 1, xlen - 16) AS {field}_first, 
+        substring({field}_partial, (xlen - 16) + 1, 16) AS {field}_last, 
+        reinterpretAsUInt64(reverse(unhex({field}_first))) AS {field}_high, 
+        reinterpretAsUInt64(reverse(unhex({field}_last))) AS {field}_low, 
+        reinterpretAsInt64(reverse(unhex('100000000'))) AS {field}_pwr, 
+        toFloat64((((toDecimal128({field}_high, 0) * {field}_pwr) * {field}_pwr) + {field}_low)) / POW(10, COALESCE(decimals, 18)) AS {field}_value
+    """.format(field=field)
+
 def repeat_on_exception(target_function):
     def wrapped(*args):
         while True:
