@@ -155,12 +155,6 @@ class BancorTradesTestCase(unittest.TestCase):
         self.assertCountEqual(trades, ["0x0"])
 
     def test_extract_trade_buyer(self):
-        test_transasctions = [{
-            "id": "0x1",
-            "transactionHash": "0x1",
-            "from": "0x1",
-            "to": "0x0"
-        }]
         test_contracts = [{
             "id": "0x0",
             "address": "0x0",
@@ -178,8 +172,7 @@ class BancorTradesTestCase(unittest.TestCase):
         ]
         self.client.bulk_index(index=TEST_CONTRACTS_INDEX, docs=test_contracts)
         self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=test_events)
-        self.client.bulk_index(index=TEST_TRANSACTIONS_INDEX, docs=test_transasctions)
 
-        trades = self.client.search(index=TEST_TRADES_INDEX, fields=["buyer"])
-        trades = [trade["_source"]["buyer"] for trade in trades]
-        self.assertCountEqual(trades, ["0x1", None])
+        trades = self.client.search(index=TEST_TRADES_INDEX, fields=["transactionHash"])
+        trades = [trade["_source"]["transactionHash"] for trade in trades]
+        self.assertCountEqual(trades, ["0x1", "0x2"])

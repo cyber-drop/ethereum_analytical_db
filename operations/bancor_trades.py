@@ -16,7 +16,7 @@ class ClickhouseBancorTrades:
         self.client.send_sql_request("""
         CREATE VIEW {trades_index}
         AS (
-            SELECT id, from_token, to_token, trader, amount, return, buyer
+            SELECT id, from_token, to_token, trader, amount, return, transactionHash
             FROM (
                 SELECT
                     id,
@@ -61,16 +61,6 @@ class ClickhouseBancorTrades:
                 )
                 USING to_token
             )
-            ANY LEFT JOIN (
-                SELECT transactionHash, from AS buyer
-                FROM {transactions_index}
-                WHERE to in(
-                    SELECT address
-                    FROM {contracts_index}
-                    WHERE standard_bancor_converter = 1
-                )
-            )
-            USING transactionHash
         )
         """.format(
             trades_index=self.indices["bancor_trade"],
