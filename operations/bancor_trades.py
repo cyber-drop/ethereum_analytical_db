@@ -64,6 +64,11 @@ class ClickhouseBancorTrades:
             ANY LEFT JOIN (
                 SELECT transactionHash, from AS buyer
                 FROM {transactions_index}
+                WHERE to in(
+                    SELECT address
+                    FROM {contracts_index}
+                    WHERE standard_bancor_converter = 1
+                )
             )
             USING transactionHash
         )

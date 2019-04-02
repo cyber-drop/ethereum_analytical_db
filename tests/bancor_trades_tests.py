@@ -158,7 +158,8 @@ class BancorTradesTestCase(unittest.TestCase):
         test_transasctions = [{
             "id": "0x1",
             "transactionHash": "0x1",
-            "from": "0x1"
+            "from": "0x1",
+            "to": "0x0"
         }]
         test_contracts = [{
             "id": "0x0",
