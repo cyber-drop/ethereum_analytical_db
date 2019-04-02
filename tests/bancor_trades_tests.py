@@ -9,6 +9,7 @@ TEST_EVENTS_INDEX = "test_events"
 TEST_TRADES_INDEX = "test_trades"
 TEST_TOKENS_INDEX = "test_tokens"
 TEST_CONTRACTS_INDEX = "test_contracts"
+TEST_TRANSACTIONS_INDEX = "test_transactions"
 
 class BancorTradesTestCase(unittest.TestCase):
     maxDiff = None
@@ -18,14 +19,16 @@ class BancorTradesTestCase(unittest.TestCase):
         self.client.prepare_indices({
             "event": TEST_EVENTS_INDEX,
             "contract_description": TEST_TOKENS_INDEX,
-            "contract": TEST_CONTRACTS_INDEX
+            "contract": TEST_CONTRACTS_INDEX,
+            "internal_transaction": TEST_TRANSACTIONS_INDEX
         })
         self.client.send_sql_request("DROP TABLE IF EXISTS {}".format(TEST_TRADES_INDEX))
         self.bancor_trades = ClickhouseBancorTrades({
             "event": TEST_EVENTS_INDEX,
             "bancor_trade": TEST_TRADES_INDEX,
             "contract_description": TEST_TOKENS_INDEX,
-            "contract": TEST_CONTRACTS_INDEX
+            "contract": TEST_CONTRACTS_INDEX,
+            "internal_transaction": TEST_TRANSACTIONS_INDEX
         })
         self.bancor_trades.extract_trades()
 
@@ -38,7 +41,7 @@ class BancorTradesTestCase(unittest.TestCase):
     def _get_transaction_address(self, hex_string):
         return "{0:#0{1}x}".format(int(hex_string, 0), TRANSACTION_ADDRESS_LENGTH)
 
-    def _create_conversion_event(self, event, id, address="0x0"):
+    def _create_conversion_event(self, event, id, address="0x0", transaction="0x0"):
         return {
             "id": hex(id),
             "topics": [
@@ -48,6 +51,7 @@ class BancorTradesTestCase(unittest.TestCase):
                 self._get_event_address(event.get("trader", '0x0')),
             ],
             "address": address,
+            "transactionHash": transaction,
             "data":
                 self._get_event_value(event.get("amount", 0)) +
                 self._get_event_value(event.get("return", 0))[2:] +
@@ -138,6 +142,7 @@ class BancorTradesTestCase(unittest.TestCase):
             }, 0, address="0x1"), {
                 "id": "0x1",
                 "topics": [CONVERSION_EVENT],
+                "transactionHash": "0x0",
                 "address": "0x2",
                 "data": "0x"
             }
@@ -145,6 +150,35 @@ class BancorTradesTestCase(unittest.TestCase):
         self.client.bulk_index(index=TEST_CONTRACTS_INDEX, docs=test_contracts)
         self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=test_events)
 
-        trades = self.client.iterate(index=TEST_TRADES_INDEX, fields=[], final=False)
-        trades = [trade["_id"] for trade in next(trades)]
+        trades = self.client.search(index=TEST_TRADES_INDEX, fields=[])
+        trades = [trade["_id"] for trade in trades]
         self.assertCountEqual(trades, ["0x0"])
+
+    def test_extract_trade_buyer(self):
+        test_transasctions = [{
+            "id": "0x1",
+            "transactionHash": "0x1",
+            "from": "0x1"
+        }]
+        test_contracts = [{
+            "id": "0x0",
+            "address": "0x0",
+            "standard_bancor_converter": 1
+        }]
+        test_events = [
+            self._create_conversion_event({
+                "from_token": "0x1",
+                "to_token": "0x1",
+            }, 0, transaction="0x1"),
+            self._create_conversion_event({
+                "from_token": "0x1",
+                "to_token": "0x1",
+            }, 0, transaction="0x2"),
+        ]
+        self.client.bulk_index(index=TEST_CONTRACTS_INDEX, docs=test_contracts)
+        self.client.bulk_index(index=TEST_EVENTS_INDEX, docs=test_events)
+        self.client.bulk_index(index=TEST_TRANSACTIONS_INDEX, docs=test_transasctions)
+
+        trades = self.client.search(index=TEST_TRADES_INDEX, fields=["buyer"])
+        trades = [trade["_source"]["buyer"] for trade in trades]
+        self.assertCountEqual(trades, ["0x1", None])

@@ -16,7 +16,7 @@ class ClickhouseBancorTrades:
         self.client.send_sql_request("""
         CREATE VIEW {trades_index}
         AS (
-            SELECT id, from_token, to_token, trader, amount, return
+            SELECT id, from_token, to_token, trader, amount, return, buyer
             FROM (
                 SELECT
                     id,
@@ -26,7 +26,8 @@ class ClickhouseBancorTrades:
                     amount,
                     substring(data, 65, 66) AS return_raw,
                     {return_raw_sql},
-                    return_raw_value AS return
+                    return_raw_value AS return,
+                    transactionHash
                 FROM (
                     SELECT
                         id,
@@ -36,7 +37,8 @@ class ClickhouseBancorTrades:
                         data,
                         substring(data, 3, 64) AS amount_raw,
                         {amount_raw_sql},
-                        amount_raw_value AS amount
+                        amount_raw_value AS amount,
+                        transactionHash
                     FROM (
                         SELECT *
                         FROM {events_index}
@@ -59,12 +61,18 @@ class ClickhouseBancorTrades:
                 )
                 USING to_token
             )
+            ANY LEFT JOIN (
+                SELECT transactionHash, from AS buyer
+                FROM {transactions_index}
+            )
+            USING transactionHash
         )
         """.format(
             trades_index=self.indices["bancor_trade"],
             events_index=self.indices["event"],
             tokens_index=self.indices["contract_description"],
             contracts_index=self.indices["contract"],
+            transactions_index=self.indices["internal_transaction"],
             conversion_event=CONVERSION_EVENT,
             amount_raw_sql=amount_raw_sql,
             return_raw_sql=return_raw_sql
