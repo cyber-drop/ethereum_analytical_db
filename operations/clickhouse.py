@@ -8,6 +8,7 @@ from operations.events import ClickhouseEvents
 from operations.token_holders import ClickhouseTokenHolders
 from operations.token_prices import ClickhouseTokenPrices
 from operations.contract_methods import ClickhouseContractMethods
+from operations.bancor_trades import ClickhouseBancorTrades
 from time import sleep
 import os
 from utils import repeat_on_exception
@@ -125,6 +126,15 @@ def extract_tokens():
     print("Extracting tokens...")
     tokens = ClickhouseContractMethods()
     tokens.search_methods()
+
+
+def prepare_bancor_trades():
+    """
+    Prepare view with bancor trades
+    """
+    print("Extracting trades...")
+    trades = ClickhouseBancorTrades()
+    trades.extract_trades()
 
 
 def prepare_indices_and_views():
