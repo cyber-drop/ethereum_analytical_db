@@ -1,0 +1,945 @@
+{
+  "dashboard": {
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    },
+    "editable": true,
+    "gnetId": null,
+    "graphTooltip": 0,
+    "hideControls": false,
+    "id": null,
+    "links": [],
+    "refresh": false,
+    "rows": [
+      {
+        "collapse": false,
+        "height": 120,
+        "panels": [
+          {
+            "cacheTimeout": null,
+            "colorBackground": false,
+            "colorValue": false,
+            "colors": [
+              "#299c46",
+              "rgba(237, 129, 40, 0.89)",
+              "#d44a3a"
+            ],
+            "datasource": null,
+            "format": "none",
+            "gauge": {
+              "maxValue": 100,
+              "minValue": 0,
+              "show": false,
+              "thresholdLabels": false,
+              "thresholdMarkers": true
+            },
+            "id": 1,
+            "interval": null,
+            "links": [],
+            "mappingType": 1,
+            "mappingTypes": [
+              {
+                "name": "value to text",
+                "value": 1
+              },
+              {
+                "name": "range to text",
+                "value": 2
+              }
+            ],
+            "maxDataPoints": 100,
+            "nullPointMode": "connected",
+            "nullText": null,
+            "postfix": "",
+            "postfixFontSize": "50%",
+            "prefix": "",
+            "prefixFontSize": "50%",
+            "rangeMaps": [
+              {
+                "from": "null",
+                "text": "N/A",
+                "to": "null"
+              }
+            ],
+            "span": 3,
+            "sparkline": {
+              "fillColor": "rgba(31, 118, 189, 0.18)",
+              "full": false,
+              "lineColor": "rgb(31, 120, 193)",
+              "show": false
+            },
+            "tableColumn": "count()",
+            "targets": [
+              {
+                "dateTimeColDataType": "timestamp",
+                "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
+                "format": "table",
+                "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
+                "intervalFactor": 1,
+                "query": "SELECT\n    count(*)\nFROM eth_internal_transaction\nWHERE value > 0\nAND blockNumber IN(\n  SELECT number\n  FROM eth_block\n  WHERE ($timeFilter)\n)",
+                "rawQuery": "SELECT     count(*) FROM eth_internal_transaction WHERE value > 0 AND blockNumber IN(   SELECT number   FROM eth_block   WHERE (timestamp >= toDateTime(1551319087)) )",
+                "refId": "A",
+                "round": "0s"
+              }
+            ],
+            "thresholds": "",
+            "title": "Ethereum transfers",
+            "type": "singlestat",
+            "valueFontSize": "80%",
+            "valueMaps": [
+              {
+                "op": "=",
+                "text": "N/A",
+                "value": "null"
+              }
+            ],
+            "valueName": "avg"
+          },
+          {
+            "cacheTimeout": null,
+            "colorBackground": false,
+            "colorValue": false,
+            "colors": [
+              "#299c46",
+              "rgba(237, 129, 40, 0.89)",
+              "#d44a3a"
+            ],
+            "datasource": null,
+            "format": "none",
+            "gauge": {
+              "maxValue": 100,
+              "minValue": 0,
+              "show": false,
+              "thresholdLabels": false,
+              "thresholdMarkers": true
+            },
+            "id": 2,
+            "interval": null,
+            "links": [],
+            "mappingType": 1,
+            "mappingTypes": [
+              {
+                "name": "value to text",
+                "value": 1
+              },
+              {
+                "name": "range to text",
+                "value": 2
+              }
+            ],
+            "maxDataPoints": 100,
+            "nullPointMode": "connected",
+            "nullText": null,
+            "postfix": "",
+            "postfixFontSize": "50%",
+            "prefix": "",
+            "prefixFontSize": "50%",
+            "rangeMaps": [
+              {
+                "from": "null",
+                "text": "N/A",
+                "to": "null"
+              }
+            ],
+            "span": 3,
+            "sparkline": {
+              "fillColor": "rgba(31, 118, 189, 0.18)",
+              "full": false,
+              "lineColor": "rgb(31, 120, 193)",
+              "show": false
+            },
+            "tableColumn": "sum(value)",
+            "targets": [
+              {
+                "dateTimeColDataType": "timestamp",
+                "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
+                "format": "table",
+                "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
+                "intervalFactor": 1,
+                "query": "SELECT sum(value)\nFROM eth_internal_transaction\nWHERE blockNumber IN(\n  SELECT number\n  FROM eth_block\n  WHERE ($timeFilter)\n)",
+                "rawQuery": "SELECT sum(value) FROM eth_internal_transaction WHERE blockNumber IN(   SELECT number   FROM eth_block   WHERE (timestamp >= toDateTime(1551319087)) )",
+                "refId": "A",
+                "round": "0s"
+              }
+            ],
+            "thresholds": "",
+            "title": "Ethereum transferred",
+            "type": "singlestat",
+            "valueFontSize": "80%",
+            "valueMaps": [
+              {
+                "op": "=",
+                "text": "N/A",
+                "value": "null"
+              }
+            ],
+            "valueName": "avg"
+          },
+          {
+            "cacheTimeout": null,
+            "colorBackground": false,
+            "colorValue": false,
+            "colors": [
+              "#299c46",
+              "rgba(237, 129, 40, 0.89)",
+              "#d44a3a"
+            ],
+            "datasource": null,
+            "format": "none",
+            "gauge": {
+              "maxValue": 100,
+              "minValue": 0,
+              "show": false,
+              "thresholdLabels": false,
+              "thresholdMarkers": true
+            },
+            "id": 3,
+            "interval": null,
+            "links": [],
+            "mappingType": 1,
+            "mappingTypes": [
+              {
+                "name": "value to text",
+                "value": 1
+              },
+              {
+                "name": "range to text",
+                "value": 2
+              }
+            ],
+            "maxDataPoints": 100,
+            "nullPointMode": "connected",
+            "nullText": null,
+            "postfix": "",
+            "postfixFontSize": "50%",
+            "prefix": "",
+            "prefixFontSize": "50%",
+            "rangeMaps": [
+              {
+                "from": "null",
+                "text": "N/A",
+                "to": "null"
+              }
+            ],
+            "span": 3,
+            "sparkline": {
+              "fillColor": "rgba(31, 118, 189, 0.18)",
+              "full": false,
+              "lineColor": "rgb(31, 120, 193)",
+              "show": false
+            },
+            "tableColumn": "count()",
+            "targets": [
+              {
+                "dateTimeColDataType": "timestamp",
+                "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
+                "format": "table",
+                "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
+                "intervalFactor": 1,
+                "query": "SELECT count(*)\nFROM eth_contract\nWHERE blockNumber IN(\n  SELECT number\n  FROM eth_block\n  WHERE ($timeFilter)\n)",
+                "rawQuery": "SELECT count(*) FROM eth_contract WHERE blockNumber IN(   SELECT number   FROM eth_block   WHERE (timestamp >= toDateTime(1551319087)) )",
+                "refId": "A",
+                "round": "0s"
+              }
+            ],
+            "thresholds": "",
+            "title": "Smart Contracts Created",
+            "type": "singlestat",
+            "valueFontSize": "80%",
+            "valueMaps": [
+              {
+                "op": "=",
+                "text": "N/A",
+                "value": "null"
+              }
+            ],
+            "valueName": "avg"
+          },
+          {
+            "cacheTimeout": null,
+            "colorBackground": false,
+            "colorValue": false,
+            "colors": [
+              "#299c46",
+              "rgba(237, 129, 40, 0.89)",
+              "#d44a3a"
+            ],
+            "datasource": null,
+            "format": "none",
+            "gauge": {
+              "maxValue": 100,
+              "minValue": 0,
+              "show": false,
+              "thresholdLabels": false,
+              "thresholdMarkers": true
+            },
+            "id": 4,
+            "interval": null,
+            "links": [],
+            "mappingType": 1,
+            "mappingTypes": [
+              {
+                "name": "value to text",
+                "value": 1
+              },
+              {
+                "name": "range to text",
+                "value": 2
+              }
+            ],
+            "maxDataPoints": 100,
+            "nullPointMode": "connected",
+            "nullText": null,
+            "postfix": "",
+            "postfixFontSize": "50%",
+            "prefix": "",
+            "prefixFontSize": "50%",
+            "rangeMaps": [
+              {
+                "from": "null",
+                "text": "N/A",
+                "to": "null"
+              }
+            ],
+            "span": 3,
+            "sparkline": {
+              "fillColor": "rgba(31, 118, 189, 0.18)",
+              "full": false,
+              "lineColor": "rgb(31, 120, 193)",
+              "show": false
+            },
+            "tableColumn": "count()",
+            "targets": [
+              {
+                "dateTimeColDataType": "timestamp",
+                "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
+                "format": "table",
+                "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
+                "intervalFactor": 1,
+                "query": "SELECT count(*)\nFROM eth_internal_transaction\nWHERE to IN(SELECT address FROM eth_contract)\nAND blockNumber IN(\n  SELECT number\n  FROM eth_block\n  WHERE ($timeFilter)\n)",
+                "rawQuery": "SELECT count(*) FROM eth_internal_transaction WHERE to IN(SELECT address FROM eth_contract) AND blockNumber IN(   SELECT number   FROM eth_block   WHERE (timestamp >= toDateTime(1551319087)) )",
+                "refId": "A",
+                "round": "0s"
+              }
+            ],
+            "thresholds": "",
+            "title": "Smart Contracts Called",
+            "type": "singlestat",
+            "valueFontSize": "80%",
+            "valueMaps": [
+              {
+                "op": "=",
+                "text": "N/A",
+                "value": "null"
+              }
+            ],
+            "valueName": "avg"
+          }
+        ],
+        "repeat": null,
+        "repeatIteration": null,
+        "repeatRowId": null,
+        "showTitle": false,
+        "title": "Dashboard Row",
+        "titleSize": "h6"
+      },
+      {
+        "collapse": false,
+        "height": 238,
+        "panels": [
+          {
+            "columns": [],
+            "datasource": null,
+            "fontSize": "100%",
+            "id": 6,
+            "links": [],
+            "pageSize": null,
+            "scroll": true,
+            "showHeader": true,
+            "sort": {
+              "col": 1,
+              "desc": true
+            },
+            "span": 6,
+            "styles": [
+              {
+                "alias": "Time",
+                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                "pattern": "Time",
+                "type": "date"
+              },
+              {
+                "alias": "",
+                "colorMode": null,
+                "colors": [
+                  "rgba(245, 54, 54, 0.9)",
+                  "rgba(237, 129, 40, 0.89)",
+                  "rgba(50, 172, 45, 0.97)"
+                ],
+                "decimals": 2,
+                "pattern": "/.*/",
+                "thresholds": [],
+                "type": "number",
+                "unit": "short"
+              }
+            ],
+            "targets": [
+              {
+                "dateTimeColDataType": "timestamp",
+                "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
+                "format": "table",
+                "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
+                "intervalFactor": 1,
+                "query": "SELECT from AS address, sum(value) AS eth_sended\nFROM eth_internal_transaction\nWHERE blockNumber IN(\n  SELECT number\n  FROM eth_block\n  WHERE ($timeFilter)\n)\nGROUP BY from\nORDER by eth_sended DESC\nLIMIT 10",
+                "rawQuery": "SELECT from AS address, sum(value) AS eth_sended FROM eth_internal_transaction WHERE blockNumber IN(   SELECT number   FROM eth_block   WHERE (timestamp >= toDateTime(1551319087)) ) GROUP BY from ORDER by eth_sended DESC LIMIT 10",
+                "refId": "A",
+                "round": "0s"
+              }
+            ],
+            "title": "TOP Ethereum Senders",
+            "transform": "table",
+            "type": "table"
+          },
+          {
+            "columns": [],
+            "datasource": null,
+            "fontSize": "100%",
+            "id": 7,
+            "links": [],
+            "pageSize": null,
+            "scroll": true,
+            "showHeader": true,
+            "sort": {
+              "col": 1,
+              "desc": true
+            },
+            "span": 6,
+            "styles": [
+              {
+                "alias": "Time",
+                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                "pattern": "Time",
+                "type": "date"
+              },
+              {
+                "alias": "",
+                "colorMode": null,
+                "colors": [
+                  "rgba(245, 54, 54, 0.9)",
+                  "rgba(237, 129, 40, 0.89)",
+                  "rgba(50, 172, 45, 0.97)"
+                ],
+                "decimals": 2,
+                "pattern": "/.*/",
+                "thresholds": [],
+                "type": "number",
+                "unit": "short"
+              }
+            ],
+            "targets": [
+              {
+                "dateTimeColDataType": "timestamp",
+                "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
+                "format": "table",
+                "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
+                "intervalFactor": 1,
+                "query": "SELECT to AS address, sum(value) AS eth_received\nFROM eth_internal_transaction\nWHERE blockNumber IN(\n  SELECT number\n  FROM eth_block\n  WHERE ($timeFilter)\n)\nGROUP BY to\nORDER by eth_received DESC\nLIMIT 10",
+                "rawQuery": "SELECT to AS address, sum(value) AS eth_received FROM eth_internal_transaction WHERE blockNumber IN(   SELECT number   FROM eth_block   WHERE (timestamp >= toDateTime(1551319087)) ) GROUP BY to ORDER by eth_received DESC LIMIT 10",
+                "refId": "A",
+                "round": "0s"
+              }
+            ],
+            "title": "TOP Ethereum Receivers",
+            "transform": "table",
+            "type": "table"
+          }
+        ],
+        "repeat": null,
+        "repeatIteration": null,
+        "repeatRowId": null,
+        "showTitle": false,
+        "title": "Dashboard Row",
+        "titleSize": "h6"
+      },
+      {
+        "collapse": false,
+        "height": 250,
+        "panels": [
+          {
+            "aliasColors": {},
+            "bars": false,
+            "dashLength": 10,
+            "dashes": false,
+            "datasource": null,
+            "fill": 1,
+            "id": 13,
+            "legend": {
+              "avg": false,
+              "current": false,
+              "max": false,
+              "min": false,
+              "show": true,
+              "total": false,
+              "values": false
+            },
+            "lines": true,
+            "linewidth": 1,
+            "links": [],
+            "nullPointMode": "null",
+            "percentage": false,
+            "pointradius": 5,
+            "points": false,
+            "renderer": "flot",
+            "seriesOverrides": [],
+            "spaceLength": 10,
+            "span": 12,
+            "stack": false,
+            "steppedLine": false,
+            "targets": [
+              {
+                "dateTimeType": "DATETIME",
+                "format": "time_series",
+                "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
+                "intervalFactor": 1,
+                "query": "SELECT\n    $timeSeries as t,\n    count()\nFROM $table\nWHERE $timeFilter\nGROUP BY t\nORDER BY t",
+                "rawQuery": "SELECT     (intDiv(toUInt32(undefined), 1800) * 1800) * 1000 as t,     count() FROM undefined.undefined WHERE undefined >= toDateTime(1551319087) GROUP BY t ORDER BY t",
+                "refId": "A",
+                "round": "0s"
+              }
+            ],
+            "thresholds": [],
+            "timeFrom": null,
+            "timeShift": null,
+            "title": "Ethereum Transfers",
+            "tooltip": {
+              "shared": true,
+              "sort": 0,
+              "value_type": "individual"
+            },
+            "type": "graph",
+            "xaxis": {
+              "buckets": null,
+              "mode": "time",
+              "name": null,
+              "show": true,
+              "values": []
+            },
+            "yaxes": [
+              {
+                "format": "short",
+                "label": null,
+                "logBase": 1,
+                "max": null,
+                "min": null,
+                "show": true
+              },
+              {
+                "format": "short",
+                "label": null,
+                "logBase": 1,
+                "max": null,
+                "min": null,
+                "show": true
+              }
+            ]
+          }
+        ],
+        "repeat": null,
+        "repeatIteration": null,
+        "repeatRowId": null,
+        "showTitle": false,
+        "title": "Dashboard Row",
+        "titleSize": "h6"
+      },
+      {
+        "collapse": false,
+        "height": 247,
+        "panels": [
+          {
+            "columns": [],
+            "datasource": null,
+            "fontSize": "100%",
+            "id": 8,
+            "links": [],
+            "pageSize": null,
+            "scroll": true,
+            "showHeader": true,
+            "sort": {
+              "col": 1,
+              "desc": true
+            },
+            "span": 6,
+            "styles": [
+              {
+                "alias": "Time",
+                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                "pattern": "Time",
+                "type": "date"
+              },
+              {
+                "alias": "",
+                "colorMode": null,
+                "colors": [
+                  "rgba(245, 54, 54, 0.9)",
+                  "rgba(237, 129, 40, 0.89)",
+                  "rgba(50, 172, 45, 0.97)"
+                ],
+                "decimals": 2,
+                "pattern": "/.*/",
+                "thresholds": [],
+                "type": "number",
+                "unit": "short"
+              }
+            ],
+            "targets": [
+              {
+                "dateTimeColDataType": "timestamp",
+                "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
+                "format": "table",
+                "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
+                "intervalFactor": 1,
+                "query": "SELECT to AS address, toFloat64(count(*)) AS calls\nFROM eth_internal_transaction\nWHERE to in (SELECT address FROM eth_contract)\nAND blockNumber IN(\n  SELECT number\n  FROM eth_block\n  WHERE ($timeFilter)\n)\nGROUP BY to\nORDER by calls DESC\nLIMIT 10",
+                "rawQuery": "SELECT to AS address, toFloat64(count(*)) AS calls FROM eth_internal_transaction WHERE to in (SELECT address FROM eth_contract) AND blockNumber IN(   SELECT number   FROM eth_block   WHERE (timestamp >= toDateTime(1551319087)) ) GROUP BY to ORDER by calls DESC LIMIT 10",
+                "refId": "A",
+                "round": "0s"
+              }
+            ],
+            "title": "TOP Contracts",
+            "transform": "table",
+            "type": "table"
+          },
+          {
+            "columns": [],
+            "datasource": null,
+            "fontSize": "100%",
+            "id": 9,
+            "links": [],
+            "pageSize": null,
+            "scroll": true,
+            "showHeader": true,
+            "sort": {
+              "col": 1,
+              "desc": true
+            },
+            "span": 6,
+            "styles": [
+              {
+                "alias": "Time",
+                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                "pattern": "Time",
+                "type": "date"
+              },
+              {
+                "alias": "",
+                "colorMode": null,
+                "colors": [
+                  "rgba(245, 54, 54, 0.9)",
+                  "rgba(237, 129, 40, 0.89)",
+                  "rgba(50, 172, 45, 0.97)"
+                ],
+                "decimals": 2,
+                "pattern": "/.*/",
+                "thresholds": [],
+                "type": "number",
+                "unit": "short"
+              }
+            ],
+            "targets": [
+              {
+                "dateTimeColDataType": "timestamp",
+                "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
+                "format": "table",
+                "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
+                "intervalFactor": 1,
+                "query": "SELECT from AS address, toFloat64(count(*)) AS calls_sended\nFROM eth_internal_transaction\nWHERE blockNumber IN(\n  SELECT number\n  FROM eth_block\n  WHERE ($timeFilter)\n)\nAND to IN(SELECT address FROM eth_contract)\nGROUP BY from\nORDER by calls_sended DESC\nLIMIT 10",
+                "rawQuery": "SELECT from AS address, toFloat64(count(*)) AS calls_sended FROM eth_internal_transaction WHERE blockNumber IN(   SELECT number   FROM eth_block   WHERE (timestamp >= toDateTime(1551319087)) ) AND to IN(SELECT address FROM eth_contract) GROUP BY from ORDER by calls_sended DESC LIMIT 10",
+                "refId": "A",
+                "round": "0s"
+              }
+            ],
+            "title": "TOP Contract Callers",
+            "transform": "table",
+            "type": "table"
+          }
+        ],
+        "repeat": null,
+        "repeatIteration": null,
+        "repeatRowId": null,
+        "showTitle": false,
+        "title": "Dashboard Row",
+        "titleSize": "h6"
+      },
+      {
+        "collapse": false,
+        "height": 222,
+        "panels": [
+          {
+            "columns": [],
+            "datasource": null,
+            "fontSize": "100%",
+            "id": 10,
+            "links": [],
+            "pageSize": null,
+            "scroll": true,
+            "showHeader": true,
+            "sort": {
+              "col": 1,
+              "desc": true
+            },
+            "span": 4,
+            "styles": [
+              {
+                "alias": "Time",
+                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                "pattern": "Time",
+                "type": "date"
+              },
+              {
+                "alias": "",
+                "colorMode": null,
+                "colors": [
+                  "rgba(245, 54, 54, 0.9)",
+                  "rgba(237, 129, 40, 0.89)",
+                  "rgba(50, 172, 45, 0.97)"
+                ],
+                "decimals": 2,
+                "pattern": "/.*/",
+                "thresholds": [],
+                "type": "number",
+                "unit": "short"
+              }
+            ],
+            "targets": [
+              {
+                "dateTimeColDataType": "timestamp",
+                "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
+                "format": "table",
+                "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
+                "intervalFactor": 1,
+                "query": "SELECT to AS address, avg(gasUsed * gasPrice) AS gas_spended\nFROM eth_internal_transaction\nWHERE blockNumber IN(\n  SELECT number\n  FROM eth_block\n  WHERE ($timeFilter)\n)\nGROUP BY address\nORDER BY gas_spended DESC\nLIMIT 10",
+                "rawQuery": "SELECT to AS address, avg(gasUsed * gasPrice) AS gas_spended FROM eth_internal_transaction WHERE blockNumber IN(   SELECT number   FROM eth_block   WHERE (timestamp >= toDateTime(1551319087)) ) GROUP BY address ORDER BY gas_spended DESC LIMIT 10",
+                "refId": "A",
+                "round": "0s"
+              }
+            ],
+            "title": "Top Gas Burners (Contracts)",
+            "transform": "table",
+            "type": "table"
+          },
+          {
+            "aliasColors": {},
+            "bars": false,
+            "dashLength": 10,
+            "dashes": false,
+            "datasource": null,
+            "fill": 1,
+            "id": 11,
+            "legend": {
+              "avg": false,
+              "current": false,
+              "max": false,
+              "min": false,
+              "show": true,
+              "total": false,
+              "values": false
+            },
+            "lines": true,
+            "linewidth": 1,
+            "links": [],
+            "nullPointMode": "null",
+            "percentage": false,
+            "pointradius": 5,
+            "points": false,
+            "renderer": "flot",
+            "seriesOverrides": [],
+            "spaceLength": 10,
+            "span": 4,
+            "stack": false,
+            "steppedLine": false,
+            "targets": [
+              {
+                "dateColDataType": "date",
+                "dateLoading": false,
+                "dateTimeColDataType": "timestamp",
+                "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
+                "format": "time_series",
+                "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
+                "intervalFactor": 1,
+                "query": "SELECT toDate(timestamp) AS $dateCol, toFloat64(count(*)) AS blocks\nFROM eth_block\nGROUP BY date\nORDER BY date",
+                "rawQuery": "SELECT toDate(timestamp) AS date, toFloat64(count(*)) AS blocks FROM eth_block GROUP BY date ORDER BY date",
+                "refId": "A",
+                "round": "0s"
+              }
+            ],
+            "thresholds": [],
+            "timeFrom": null,
+            "timeShift": null,
+            "title": "Gas Usage",
+            "tooltip": {
+              "shared": true,
+              "sort": 0,
+              "value_type": "individual"
+            },
+            "type": "graph",
+            "xaxis": {
+              "buckets": null,
+              "mode": "time",
+              "name": null,
+              "show": true,
+              "values": []
+            },
+            "yaxes": [
+              {
+                "format": "short",
+                "label": null,
+                "logBase": 1,
+                "max": null,
+                "min": null,
+                "show": true
+              },
+              {
+                "format": "short",
+                "label": null,
+                "logBase": 1,
+                "max": null,
+                "min": null,
+                "show": true
+              }
+            ]
+          },
+          {
+            "columns": [],
+            "datasource": null,
+            "fontSize": "100%",
+            "id": 12,
+            "links": [],
+            "pageSize": null,
+            "scroll": true,
+            "showHeader": true,
+            "sort": {
+              "col": 1,
+              "desc": true
+            },
+            "span": 4,
+            "styles": [
+              {
+                "alias": "Time",
+                "dateFormat": "YYYY-MM-DD HH:mm:ss",
+                "pattern": "Time",
+                "type": "date"
+              },
+              {
+                "alias": "",
+                "colorMode": null,
+                "colors": [
+                  "rgba(245, 54, 54, 0.9)",
+                  "rgba(237, 129, 40, 0.89)",
+                  "rgba(50, 172, 45, 0.97)"
+                ],
+                "decimals": 2,
+                "pattern": "/.*/",
+                "thresholds": [],
+                "type": "number",
+                "unit": "short"
+              }
+            ],
+            "targets": [
+              {
+                "dateTimeColDataType": "timestamp",
+                "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
+                "format": "table",
+                "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
+                "intervalFactor": 1,
+                "query": "SELECT author, toFloat64(count(*)) AS blocks\nFROM eth_internal_transaction\nWHERE blockNumber IN(\n  SELECT number\n  FROM eth_block\n  WHERE ($timeFilter)\n)\nAND type = 'reward'\nGROUP BY author\nORDER BY blocks DESC\nLIMIT 10",
+                "rawQuery": "SELECT author, toFloat64(count(*)) AS blocks FROM eth_internal_transaction WHERE blockNumber IN(   SELECT number   FROM eth_block   WHERE (timestamp >= toDateTime(1551319087)) ) AND type = 'reward' GROUP BY author ORDER BY blocks DESC LIMIT 10",
+                "refId": "A",
+                "round": "0s"
+              }
+            ],
+            "title": "TOP Miners",
+            "transform": "table",
+            "type": "table"
+          }
+        ],
+        "repeat": null,
+        "repeatIteration": null,
+        "repeatRowId": null,
+        "showTitle": false,
+        "title": "Dashboard Row",
+        "titleSize": "h6"
+      }
+    ],
+    "schemaVersion": 14,
+    "style": "dark",
+    "tags": [],
+    "templating": {
+      "list": []
+    },
+    "time": {
+      "from": "now-5y",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": [
+        "5s",
+        "10s",
+        "30s",
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "2h",
+        "1d"
+      ],
+      "time_options": [
+        "5m",
+        "15m",
+        "1h",
+        "6h",
+        "12h",
+        "24h",
+        "2d",
+        "7d",
+        "30d"
+      ]
+    },
+    "timezone": "",
+    "title": "Ethereum",
+    "version": 7
+  },
+  "meta": {
+    "canEdit": true,
+    "canSave": true,
+    "canStar": true,
+    "created": "2019-03-19T23:18:02Z",
+    "createdBy": "admin",
+    "expires": "0001-01-01T00:00:00Z",
+    "slug": "Ethereum",
+    "type": "db",
+    "updated": "2019-03-19T23:22:43Z",
+    "updatedBy": "admin",
+    "version": 7
+  }
+}

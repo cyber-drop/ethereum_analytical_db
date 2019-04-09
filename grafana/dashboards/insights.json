@@ -18,7 +18,6 @@
     "graphTooltip": 0,
     "hideControls": false,
     "id": null,
-    "uid": null,
     "links": [],
     "rows": [
       {
@@ -81,12 +80,14 @@
             "tableColumn": "count()",
             "targets": [
               {
+                "dateTimeColDataType": "timestamp",
                 "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
                 "format": "table",
                 "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
                 "intervalFactor": 1,
-                "query": "SELECT count(*) FROM eth_block",
-                "rawQuery": "SELECT count(*) FROM eth_block",
+                "query": "SELECT count(*) FROM eth_block\nWHERE $timeFilter",
+                "rawQuery": "SELECT count(*) FROM eth_block WHERE timestamp >= toDateTime(1397010300)",
                 "refId": "A",
                 "round": "0s"
               }
@@ -172,12 +173,14 @@
             "tableColumn": "count()",
             "targets": [
               {
+                "dateTimeColDataType": "timestamp",
                 "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
                 "format": "table",
                 "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
                 "intervalFactor": 1,
-                "query": "SELECT count(*) FROM eth_contract",
-                "rawQuery": "SELECT count(*) FROM eth_contract",
+                "query": "SELECT count(*) FROM eth_contract\nWHERE blockNumber in(\n  SELECT number\n  FROM eth_block\n  WHERE $timeFilter\n)",
+                "rawQuery": "SELECT count(*) FROM eth_contract WHERE blockNumber in(   SELECT number   FROM eth_block   WHERE timestamp >= toDateTime(1397010300) )",
                 "refId": "A",
                 "round": "0s"
               }
@@ -251,12 +254,14 @@
             "tableColumn": "count()",
             "targets": [
               {
+                "dateTimeColDataType": "timestamp",
                 "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
                 "format": "table",
                 "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
                 "intervalFactor": 1,
-                "query": "SELECT count(*) FROM eth_contract WHERE standard_erc20 = 1",
-                "rawQuery": "SELECT count(*) FROM eth_contract WHERE standard_erc20 = 1",
+                "query": "SELECT count(*) \nFROM eth_contract \nWHERE blockNumber in(\n  SELECT number\n  FROM eth_block\n  WHERE $timeFilter\n)\nAND standard_erc20 = 1",
+                "rawQuery": "SELECT count(*)  FROM eth_contract  WHERE blockNumber in(   SELECT number   FROM eth_block   WHERE timestamp >= toDateTime(1397010300) ) AND standard_erc20 = 1",
                 "refId": "A",
                 "round": "0s"
               }
@@ -330,12 +335,14 @@
             "tableColumn": "count()",
             "targets": [
               {
+                "dateTimeColDataType": "timestamp",
                 "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
                 "format": "table",
                 "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
                 "intervalFactor": 1,
-                "query": "SELECT count(*) FROM eth_contract_description",
-                "rawQuery": "SELECT count(*) FROM eth_contract_description",
+                "query": "SELECT count(*) FROM eth_contract_description\nWHERE id in(\n  SELECT address \n  FROM eth_contract \n  WHERE blockNumber in(\n    SELECT number\n    FROM eth_block\n    WHERE $timeFilter\n  )\n)",
+                "rawQuery": "SELECT count(*) FROM eth_contract_description WHERE id in(   SELECT address    FROM eth_contract    WHERE blockNumber in(     SELECT number     FROM eth_block     WHERE timestamp >= toDateTime(1397010300)   ) )",
                 "refId": "A",
                 "round": "0s"
               }
@@ -409,12 +416,14 @@
             "tableColumn": "count()",
             "targets": [
               {
+                "dateTimeColDataType": "timestamp",
                 "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
                 "format": "table",
                 "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
                 "intervalFactor": 1,
-                "query": "SELECT count(*) FROM eth_contract_abi",
-                "rawQuery": "SELECT count(*) FROM eth_contract_abi",
+                "query": "SELECT count(*) FROM eth_contract_abi\nWHERE id in(\n  SELECT address\n  FROM eth_contract\n  WHERE blockNumber in(\n    SELECT number\n    FROM eth_block\n    WHERE $timeFilter\n  )\n)",
+                "rawQuery": "SELECT count(*) FROM eth_contract_abi WHERE id in(   SELECT address   FROM eth_contract   WHERE blockNumber in(     SELECT number     FROM eth_block     WHERE timestamp >= toDateTime(1397010300)   ) )",
                 "refId": "A",
                 "round": "0s"
               }
@@ -500,12 +509,14 @@
             "tableColumn": "count()",
             "targets": [
               {
+                "dateTimeColDataType": "timestamp",
                 "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
                 "format": "table",
                 "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
                 "intervalFactor": 1,
-                "query": "SELECT count(*) FROM eth_internal_transaction",
-                "rawQuery": "SELECT count(*) FROM eth_internal_transaction",
+                "query": "SELECT count(*) FROM eth_internal_transaction\nWHERE blockNumber in(\n  SELECT number\n  FROM eth_block\n  WHERE $timeFilter\n)",
+                "rawQuery": "SELECT count(*) FROM eth_internal_transaction WHERE blockNumber in(   SELECT number   FROM eth_block   WHERE timestamp >= toDateTime(1397010300) )",
                 "refId": "A",
                 "round": "0s"
               }
@@ -579,12 +590,14 @@
             "tableColumn": "count()",
             "targets": [
               {
+                "dateTimeColDataType": "timestamp",
                 "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
                 "format": "table",
                 "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
                 "intervalFactor": 1,
-                "query": "SELECT count(*) FROM eth_event",
-                "rawQuery": "SELECT count(*) FROM eth_event",
+                "query": "SELECT count(*) FROM eth_event\nWHERE blockNumber in(\n  SELECT toInt32(number)\n  FROM eth_block\n  WHERE $timeFilter\n)",
+                "rawQuery": "SELECT count(*) FROM eth_event WHERE blockNumber in(   SELECT toInt32(number)   FROM eth_block   WHERE timestamp >= toDateTime(1397010300) )",
                 "refId": "A",
                 "round": "0s"
               }
@@ -658,12 +671,14 @@
             "tableColumn": "count()",
             "targets": [
               {
+                "dateTimeColDataType": "timestamp",
                 "dateTimeType": "DATETIME",
+                "datetimeLoading": false,
                 "format": "table",
                 "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
                 "intervalFactor": 1,
-                "query": "SELECT count(*) FROM eth_token_transaction",
-                "rawQuery": "SELECT count(*) FROM eth_token_transaction",
+                "query": "SELECT count(*) FROM eth_token_transaction\nWHERE blockNumber in(\n  SELECT toInt32(number)\n  FROM eth_block\n  WHERE $timeFilter\n)",
+                "rawQuery": "SELECT count(*) FROM eth_token_transaction WHERE blockNumber in(   SELECT toInt32(number)   FROM eth_block   WHERE timestamp >= toDateTime(1397010300) )",
                 "refId": "A",
                 "round": "0s"
               }
@@ -855,7 +870,7 @@
       "list": []
     },
     "time": {
-      "from": "now-6h",
+      "from": "now-5y",
       "to": "now"
     },
     "timepicker": {
@@ -884,9 +899,9 @@
       ]
     },
     "timezone": "",
-    "title": "cyberdrop",
-    "version": 4
-  },
+    "title": "Insights",
+    "version": 1
+  }, 
   "meta": {
     "canEdit": true,
     "canSave": true,
@@ -894,10 +909,10 @@
     "created": "2019-03-19T23:18:02Z",
     "createdBy": "admin",
     "expires": "0001-01-01T00:00:00Z",
-    "slug": "cyberdrop",
+    "slug": "Insights",
     "type": "db",
     "updated": "2019-03-19T23:22:43Z",
     "updatedBy": "admin",
-    "version": 4
+    "version": 1
   }
 }
