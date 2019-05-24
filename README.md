@@ -176,12 +176,12 @@ Current data schema is going below:
 Parity:
 - CPU: multi-core
 - RAM: 4 GB
-- Space: > 200 GB
+- Space: > 200 GB SSD
 
 Clickhouse:
 - CPU: multi-core
 - RAM: 20 GB
-- Space: > 220 GB
+- Space: > 220 GB SSD
 
 ETL:
 - CPU: multi-core
@@ -189,7 +189,7 @@ ETL:
 
 Tested on:
 - CPU: 6 cores (12 threads), 3.50 GHz
-- RAM: 252 GB
+- RAM: 256 GB
 - Space: 1 TB SSD
 
 ### Acknowledgments
