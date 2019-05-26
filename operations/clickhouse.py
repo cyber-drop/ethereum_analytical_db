@@ -14,7 +14,6 @@ import os
 from utils import repeat_on_exception
 
 
-@repeat_on_exception
 def prepare_indices():
     """
     Prepare tables in database
@@ -24,7 +23,6 @@ def prepare_indices():
     indices.prepare_indices()
 
 
-@repeat_on_exception
 def prepare_blocks():
     """
     Extract blocks with timestamps
@@ -43,7 +41,6 @@ def prepare_contracts_view():
     contract_transactions.extract_contract_addresses()
 
 
-@repeat_on_exception
 def extract_traces():
     """
     Extract internal transactions
@@ -64,7 +61,6 @@ def extract_contracts_abi():
     contracts.save_contracts_abi()
 
 
-@repeat_on_exception
 def extract_events():
     """
     Extract events
@@ -118,7 +114,6 @@ def extract_prices():
     prices.get_prices_within_interval()
 
 
-@repeat_on_exception
 def extract_tokens():
     """
     Extract ERC20 token names, symbols, total supply and etc.
@@ -159,6 +154,7 @@ def synchronize():
 
     Will extract only new blocks, internal transactions, events and token descriptions
     """
+    prepare_indices()
     while True:
         _fill_database()
         sleep(10)
@@ -168,6 +164,7 @@ def synchronize_full():
     """
     Run full synchronization of the database
     """
+    prepare_indices()
     while True:
         _fill_database()
         extract_contracts_abi()

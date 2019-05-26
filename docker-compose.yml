@@ -11,7 +11,8 @@ services:
     depends_on:
       - clickhouse
       - parity
-    command: prepare-database
+    command: start #prepare-database
+    restart: always
 
   clickhouse:
     build: ./clickhouse-config/
@@ -46,3 +47,4 @@ services:
     image: yandex/clickhouse-client:latest
     depends_on:
       - clickhouse
+    restart: always
