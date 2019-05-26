@@ -41,6 +41,9 @@ BATCH_SIZE = 1000 # recommended
 # Max size of chunk inserted into Clickhouse
 MAX_CHUNK_SIZE = 20000000 # recommended, average size of block
 
+# Number of chunks processed simultaneously while extracting transactions from parity
+PARITY_EXTRACTION_PROCESSES = 3 # recommended
+
 # Number of chunks processed simultaneously during input parsing
 INPUT_PARSING_PROCESSES = 10 # recommended
 

@@ -1,0 +1,30 @@
+<yandex>
+  <dictionary>
+    <name>block_timestamp</name>
+    <lifetime>300</lifetime>
+        <layout>
+            <hashed/>
+        </layout>
+    <source>
+        <clickhouse>
+            <host>localhost</host>
+            <port>9000</port>
+            <user>default</user>
+            <password></password>
+            <db>default</db>
+            <table>eth_block</table>
+        </clickhouse>
+    </source>
+    <structure>
+      <id>
+          <name>number</name>
+      </id>
+      <attribute>
+          <name>timestamp</name>
+          <type>DateTime</type>
+          <null_value/>
+      </attribute>
+  </structure>
+  </dictionary>
+</yandex>
+
