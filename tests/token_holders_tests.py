@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, ANY, patch
 from tests.test_utils import TestClickhouse
 import numpy as np
 import math
+import utils
 
 TRANSFER_EVENT = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 EVENT_ADDRESS_LENGTH = len("0x000000000000000000000000263627126a771fa9745763495d3975614e235298")
@@ -41,9 +42,9 @@ class ClickhouseTokenHoldersTestCase(unittest.TestCase):
                 "id": big_hex,
                 "data": big_hex
             }])
-            request_string = self.token_holders._generate_sql_for_data()
+            request_string = utils.generate_sql_for_value("data")
             sql = """
-                SELECT value
+                SELECT data_value
                 FROM (
                     SELECT
                         {} AS decimals, 

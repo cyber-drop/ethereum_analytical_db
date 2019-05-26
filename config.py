@@ -28,6 +28,7 @@ INDICES = {
     "miner_transaction": "eth_miner_transaction",
     "event": "eth_event",
     "contract_description": "eth_contract_description",
+    "bancor_trade": "eth_bancor_trade"
 }
 
 # List of contract addresses to process in several operations.
