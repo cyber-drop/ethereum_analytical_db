@@ -11,10 +11,11 @@ services:
     depends_on:
       - clickhouse
       - parity
-    command: prepare-database
+    command: start #prepare-database
+    restart: always
 
   clickhouse:
-    image: yandex/clickhouse-server:19.3.5
+    build: ./clickhouse-config/
     ports:
       - "9000:9000"
       - "8123:8123"
@@ -40,6 +41,7 @@ services:
       - clickhouse
     ports:
       - "3000:3000"
+    restart: always
 
   clickhouse_client:
     network_mode: host

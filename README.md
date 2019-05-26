@@ -7,20 +7,9 @@ To build all nessesary containers (clickhouse, parity, grafana, core), use comma
 docker-compose up
 ```
 
+This will immediately start synchronization process
+
 Maybe, you'll have to wait a bit while parity will get an actual info from Ethereum chain
-
-
-### Real-time synchronization
-
-To start real-time synchronization loop, use:
-```bash
-docker-compose run core start
-```
-
-To start synchronization with additional info for contracts whitelisted in config.py (extract ABI, parse inputs), use:
-```bash
-docker-compose run core start-full
-```
 
 ### Database state
 

@@ -2,7 +2,7 @@ import requests
 import json
 from multiprocessing import Pool
 from itertools import repeat
-from config import PARITY_HOSTS, GENESIS, INDICES
+from config import PARITY_HOSTS, GENESIS, INDICES, PARITY_EXTRACTION_PROCESSES
 from clients.custom_clickhouse import CustomClickhouse
 import pygtrie as trie
 import utils
@@ -10,7 +10,7 @@ from pyelasticsearch import bulk_chunks
 import pdb
 
 BYTES_PER_CHUNK = 1000000
-NUMBER_OF_PROCESSES = 10
+NUMBER_OF_PROCESSES = PARITY_EXTRACTION_PROCESSES
 
 INPUT_TRANSACTION = 0
 INTERNAL_TRANSACTION = 1
