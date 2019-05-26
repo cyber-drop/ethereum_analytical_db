@@ -155,9 +155,8 @@ def synchronize():
     Will extract only new blocks, internal transactions, events and token descriptions
     """
     prepare_indices()
-    while True:
-        _fill_database()
-        sleep(10)
+    _fill_database()
+    sleep(10)
 
 
 def synchronize_full():
@@ -165,13 +164,12 @@ def synchronize_full():
     Run full synchronization of the database
     """
     prepare_indices()
-    while True:
-        _fill_database()
-        extract_contracts_abi()
-        parse_transactions_inputs()
-        parse_events_inputs()
-        extract_prices()
-        sleep(10)
+    _fill_database()
+    extract_contracts_abi()
+    parse_transactions_inputs()
+    parse_events_inputs()
+    extract_prices()
+    sleep(10)
         
 
 def run_tests():
