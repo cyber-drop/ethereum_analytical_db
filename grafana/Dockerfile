@@ -1,4 +1,4 @@
-FROM grafana/grafana:4.6.4
+FROM grafana/grafana:latest
 
 ENV GF_INSTALL_PLUGINS="vertamedia-clickhouse-datasource"
 
