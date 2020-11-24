@@ -1,6 +1,6 @@
 FROM grafana/grafana:latest
 
-ENV GF_INSTALL_PLUGINS="vertamedia-clickhouse-datasource"
+ENV GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=vertamedia-clickhouse-datasource 
 
 COPY ./configure_grafana.sh /
 
