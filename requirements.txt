@@ -6,6 +6,6 @@ nose==1.3.7
 web3==4.3.0
 numpy==1.14.4
 pandas==0.23.0
-clickhouse-driver==0.0.15
+clickhouse-driver==0.0.16
 pyelasticsearch==1.2.3
 httpretty==0.9.6
