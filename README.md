@@ -180,7 +180,3 @@ Tested on:
 - CPU: 6 cores (12 threads), 3.50 GHz
 - RAM: 256 GB
 - Space: 1 TB SSD
-
-### Acknowledgments
-
-Copyright 2019 Serge Nedashkovsky (github.com/Snedashkovsky), released under the AGPLv3.
