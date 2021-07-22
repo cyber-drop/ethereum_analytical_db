@@ -1,3 +1,3 @@
-FROM yandex/clickhouse-server:19.3.5 
+FROM yandex/clickhouse-server:latest
 
 COPY ./*.xml /etc/clickhouse-server

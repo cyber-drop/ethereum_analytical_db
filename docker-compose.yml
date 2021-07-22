@@ -27,7 +27,7 @@ services:
     restart: always
 
   parity:
-    image: parity/parity:stable
+    image: openethereum/openethereum:latest
     ports:
       - "8545:8545"
     command: --mode=active --jsonrpc-interface=all --tracing=on --db-path /db
