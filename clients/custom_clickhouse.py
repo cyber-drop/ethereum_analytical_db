@@ -20,6 +20,7 @@ class CustomClickhouse(CustomClient):
         # TODO wait for clickhouse port
         client = Client('localhost', send_receive_timeout=10000)
         client.execute("SET max_memory_usage = {}".format(MAX_MEMORY_USAGE))
+        client.execute("SET joined_subquery_requires_alias = 0")
         return client
 
     def __init__(self):
